@@ -1,0 +1,91 @@
+{{/* Data: httpx.PageData dengan .Data bertipe explain.ResultPage. */}}
+{{define "title"}}Analisis plan{{end}}
+
+{{define "content"}}
+{{$d := .Data}}
+<nav class="breadcrumb">
+  <a href="/databases/{{$d.DBID}}">Database</a> /
+  <a href="/databases/{{$d.DBID}}/migrations">Migration</a> /
+  Analisis plan
+</nav>
+
+<h1>Analisis plan{{if $d.Analyze}} (EXPLAIN ANALYZE){{else}} (EXPLAIN){{end}}</h1>
+
+{{with $d.Error}}
+<p class="alert alert-error" role="alert">{{.}}</p>
+{{end}}
+
+{{with $d.Result}}
+  {{with .Plan}}
+  <section>
+    <h2>Ringkasan</h2>
+    <dl class="summary">
+      <dt>Estimasi total cost</dt><dd>{{printf "%.2f" .TotalCost}}</dd>
+      {{with .PlanningTimeMs}}<dt>Planning time</dt><dd>{{printf "%.3f" .}} ms</dd>{{end}}
+      {{with .ExecutionTimeMs}}<dt>Execution time</dt><dd>{{printf "%.3f" .}} ms</dd>{{end}}
+    </dl>
+  </section>
+
+  <section>
+    <h2>Node plan</h2>
+    <div class="table-scroll">
+    <table class="plan">
+      <thead>
+        <tr>
+          <th>Node</th><th>Relasi</th><th>Index</th><th>Join</th><th>Kondisi</th>
+          <th>Cost (startup..total)</th><th>Estimasi baris</th>
+          {{if $d.Analyze}}<th>Waktu aktual (ms)</th><th>Baris aktual</th><th>Loops</th><th>Buffer hit/read</th>{{end}}
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Nodes}}
+        <tr>
+          <td class="mono">{{.Prefix}}{{.NodeType}}{{with .Relationship}} <span class="muted">({{.}})</span>{{end}}</td>
+          <td class="mono">{{.Relation}}{{if and .Alias (ne .Alias .Relation)}} <span class="muted">as {{.Alias}}</span>{{end}}</td>
+          <td class="mono">{{.IndexName}}</td>
+          <td>{{.JoinType}}</td>
+          <td class="mono">{{.Condition}}</td>
+          <td class="num">{{printf "%.2f" .StartupCost}}..{{printf "%.2f" .TotalCost}}</td>
+          <td class="num">{{printf "%.0f" .PlanRows}}</td>
+          {{if $d.Analyze}}
+          <td class="num">{{if .Analyzed}}{{printf "%.3f" .ActualStartupMs}}..{{printf "%.3f" .ActualTotalMs}}{{else}}-{{end}}</td>
+          <td class="num">{{if .Analyzed}}{{printf "%.0f" .ActualRows}}{{else}}-{{end}}</td>
+          <td class="num">{{if .Analyzed}}{{printf "%.0f" .ActualLoops}}{{else}}-{{end}}</td>
+          <td class="num">{{.SharedHit}}/{{.SharedRead}}</td>
+          {{end}}
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <details>
+    <summary>JSON mentah</summary>
+    <pre class="mono">{{.PrettyJSON}}</pre>
+  </details>
+  {{end}}
+
+  {{with .RawText}}
+  <section>
+    <h2>Output plan ({{$d.Result.Dialect}})</h2>
+    <pre class="mono">{{.}}</pre>
+  </section>
+  {{end}}
+{{end}}
+
+<section>
+  <h2>Statement</h2>
+  <form method="post" action="/databases/{{$d.DBID}}/explain">
+    {{template "csrf" .}}
+    <textarea name="sql" rows="10" class="mono" required>{{$d.SQL}}</textarea>
+    <label><input type="checkbox" name="analyze" value="on"{{if $d.Analyze}} checked{{end}}> Jalankan dengan ANALYZE</label>
+    <p class="hint">ANALYZE benar-benar menjalankan statement (dibatalkan setelahnya) dan dapat memakan waktu.</p>
+    <button type="submit">Analisis ulang</button>
+  </form>
+  <p>
+    <a href="/databases/{{$d.DBID}}/migrations/new">Kembali ke editor migration</a> ·
+    <a href="/databases/{{$d.DBID}}/migrations">Riwayat migration</a>
+  </p>
+</section>
+{{end}}

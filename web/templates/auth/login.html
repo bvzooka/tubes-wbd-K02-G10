@@ -1,0 +1,26 @@
+{{/* Data: httpx.PageData dengan .Data bertipe auth.LoginPage. */}}
+{{define "title"}}Masuk{{end}}
+
+{{define "content"}}
+<section class="auth-card">
+  <h1>Masuk</h1>
+
+  {{with .Data.Error}}
+  <p class="alert alert-error" role="alert">{{.}}</p>
+  {{end}}
+
+  <form method="post" action="/login" autocomplete="on">
+    <input type="hidden" name="csrf_token" value="{{.Data.CSRFToken}}">
+    <input type="hidden" name="next" value="{{.Data.Next}}">
+
+    <label for="username">Username</label>
+    <input id="username" name="username" type="text" value="{{.Data.Username}}"
+           autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="32">
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="72">
+
+    <button type="submit">Masuk</button>
+  </form>
+</section>
+{{end}}
