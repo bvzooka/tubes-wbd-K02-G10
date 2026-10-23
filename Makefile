@@ -1,4 +1,4 @@
-.PHONY: up down run test test-short fmt vet
+.PHONY: up down run test test-short test-docker fmt vet
 
 up:
 	docker compose up -d appdb targetdb testdb
@@ -14,6 +14,9 @@ test-short:
 
 test:
 	go test ./...
+
+test-docker:
+	docker compose run --rm test
 
 fmt:
 	gofmt -w .
