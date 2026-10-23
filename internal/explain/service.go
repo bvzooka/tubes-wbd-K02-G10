@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
 	"dbplatform/internal/contract"
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/domain"
@@ -22,28 +21,25 @@ var allowedKeywords = map[string]bool{
 	"select": true, "insert": true, "update": true, "delete": true, "with": true, "values": true,
 }
 
-// InputError adalah kesalahan input yang aman ditampilkan ke user.
-// errors.Is(err, domain.ErrUnsupported) atau domain.ErrValidation bernilai true sesuai Kind.
 type InputError struct {
 	Kind    error
-	Message string // Bahasa Indonesia
+	Message string 
 }
 
 func (e *InputError) Error() string { return e.Message }
 func (e *InputError) Unwrap() error { return e.Kind }
 
-// Result adalah hasil satu EXPLAIN.
+// hasil satu EXPLAIN
 type Result struct {
-	SQL     string
+	SQL string
 	Analyze bool
 	Dialect domain.DBMS
-	// Plan terisi untuk PostgreSQL. RawText terisi untuk dialek lain atau jika JSON gagal di-parse.
-	Plan    *Plan
+	Plan *Plan
 	RawText string
 }
 
 type Service struct {
-	authz   contract.Authorizer
+	authz contract.Authorizer
 	drivers contract.DriverProvider
 }
 
@@ -51,8 +47,7 @@ func NewService(authz contract.Authorizer, drivers contract.DriverProvider) *Ser
 	return &Service{authz: authz, drivers: drivers}
 }
 
-// Run memeriksa akses View + Edit, memvalidasi SQL, lalu menjalankan EXPLAIN di transaction
-// yang selalu di-rollback. ANALYZE benar-benar mengeksekusi statement sebelum di-rollback.
+// memeriksa akses View + Edit, validasi SQL,  menjalankan EXPLAIN di transaction, ANALYZE eksekusi statement sblm dirollback
 func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql string, analyze bool) (*Result, error) {
 	ok, err := s.authz.Can(ctx, p.UserID, dbID, domain.AccessViewEdit)
 	if err != nil {
@@ -75,7 +70,7 @@ func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql s
 	res := &Result{SQL: body, Analyze: analyze, Dialect: drv.Dialect()}
 	stmt := explainStatement(drv.Dialect(), body, analyze)
 	var rs *domain.ResultSet
-	// Tanpa ANALYZE statement tidak dieksekusi, jadi transaction READ ONLY aman sebagai lapisan tambahan.
+	// tnpa ANALYZE statement tidak dieksekusi, jadi transaction READ ONLY aman
 	opts := dbdriver.TxOptions{ReadOnly: !analyze, Timeout: explainTimeout}
 	err = drv.WithTx(ctx, opts, func(tx dbdriver.Tx) error {
 		var qerr error
@@ -89,8 +84,7 @@ func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql s
 		if errors.Is(err, domain.ErrConnectionFailed) || ctx.Err() != nil {
 			return nil, fmt.Errorf("explain: %w", err)
 		}
-		// Kesalahan dari statement user (sintaks, tabel tidak ada, timeout) ditampilkan apa adanya;
-		// pesan dari DBMS tidak memuat kredensial koneksi.
+		// kesalahan dari statement user ditampilkan, pesan dri DBMS tidak memuat kredensial koneksi
 		return nil, &InputError{Kind: domain.ErrValidation, Message: "Database menolak statement: " + truncate(err.Error(), maxErrorChars)}
 	}
 
@@ -145,7 +139,7 @@ func explainStatement(dialect domain.DBMS, body string, analyze bool) string {
 	}
 }
 
-// resultText menggabungkan semua sel menjadi teks (output EXPLAIN bisa satu sel JSON atau banyak baris teks).
+// resultText menggabungkan semua sel jd teks 
 func resultText(rs *domain.ResultSet) string {
 	if rs == nil {
 		return ""
@@ -173,7 +167,7 @@ func truncate(s string, max int) string {
 	return string(r[:max]) + "…"
 }
 
-// userMessage mengembalikan pesan aman untuk InputError, atau "" untuk error lain.
+// userMessage mengembalikan pesan utk InputError, atau "" untuk error lain
 func userMessage(err error) string {
 	var ie *InputError
 	if errors.As(err, &ie) {
