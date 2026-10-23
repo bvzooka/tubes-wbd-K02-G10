@@ -1,0 +1,2 @@
+{{/* Pakai di dalam setiap <form method="post">: {{template "csrf" .}} (. = PageData). */}}
+{{define "csrf"}}<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">{{end}}
