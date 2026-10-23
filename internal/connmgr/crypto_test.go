@@ -82,10 +82,10 @@ func TestParseKey(t *testing.T) {
 	short := base64.StdEncoding.EncodeToString(make([]byte, 16))
 
 	tests := []struct {
-		name    string
-		input   string
+		name string
+		input string
 		wantErr bool
-		isLen   bool 
+		isLen bool 
 	}{
 		{"valid", good, false, false},
 		{"valid dengan spasi/newline", good + "\n", false, false},
