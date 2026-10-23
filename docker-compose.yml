@@ -1,0 +1,71 @@
+services:
+  appdb:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dbplatform
+    ports:
+      - "5432:5432"
+    volumes:
+      - appdb_data:/var/lib/postgresql/data
+
+  targetdb:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sampledb
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./docker/targetdb/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  testdb:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5434:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # Menjalankan test Go di dalam container (berguna jika Windows memblok file .exe hasil go test).
+  #   docker compose run --rm test                    -> semua test
+  #   docker compose run --rm test go test -short ./... -> unit test saja
+  test:
+    profiles: ["tools"]
+    image: golang:1.26
+    working_dir: /src
+    environment:
+      TEST_ADMIN_URL: postgres://postgres:postgres@testdb:5432/postgres?sslmode=disable
+    volumes:
+      - .:/src
+      - gomod:/go/pkg/mod
+      - gobuild:/root/.cache/go-build
+    depends_on:
+      testdb:
+        condition: service_healthy
+    command: ["go", "test", "./..."]
+
+  # Opsional untuk bonus MySQL: docker compose --profile mysql up -d
+  targetmysql:
+    profiles: ["mysql"]
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sampledb
+    ports:
+      - "3307:3306"
+
+volumes:
+  appdb_data:
+  gomod:
+  gobuild:
