@@ -1,0 +1,10 @@
+{{/* Data: httpx.PageData dengan .Data bertipe httpx.ErrorPage. */}}
+{{define "title"}}Akses ditolak{{end}}
+
+{{define "content"}}
+<section class="error-page">
+  <h1>{{.Data.Heading}}</h1>
+  <p>{{.Data.Message}}</p>
+  <p><a href="/databases">Kembali ke daftar database</a></p>
+</section>
+{{end}}

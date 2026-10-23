@@ -27,8 +27,8 @@ type Config struct {
 	Env         string
 	Addr        string
 	DatabaseURL string
-	SecretKey []byte // SecretKey adalah 32 byte hasil decode APP_SECRET_KEY
-	Session   SessionConfig
+	SecretKey   []byte // SecretKey adalah 32 byte hasil decode APP_SECRET_KEY
+	Session     SessionConfig
 
 	SeedAdminUsername string
 	SeedAdminPassword string

@@ -1,0 +1,2 @@
+{{/* Dirender otomatis oleh layout. Kind: success, error, atau info. */}}
+{{define "flash"}}{{with .Flash}}<p class="alert alert-{{.Kind}}" role="status">{{.Message}}</p>{{end}}{{end}}
