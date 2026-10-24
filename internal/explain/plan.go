@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -149,6 +150,17 @@ func firstNonEmpty(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+func (p *Plan) PlanningTimeText() string { return msText(p.PlanningTimeMs) }
+
+func (p *Plan) ExecutionTimeText() string { return msText(p.ExecutionTimeMs) }
+
+func msText(f *float64) string {
+	if f == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*f, 'f', 3, 64)
 }
 
 func deref(f *float64) float64 {

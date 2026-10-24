@@ -163,7 +163,7 @@ func TestAuth_Integration_LoginStoresOnlyHash(t *testing.T) {
 	ctx := context.Background()
 	var n int
 	var hash []byte
-	if err := a.pool.QueryRow(ctx, `SELECT count(*), max(token_hash) FROM sessions`).Scan(&n, &hash); err != nil {
+	if err := a.pool.QueryRow(ctx, `SELECT count(*), (array_agg(token_hash))[1] FROM sessions`).Scan(&n, &hash); err != nil {
 		t.Fatal(err)
 	}
 	if n != 1 || !bytes.Equal(hash, auth.HashToken(raw)) {

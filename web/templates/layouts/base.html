@@ -10,21 +10,24 @@
 </head>
 <body class="{{if .Principal}}has-nav {{end}}sec-{{.Section}}">
   <header class="topbar">
-    <a class="brand" href="/">Database Management Platform</a>
+    <a class="brand" href="/" aria-label="Database Management Platform"><span class="brand-mark" aria-hidden="true">db</span><span class="brand-name">Database Management Platform</span></a>
     {{with .Principal}}
-    <nav class="nav">
+    <nav class="nav" aria-label="Navigasi utama">
       <a href="/databases">Database</a>
       {{if .IsPlatformAdmin}}
       <a href="/admin/users">Pengguna</a>
       <a href="/admin/groups">Group</a>
       <a href="/admin/connections">Koneksi</a>
       {{end}}
-      <span class="who">{{.Username}}</span>
+    </nav>
+    <div class="account">
+      <span class="avatar" aria-hidden="true"></span>
+      <span class="who"><strong>{{.Username}}</strong><small>{{if .IsPlatformAdmin}}Platform Admin{{else}}Pengguna{{end}}</small></span>
       <form class="inline" method="post" action="/logout">
         {{template "csrf" $}}
-        <button type="submit" class="link">Keluar</button>
+        <button type="submit" class="icon-btn" aria-label="Keluar" title="Keluar"><svg class="ic"><use href="#i-logout"/></svg></button>
       </form>
-    </nav>
+    </div>
     {{end}}
   </header>
 
