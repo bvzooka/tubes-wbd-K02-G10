@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dbplatform/internal/access"
+	"dbplatform/internal/clock"
 	"dbplatform/internal/domain"
 	"dbplatform/internal/migration"
 	"dbplatform/internal/testutil"
@@ -23,7 +24,8 @@ func newSvcEnv(t *testing.T) svcEnv {
 	t.Helper()
 	pool := testutil.NewAppDB(t)
 	repo := migration.NewRepo(pool)
-	return svcEnv{pool: pool, repo: repo, svc: migration.NewService(repo, access.New(pool))}
+	svc := migration.NewService(repo, access.New(pool), testutil.NewFakeDriverProvider(), clock.System{})
+	return svcEnv{pool: pool, repo: repo, svc: svc}
 }
 
 func (e svcEnv) actor(t *testing.T, username string, admin bool) domain.Principal {

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
+	"dbplatform/internal/clock"
 	"dbplatform/internal/domain"
 )
 
@@ -44,6 +46,28 @@ type updateArgs struct {
 	checksum  string
 }
 
+type claimArgs struct {
+	connID     int64
+	version    int
+	executedBy int64
+	now        time.Time
+}
+
+type finishArgs struct {
+	connID     int64
+	version    int
+	status     domain.MigrationStatus
+	errMsg     string
+	warning    string
+	finishedAt time.Time
+}
+
+type stuckArgs struct {
+	before     time.Time
+	message    string
+	finishedAt time.Time
+}
+
 type fakeStore struct {
 	created   []createArgs
 	updated   []updateArgs
@@ -54,6 +78,36 @@ type fakeStore struct {
 	getResult domain.Migration
 	listed    []domain.Migration
 	err       error
+
+	claimResult domain.Migration
+	claimErr    error
+	claims      []claimArgs
+	finishErr   error
+	finishes    []finishArgs
+	stuckCount  int
+	stuckErr    error
+	stuckCalls  []stuckArgs
+}
+
+func (f *fakeStore) Claim(_ context.Context, connID int64, version int, executedBy int64, now time.Time) (domain.Migration, error) {
+	if f.claimErr != nil {
+		return domain.Migration{}, f.claimErr
+	}
+	f.claims = append(f.claims, claimArgs{connID, version, executedBy, now})
+	return f.claimResult, nil
+}
+
+func (f *fakeStore) Finish(_ context.Context, connID int64, version int, status domain.MigrationStatus, errMsg, warning string, finishedAt time.Time) error {
+	if f.finishErr != nil {
+		return f.finishErr
+	}
+	f.finishes = append(f.finishes, finishArgs{connID, version, status, errMsg, warning, finishedAt})
+	return nil
+}
+
+func (f *fakeStore) FailStuck(_ context.Context, before time.Time, message string, finishedAt time.Time) (int, error) {
+	f.stuckCalls = append(f.stuckCalls, stuckArgs{before, message, finishedAt})
+	return f.stuckCount, f.stuckErr
 }
 
 func (f *fakeStore) Create(_ context.Context, connID int64, name, sql, checksum string, createdBy int64) (domain.Migration, error) {
@@ -104,7 +158,7 @@ func newTestService(store *fakeStore) (*Service, *fakeAuthz) {
 		{editor.UserID, connA}: domain.AccessViewEdit,
 		{viewer.UserID, connA}: domain.AccessViewOnly,
 	}}
-	return NewService(store, authz), authz
+	return NewService(store, authz, nil, clock.NewFake(time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC))), authz
 }
 
 func TestService_Create_Success(t *testing.T) {

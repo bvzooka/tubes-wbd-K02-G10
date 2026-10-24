@@ -3,7 +3,9 @@ package migration
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"dbplatform/internal/clock"
 	"dbplatform/internal/contract"
 	"dbplatform/internal/domain"
 )
@@ -14,15 +16,20 @@ type store interface {
 	List(ctx context.Context, connID int64) ([]domain.Migration, error)
 	UpdateDraft(ctx context.Context, connID int64, version int, name, sql, checksum string) (domain.Migration, error)
 	Cancel(ctx context.Context, connID int64, version int) error
+	Claim(ctx context.Context, connID int64, version int, executedBy int64, now time.Time) (domain.Migration, error)
+	Finish(ctx context.Context, connID int64, version int, status domain.MigrationStatus, errMsg, warning string, finishedAt time.Time) error
+	FailStuck(ctx context.Context, startedBefore time.Time, message string, finishedAt time.Time) (int, error)
 }
 
 type Service struct {
-	store store
-	authz contract.Authorizer
+	store   store
+	authz   contract.Authorizer
+	drivers contract.DriverProvider
+	clock   clock.Clock
 }
 
-func NewService(store store, authz contract.Authorizer) *Service {
-	return &Service{store: store, authz: authz}
+func NewService(store store, authz contract.Authorizer, drivers contract.DriverProvider, clk clock.Clock) *Service {
+	return &Service{store: store, authz: authz, drivers: drivers, clock: clk}
 }
 
 func (s *Service) require(ctx context.Context, actor domain.Principal, connID int64, min domain.AccessLevel) error {
