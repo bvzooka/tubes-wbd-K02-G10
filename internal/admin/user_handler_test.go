@@ -24,6 +24,47 @@ type fakeUserService struct {
 	createErr error
 	gotIn     admin.UserInput
 	calls     int
+
+	getUser   domain.User
+	getErr    error
+	updateErr error
+	offErr    error
+	onErr     error
+	gotID     int64
+	gotUpdate admin.UserUpdate
+	offID     int64
+	onID      int64
+}
+
+func (f *fakeUserService) GetUser(_ context.Context, actor domain.Principal, _ int64) (domain.User, error) {
+	if !actor.IsPlatformAdmin {
+		return domain.User{}, domain.ErrForbidden
+	}
+	return f.getUser, f.getErr
+}
+
+func (f *fakeUserService) UpdateUser(_ context.Context, actor domain.Principal, id int64, in admin.UserUpdate) (domain.User, error) {
+	f.gotID, f.gotUpdate = id, in
+	if !actor.IsPlatformAdmin {
+		return domain.User{}, domain.ErrForbidden
+	}
+	return domain.User{ID: id, Username: "target"}, f.updateErr
+}
+
+func (f *fakeUserService) DeactivateUser(_ context.Context, actor domain.Principal, id int64) (domain.User, error) {
+	f.offID = id
+	if !actor.IsPlatformAdmin {
+		return domain.User{}, domain.ErrForbidden
+	}
+	return domain.User{ID: id, Username: "target"}, f.offErr
+}
+
+func (f *fakeUserService) ActivateUser(_ context.Context, actor domain.Principal, id int64) (domain.User, error) {
+	f.onID = id
+	if !actor.IsPlatformAdmin {
+		return domain.User{}, domain.ErrForbidden
+	}
+	return domain.User{ID: id, Username: "target"}, f.onErr
 }
 
 func (f *fakeUserService) CreateUser(_ context.Context, actor domain.Principal, in admin.UserInput) (domain.User, error) {
