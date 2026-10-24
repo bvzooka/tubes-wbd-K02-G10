@@ -99,6 +99,8 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 
 	adminSvc := admin.NewService(admin.NewUserRepo(pool), hasher, sessions)
 	admin.NewUserHandler(d, adminSvc).Register(mux)
+	groupSvc := admin.NewGroupService(admin.NewGroupRepo(pool), sessions)
+	admin.NewGroupHandler(d, groupSvc).Register(mux)
 
 	static, err := fs.Sub(webassets.FS, "static")
 	if err != nil {
