@@ -2,13 +2,13 @@ package connmgr
 
 import (
 	"context"
+	"dbplatform/internal/domain"
 	"errors"
 	"fmt"
-	"time"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"dbplatform/internal/domain"
+	"time"
 )
 
 type Repo struct {
@@ -31,7 +31,7 @@ func scanConn(row pgx.Row) (domain.Connection, error) {
 	return c, err
 }
 
-// mapErr menerjemahkan error database platform ke error domain
+// menerjemahkan error database platform ke error domain
 func mapErr(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ErrNotFound
@@ -66,7 +66,7 @@ func (r *Repo) Insert(ctx context.Context, in domain.ConnectionInput, createdBy 
 
 // mengubah koneksi, password kosong berarti password lama dipertahankan
 func (r *Repo) Update(ctx context.Context, id int64, in domain.ConnectionInput) (domain.Connection, error) {
-	var enc []byte 
+	var enc []byte
 	if in.Password != "" {
 		var err error
 		if enc, err = Encrypt(r.key, []byte(in.Password)); err != nil {
@@ -137,7 +137,7 @@ func (r *Repo) Stamp(ctx context.Context, id int64) (time.Time, bool, error) {
 	return updatedAt, active, nil
 }
 
-// memenuhi Store, baris penuh dgn password yang sudah didekripsi
+// memenuhi Store, baris penuh dgn password yg sudah didekripsi
 func (r *Repo) Load(ctx context.Context, id int64) (domain.Connection, string, error) {
 	var enc []byte
 	var c domain.Connection

@@ -9,14 +9,11 @@ import (
 
 const testTimeout = 10 * time.Second
 
-// Service berisi logika bisnis CRUD koneksi. Semua method memeriksa Platform Admin
-// (defense in depth, di luar middleware).
 type Service struct {
 	repo    *Repo
 	factory DriverFactory
 }
 
-// NewService: factory dipakai TestConnection untuk membuka koneksi sementara.
 func NewService(repo *Repo, factory DriverFactory) *Service {
 	return &Service{repo: repo, factory: factory}
 }
@@ -28,7 +25,6 @@ func requireAdmin(p domain.Principal) error {
 	return nil
 }
 
-// Create memvalidasi dan menyimpan koneksi baru.
 func (s *Service) Create(ctx context.Context, p domain.Principal, in domain.ConnectionInput) (domain.Connection, error) {
 	if err := requireAdmin(p); err != nil {
 		return domain.Connection{}, err
@@ -39,7 +35,6 @@ func (s *Service) Create(ctx context.Context, p domain.Principal, in domain.Conn
 	return s.repo.Insert(ctx, NormalizeInput(in), p.UserID)
 }
 
-// Update memvalidasi dan mengubah koneksi. Password kosong berarti tidak diubah.
 func (s *Service) Update(ctx context.Context, p domain.Principal, id int64, in domain.ConnectionInput) (domain.Connection, error) {
 	if err := requireAdmin(p); err != nil {
 		return domain.Connection{}, err
@@ -71,9 +66,7 @@ func (s *Service) Get(ctx context.Context, p domain.Principal, id int64) (domain
 	return s.repo.Get(ctx, id)
 }
 
-// TestConnection mencoba terhubung memakai data form tanpa menyimpan apa pun.
-// id 0 untuk koneksi baru; id > 0 untuk form ubah: password kosong memakai password tersimpan.
-// Error koneksi sudah berpesan aman (tanpa kredensial).
+
 func (s *Service) TestConnection(ctx context.Context, p domain.Principal, id int64, in domain.ConnectionInput) error {
 	if err := requireAdmin(p); err != nil {
 		return err

@@ -17,7 +17,7 @@ const keySize = 32
 var (
 	// ErrInvalidKey dikembalikan klo kunci bukan tepat 32 byte.
 	ErrInvalidKey = errors.New("connmgr: kunci enkripsi harus 32 byte")
-	// ErrDecrypt dikembalikan kalo data ga  bisa dibuka 
+	// ErrDecrypt dikembalikan kalo data ga  bisa dibuka
 	ErrDecrypt = errors.New("connmgr: gagal mendekripsi data")
 )
 

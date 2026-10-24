@@ -2,14 +2,14 @@ package connmgr
 
 import (
 	"context"
+	"dbplatform/internal/dbdriver"
+	"dbplatform/internal/domain"
 	"fmt"
 	"sync"
 	"time"
-	"dbplatform/internal/dbdriver"
-	"dbplatform/internal/domain"
 )
 
-// sumber data koneksi untuk Provider 
+// sumber data koneksi untuk Provider
 type Store interface {
 	// mengembalikan updated_at dan is_active, ErrNotFound kalau ga ada
 	Stamp(ctx context.Context, id int64) (updatedAt time.Time, active bool, err error)
@@ -70,7 +70,7 @@ func (p *Provider) Get(ctx context.Context, id int64) (dbdriver.Driver, error) {
 	return drv, nil
 }
 
-// Close menutup semua driver yang ada di cache.
+// menutup semua driver yg di cache
 func (p *Provider) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()

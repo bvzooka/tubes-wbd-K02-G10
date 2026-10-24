@@ -54,7 +54,7 @@ func TestCrypto_SamePlaintextDifferentOutput(t *testing.T) {
 func TestCrypto_TamperedDataFails(t *testing.T) {
 	key := testKey(1)
 	enc, _ := Encrypt(key, []byte("rahasia"))
-	enc[len(enc)-1] ^= 0xFF 
+	enc[len(enc)-1] ^= 0xFF
 	if _, err := Decrypt(key, enc); !errors.Is(err, ErrDecrypt) {
 		t.Errorf("want ErrDecrypt, got %v", err)
 	}
@@ -82,10 +82,10 @@ func TestParseKey(t *testing.T) {
 	short := base64.StdEncoding.EncodeToString(make([]byte, 16))
 
 	tests := []struct {
-		name string
-		input string
+		name    string
+		input   string
 		wantErr bool
-		isLen bool 
+		isLen   bool
 	}{
 		{"valid", good, false, false},
 		{"valid dengan spasi/newline", good + "\n", false, false},
