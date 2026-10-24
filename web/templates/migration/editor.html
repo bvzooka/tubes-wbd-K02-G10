@@ -3,6 +3,9 @@
 {{define "content"}}
 <p><a href="/databases/{{.Data.DBID}}/migrations">&laquo; Riwayat migration {{.Data.DBName}}</a></p>
 <h1>{{if .Data.Edit}}Ubah draft versi {{.Data.Version}}{{else}}Migration baru{{end}}</h1>
+{{if not .Data.Edit}}
+<p class="muted">Ingin membuat SQL otomatis dari perbedaan dua database? <a href="/databases/{{.Data.DBID}}/schema-diff">Buat dari schema diff</a>.</p>
+{{end}}
 
 <section class="card">
   <form method="post" action="{{if .Data.Edit}}/databases/{{.Data.DBID}}/migrations/{{.Data.Version}}{{else}}/databases/{{.Data.DBID}}/migrations{{end}}" autocomplete="off">

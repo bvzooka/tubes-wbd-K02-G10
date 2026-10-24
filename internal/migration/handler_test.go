@@ -186,7 +186,7 @@ func TestMigrationHandler_List(t *testing.T) {
 	for _, want := range []string{
 		`href="/databases/5/migrations/1"`, `href="/databases/5/migrations/2"`, "badge-draft", "badge-success",
 		"tambah &lt;tabel&gt;", "budi", "20 Oct 2026 09:30", "21 Oct 2026 14:05", "Sampel &lt;db&gt;",
-		`href="/databases/5/migrations/new"`,
+		`href="/databases/5/migrations/new"`, `href="/databases/5/schema-diff"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("daftar tidak memuat %q", want)
@@ -201,8 +201,8 @@ func TestMigrationHandler_ListHidesCreateButtonFromViewOnly(t *testing.T) {
 	svc := &fakeMigrationService{list: []domain.Migration{sampleMigration(1, domain.MigrationSuccess)}}
 	body := httpGet(readerServer(t, svc), "/databases/5/migrations").Body.String()
 
-	if strings.Contains(body, "/migrations/new") {
-		t.Error("view_only tidak boleh melihat tombol migration baru")
+	if strings.Contains(body, "/migrations/new") || strings.Contains(body, "/schema-diff") {
+		t.Error("view_only tidak boleh melihat tombol migration baru maupun schema diff")
 	}
 	if !strings.Contains(body, `href="/databases/5/migrations/1"`) {
 		t.Error("view_only tetap harus bisa melihat riwayat")
@@ -226,6 +226,7 @@ func TestMigrationHandler_NewEditorHasExplainButtonAndCSRF(t *testing.T) {
 	for _, want := range []string{
 		`action="/databases/5/migrations"`, `name="csrf_token"`, `name="name"`, `name="sql"`,
 		`name="action" value="execute"`, `formaction="/databases/5/explain"`, `name="analyze"`, "Simpan draft",
+		`href="/databases/5/schema-diff"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("editor tidak memuat %q", want)

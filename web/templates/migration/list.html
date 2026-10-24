@@ -4,7 +4,10 @@
 <p><a href="/databases/{{.Data.DBID}}">&laquo; {{.Data.DBName}}</a></p>
 <h1>Riwayat migration</h1>
 {{if .Data.CanEdit}}
-<p><a class="button" href="/databases/{{.Data.DBID}}/migrations/new">Migration baru</a></p>
+<p>
+  <a class="button" href="/databases/{{.Data.DBID}}/migrations/new">Migration baru</a>
+  <a class="button secondary" href="/databases/{{.Data.DBID}}/schema-diff">Buat dari schema diff</a>
+</p>
 {{end}}
 
 <div class="table-wrap">
