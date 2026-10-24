@@ -87,16 +87,14 @@ body:not(.has-nav) .topbar { background: transparent; border-color: transparent;
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   flex: none;
-  border-radius: 50%;
-  background: var(--ink);
-  color: var(--lime);
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #f4fdf1;
 }
+.brand-mark img { width: 108%; height: 108%; max-width: none; flex: none; }
 .has-nav .brand-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .nav {

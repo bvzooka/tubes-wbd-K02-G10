@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{template "title" .}} · Database Management Platform</title>
+  <link rel="icon" type="image/png" href="/static/logo.png">
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/app.js" defer></script>
 </head>
 <body class="{{if .Principal}}has-nav {{end}}sec-{{.Section}}">
   <header class="topbar">
-    <a class="brand" href="/" aria-label="Database Management Platform"><span class="brand-mark" aria-hidden="true">db</span><span class="brand-name">Database Management Platform</span></a>
+    <a class="brand" href="/" aria-label="Database Management Platform"><span class="brand-mark" aria-hidden="true"><img src="/static/logo.png" alt="" width="44" height="44"></span><span class="brand-name">Database Management Platform</span></a>
     {{with .Principal}}
     <nav class="nav" aria-label="Navigasi utama">
       <a href="/databases">Database</a>
