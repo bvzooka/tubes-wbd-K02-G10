@@ -11,7 +11,6 @@ import (
 // ErrorHandler memetakan error domain ke respons HTTP (diimplementasikan httpx.HandleError).
 type ErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 
-// ---- Disediakan Kurt ----
 
 type Authorizer interface {
 	// EffectiveLevel mengembalikan level tertinggi user pada koneksi (AccessNone jika tidak ada).

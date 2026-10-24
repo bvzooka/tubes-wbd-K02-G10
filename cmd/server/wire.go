@@ -85,7 +85,6 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		mod.Handler.Register(mux)
 		go mod.Sessions.RunCleanup(ctx, time.Hour)
 	}
-	// ---- Reva: connmgr + viewer ----
 	connRepo := connmgr.NewRepo(pool, cfg.SecretKey)
 	drivers := connmgr.NewProvider(connRepo, postgres.New)
 	prevCleanup := cleanup
@@ -94,7 +93,6 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 	connmgr.NewHandler(connmgr.NewService(connRepo, postgres.New), d).Register(mux)
 	viewer.NewHandler(viewer.NewService(d.Authz, drivers), d).Register(mux)
 
-	// ---- Bonus: explain (Kurt) ----
 	explain.NewHandler(explain.NewService(d.Authz, drivers), render, handleErr, d.Auth).Register(mux)
 
 	_ = hasher

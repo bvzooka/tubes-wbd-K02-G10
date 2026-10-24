@@ -92,6 +92,17 @@ th { background: #eef1f6; font-weight: 600; white-space: nowrap; }
 td.num { text-align: right; }
 .null { color: var(--muted); font-style: italic; }
 .table-wrap { overflow-x: auto; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875rem; }
+pre.mono { padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow-x: auto; white-space: pre; }
+table.plan td.mono { white-space: pre; }
+table.plan td.num { white-space: nowrap; }
+dl.summary { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0; }
+dl.summary dt { font-weight: 600; }
+dl.summary dd { margin: 0; }
+details { margin: 1rem 0; }
+details summary { cursor: pointer; font-weight: 600; }
+.breadcrumb { margin-bottom: 0.75rem; color: var(--muted); font-size: 0.9rem; }
+.hint { color: var(--muted); font-size: 0.875rem; margin: 0.25rem 0 0; }
 
 .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.8rem; background: #eef1f6; }
 .badge-view_only { background: #e6f0ff; }
