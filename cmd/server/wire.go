@@ -17,7 +17,6 @@ import (
 	"dbplatform/internal/config"
 	"dbplatform/internal/connmgr"
 	"dbplatform/internal/contract"
-	"dbplatform/internal/dbdriver/postgres"
 	"dbplatform/internal/explain"
 	"dbplatform/internal/httpx"
 	"dbplatform/internal/migration"
@@ -89,11 +88,11 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		go mod.Sessions.RunCleanup(ctx, time.Hour)
 	}
 	connRepo := connmgr.NewRepo(pool, cfg.SecretKey)
-	drivers := connmgr.NewProvider(connRepo, postgres.New)
+	drivers := connmgr.NewProvider(connRepo, connmgr.DefaultFactory)
 	prevCleanup := cleanup
 	cleanup = func() { drivers.Close(); prevCleanup() }
 	d.Drivers = drivers
-	connmgr.NewHandler(connmgr.NewService(connRepo, postgres.New), d).Register(mux)
+	connmgr.NewHandler(connmgr.NewService(connRepo, connmgr.DefaultFactory), d).Register(mux)
 	viewer.NewHandler(viewer.NewService(d.Authz, drivers), d).Register(mux)
 
 	explain.NewHandler(explain.NewService(d.Authz, drivers), render, handleErr, d.Auth).Register(mux)

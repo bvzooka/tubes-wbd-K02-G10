@@ -1,13 +1,13 @@
 package connmgr_test
 
 import (
+	"dbplatform/internal/dbmgmttest"
+	"dbplatform/internal/domain"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
-	"dbplatform/internal/dbmgmttest"
-	"dbplatform/internal/domain"
 )
 
 func wantStatus(t *testing.T, resp *http.Response, want int, what string) {
@@ -89,6 +89,14 @@ func TestConnections_Integration_CreateFlow(t *testing.T) {
 	wantStatus(t, resp, http.StatusOK, "form baru")
 	if !strings.Contains(body, `name="csrf_token"`) || !strings.Contains(body, "Uji koneksi") {
 		t.Error("form baru harus memuat csrf dan tombol uji koneksi")
+	}
+	for _, opt := range []string{`value="postgres"`, `value="mysql"`, `value="mariadb"`} {
+		if !strings.Contains(body, opt) {
+			t.Errorf("form baru tidak menawarkan opsi %s", opt)
+		}
+	}
+	if strings.Contains(body, `value="5432"`) {
+		t.Error("form baru tidak boleh mengisi port 5432")
 	}
 
 	resp, _ = a.Post(t, c, "/admin/connections", formFor(a, "Kedua"))
@@ -188,8 +196,6 @@ func TestConnections_Integration_EditAndUpdate(t *testing.T) {
 	if got, _ := a.Repo.Get(t.Context(), a.ConnID); got.Name != "Sampel Baru" {
 		t.Errorf("nama = %q", got.Name)
 	}
-
-	// Input tidak valid: 422 dan data lama utuh.
 	form.Set("port", "70000")
 	resp, body = a.Post(t, c, editPath, form)
 	wantStatus(t, resp, http.StatusUnprocessableEntity, "update invalid")
@@ -273,7 +279,6 @@ func TestConnections_Integration_TestEndpoint(t *testing.T) {
 		t.Error("pesan validasi host tidak ada")
 	}
 
-	// Form ubah: password kosong memakai password tersimpan.
 	edit := formFor(a, "Sampel")
 	edit.Set("password", "")
 	edit.Set("id", fmt.Sprint(a.ConnID))
@@ -289,8 +294,6 @@ func TestConnections_Integration_TestEndpoint(t *testing.T) {
 
 const uniquePassword = "KataSandi-Unik-987"
 
-// setUniquePassword mengganti password koneksi sampel dengan nilai yang mudah dicari
-// di HTML (password asli sama dengan username "postgres", sehingga ambigu).
 func setUniquePassword(t *testing.T, a *dbmgmttest.App) {
 	t.Helper()
 	in := a.TargetInput("Sampel")
