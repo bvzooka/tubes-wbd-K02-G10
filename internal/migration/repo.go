@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -22,7 +23,10 @@ type Repo struct{ db DB }
 
 func NewRepo(db DB) *Repo { return &Repo{db: db} }
 
-const foreignKeyViolation = "23503"
+const (
+	uniqueViolation     = "23505"
+	foreignKeyViolation = "23503"
+)
 
 const selectMigration = `
 	SELECT m.id, m.connection_id, m.version, m.name, %s, m.checksum, m.status, m.error_message, m.warning,
@@ -156,6 +160,98 @@ func (r *Repo) Cancel(ctx context.Context, connID int64, version int) error {
 		return r.notDraftOrMissing(ctx, connID, version)
 	}
 	return nil
+}
+
+func (r *Repo) Claim(ctx context.Context, connID int64, version int, executedBy int64, now time.Time) (domain.Migration, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return domain.Migration{}, fmt.Errorf("begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+
+	if err := lockMigrations(ctx, tx, connID); err != nil {
+		return domain.Migration{}, err
+	}
+
+	var status string
+	err = tx.QueryRow(ctx, `
+		SELECT status
+		FROM db_migrations
+		WHERE connection_id = $1 AND version = $2
+		FOR UPDATE`, connID, version).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Migration{}, domain.ErrNotFound
+	}
+	if err != nil {
+		return domain.Migration{}, fmt.Errorf("read migration status: %w", err)
+	}
+	if domain.MigrationStatus(status) != domain.MigrationDraft {
+		return domain.Migration{}, domain.ErrMigrationNotDraft
+	}
+
+	var blocking int
+	err = tx.QueryRow(ctx, `
+		SELECT version
+		FROM db_migrations
+		WHERE connection_id = $1 AND version < $2 AND status IN ('draft', 'running')
+		ORDER BY version
+		LIMIT 1`, connID, version).Scan(&blocking)
+	switch {
+	case err == nil:
+		return domain.Migration{}, &OutOfOrderError{Blocking: blocking}
+	case !errors.Is(err, pgx.ErrNoRows):
+		return domain.Migration{}, fmt.Errorf("check order: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE db_migrations
+		SET status = 'running', executed_by = $3, executed_at = $4, finished_at = NULL,
+		    error_message = '', warning = '', updated_at = $4
+		WHERE connection_id = $1 AND version = $2`,
+		connID, version, executedBy, now)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		return domain.Migration{}, domain.ErrMigrationOutOfOrder
+	}
+	if err != nil {
+		return domain.Migration{}, fmt.Errorf("mark running: %w", err)
+	}
+
+	m, err := scanMigration(tx.QueryRow(ctx, selectFull+` WHERE m.connection_id = $1 AND m.version = $2`, connID, version))
+	if err != nil {
+		return domain.Migration{}, fmt.Errorf("read claimed migration: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Migration{}, fmt.Errorf("commit claim: %w", err)
+	}
+	return m, nil
+}
+
+func (r *Repo) Finish(ctx context.Context, connID int64, version int, status domain.MigrationStatus, errMsg, warning string, finishedAt time.Time) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE db_migrations
+		SET status = $3, error_message = $4, warning = $5, finished_at = $6, updated_at = $6
+		WHERE connection_id = $1 AND version = $2 AND status = 'running'`,
+		connID, version, string(status), errMsg, warning, finishedAt)
+	if err != nil {
+		return fmt.Errorf("finish migration: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("migration %d is not running: %w", version, domain.ErrConflict)
+	}
+	return nil
+}
+
+func (r *Repo) FailStuck(ctx context.Context, startedBefore time.Time, message string, finishedAt time.Time) (int, error) {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE db_migrations
+		SET status = 'failed', error_message = $2, finished_at = $3, updated_at = $3
+		WHERE status = 'running' AND executed_at < $1`,
+		startedBefore, message, finishedAt)
+	if err != nil {
+		return 0, fmt.Errorf("fail stuck migrations: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
 }
 
 func (r *Repo) notDraftOrMissing(ctx context.Context, connID int64, version int) error {
