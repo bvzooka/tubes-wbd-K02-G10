@@ -19,6 +19,10 @@ const (
 	msgGroupNameInvalid   = "Nama group harus 1 sampai 64 karakter."
 	msgGroupNameTaken     = "Nama group sudah dipakai."
 	msgDescriptionTooLong = "Deskripsi maksimal 500 karakter."
+	msgAccessLevelInvalid = "Pilih level akses yang valid."
+	msgConnectionMissing  = "Pilih koneksi yang valid."
+	msgConnectionInactive = "Koneksi ini sedang dinonaktifkan."
+	msgUserMissing        = "Pilih user yang valid."
 )
 
 var usernamePattern = regexp.MustCompile(`^[a-z0-9_.-]{3,32}$`)
