@@ -28,7 +28,7 @@
 
   <section>
     <h2>Node plan</h2>
-    <div class="table-scroll">
+    <div class="table-wrap">
     <table class="plan">
       <thead>
         <tr>
@@ -78,10 +78,10 @@
   <h2>Statement</h2>
   <form method="post" action="/databases/{{$d.DBID}}/explain">
     {{template "csrf" .}}
-    <textarea name="sql" rows="10" class="mono" required>{{$d.SQL}}</textarea>
+    <textarea name="sql" rows="10" class="sql" required>{{$d.SQL}}</textarea>
     <label><input type="checkbox" name="analyze" value="on"{{if $d.Analyze}} checked{{end}}> Jalankan dengan ANALYZE</label>
     <p class="hint">ANALYZE benar-benar menjalankan statement (dibatalkan setelahnya) dan dapat memakan waktu.</p>
-    <button type="submit">Analisis ulang</button>
+    <button type="submit">{{if or $d.Result $d.Error}}Analisis ulang{{else}}Analisis plan{{end}}</button>
   </form>
   <p>
     <a href="/databases/{{$d.DBID}}/migrations/new">Kembali ke editor migration</a> ·
