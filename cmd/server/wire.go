@@ -20,6 +20,7 @@ import (
 	"dbplatform/internal/dbdriver/postgres"
 	"dbplatform/internal/explain"
 	"dbplatform/internal/httpx"
+	"dbplatform/internal/migration"
 	"dbplatform/internal/viewer"
 	webassets "dbplatform/web"
 )
@@ -101,6 +102,16 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 	admin.NewUserHandler(d, adminSvc).Register(mux)
 	groupSvc := admin.NewGroupService(admin.NewGroupRepo(pool), sessions)
 	admin.NewGroupHandler(d, groupSvc).Register(mux)
+
+	migrationSvc := migration.NewService(migration.NewRepo(pool), d.Authz, d.Drivers, clk)
+	recovered, err := migrationSvc.RecoverStuck(ctx)
+	if err != nil {
+		return fail(err)
+	}
+	if recovered > 0 {
+		logger.Warn("migration yang terputus ditandai gagal", "jumlah", recovered)
+	}
+	migration.NewHandler(d, migrationSvc).Register(mux)
 
 	static, err := fs.Sub(webassets.FS, "static")
 	if err != nil {

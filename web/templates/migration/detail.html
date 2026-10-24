@@ -1,0 +1,49 @@
+{{define "title"}}Migration versi {{.Data.Migration.Version}}{{end}}
+
+{{define "content"}}
+{{$m := .Data.Migration}}
+<p><a href="/databases/{{.Data.DBID}}/migrations">&laquo; Riwayat migration {{.Data.DBName}}</a></p>
+<h1>Versi {{$m.Version}}: {{$m.Name}}</h1>
+
+<section class="card">
+  <table>
+    <tbody>
+      <tr><th>Status</th><td><span class="badge badge-{{$m.Status}}">{{$m.Status}}</span></td></tr>
+      <tr><th>Dibuat oleh</th><td>{{$m.CreatedByName}}</td></tr>
+      <tr><th>Dibuat</th><td>{{$m.CreatedAt.Format "02 Jan 2006 15:04:05"}}</td></tr>
+      <tr><th>Dieksekusi oleh</th><td>{{if $m.ExecutedByName}}{{$m.ExecutedByName}}{{else}}<span class="muted">-</span>{{end}}</td></tr>
+      <tr><th>Mulai dieksekusi</th><td>{{with $m.ExecutedAt}}{{.Format "02 Jan 2006 15:04:05"}}{{else}}<span class="muted">-</span>{{end}}</td></tr>
+      <tr><th>Selesai</th><td>{{with $m.FinishedAt}}{{.Format "02 Jan 2006 15:04:05"}}{{else}}<span class="muted">-</span>{{end}}</td></tr>
+      <tr><th>Checksum</th><td><code>{{$m.Checksum}}</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+{{if $m.ErrorMessage}}
+<p class="alert alert-error" role="alert"><strong>Pesan error:</strong> {{$m.ErrorMessage}}</p>
+{{end}}
+{{if $m.Warning}}
+<p class="alert alert-warning" role="alert"><strong>Peringatan:</strong> {{$m.Warning}}</p>
+{{end}}
+
+<section class="card">
+  <h2>SQL</h2>
+  <pre class="sql-view">{{$m.SQL}}</pre>
+</section>
+
+{{if and .Data.CanEdit (eq $m.Status "draft")}}
+<section class="card">
+  <h2>Aksi</h2>
+  <p class="muted">Seluruh SQL dijalankan dalam satu transaction di database target. Bila ada statement yang gagal, semua perubahan dibatalkan.</p>
+  <a class="button secondary" href="/databases/{{.Data.DBID}}/migrations/{{$m.Version}}/edit">Ubah draft</a>
+  <form class="inline" method="post" action="/databases/{{.Data.DBID}}/migrations/{{$m.Version}}/execute">
+    {{template "csrf" .}}
+    <button type="submit">Jalankan migration</button>
+  </form>
+  <form class="inline" method="post" action="/databases/{{.Data.DBID}}/migrations/{{$m.Version}}/cancel">
+    {{template "csrf" .}}
+    <button type="submit" class="danger">Batalkan draft</button>
+  </form>
+</section>
+{{end}}
+{{end}}
