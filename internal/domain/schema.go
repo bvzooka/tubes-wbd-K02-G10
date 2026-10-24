@@ -16,8 +16,7 @@ const (
 	ConstraintCheck      ConstraintType = "check"
 )
 
-// Schema adalah hasil introspeksi satu database. Urutan harus deterministik:
-// tabel menurut (Schema, Name), kolom menurut Position, constraint dan index menurut Name.
+// Schema harus berurutan deterministik: tabel menurut (Schema, Name), kolom menurut Position, constraint dan index menurut Name.
 type Schema struct {
 	Tables []Table
 }
@@ -40,28 +39,29 @@ type Column struct {
 	Default  *string // nil jika tidak ada default
 }
 
+// RefSchema sampai OnDelete hanya terisi untuk foreign key, CheckExpr hanya untuk check.
 type Constraint struct {
 	Name       string
 	Type       ConstraintType
 	Columns    []string
-	RefSchema  string   // hanya foreign key
-	RefTable   string   // hanya foreign key
-	RefColumns []string // hanya foreign key
-	OnUpdate   string   // hanya foreign key, contoh "NO ACTION", "CASCADE"
-	OnDelete   string   // hanya foreign key
-	CheckExpr  string   // hanya check
+	RefSchema  string
+	RefTable   string
+	RefColumns []string
+	OnUpdate   string
+	OnDelete   string
+	CheckExpr  string
 }
 
+// Definition adalah pernyataan CREATE INDEX lengkap.
 type Index struct {
 	Name       string
-	Columns    []string // best effort; ekspresi boleh berupa teks ekspresi
+	Columns    []string
 	Unique     bool
 	Primary    bool
-	Method     string // btree, hash, gin, ...
-	Definition string // pernyataan CREATE INDEX lengkap
+	Method     string
+	Definition string
 }
 
-// TableRef menunjuk satu tabel (schema dan nama).
 type TableRef struct {
 	Schema string
 	Table  string
@@ -95,7 +95,6 @@ func (p PageRequest) Offset() int {
 	return (n.Page - 1) * n.PageSize
 }
 
-// Cell adalah satu nilai sel hasil query dalam bentuk teks.
 type Cell struct {
 	Value string
 	Null  bool

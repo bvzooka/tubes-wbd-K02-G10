@@ -25,8 +25,7 @@ type Connection struct {
 	UpdatedAt    time.Time
 }
 
-// ConnectionInput dipakai saat membuat atau mengubah koneksi.
-// Password kosong pada update berarti password tidak diubah.
+// ConnectionInput dengan Password kosong pada update berarti password tidak diubah.
 type ConnectionInput struct {
 	Name         string
 	DBMS         DBMS

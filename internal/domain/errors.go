@@ -15,9 +15,9 @@ var (
 	ErrMigrationNotDraft   = errors.New("migration is not a draft")
 )
 
-// ValidationError membawa pesan per field. errors.Is(err, ErrValidation) bernilai true.
+// ValidationError membawa pesan per field form dan cocok dengan errors.Is(err, ErrValidation).
 type ValidationError struct {
-	Fields map[string]string // nama field form -> pesan (Bahasa Indonesia)
+	Fields map[string]string
 }
 
 func (e *ValidationError) Error() string { return "validation failed" }
