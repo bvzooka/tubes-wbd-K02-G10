@@ -114,5 +114,16 @@ details summary { cursor: pointer; font-weight: 600; }
 .badge-cancelled { background: #eceff3; color: var(--muted); }
 .destructive { color: var(--danger); }
 
+pre.sql-view {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: #f1f3f7;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-x: auto;
+  white-space: pre;
+  font-size: 0.9rem;
+}
+
 .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 1rem 0; }
 .pagination .disabled { color: var(--muted); }

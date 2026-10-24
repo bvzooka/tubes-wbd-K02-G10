@@ -1,0 +1,126 @@
+{{define "title"}}{{.Data.Group.Name}}{{end}}
+
+{{define "content"}}
+<h1>{{.Data.Group.Name}}</h1>
+<p><a href="/admin/groups">&laquo; Semua group</a></p>
+
+<section class="card">
+  <h2>Detail group</h2>
+  <form method="post" action="/admin/groups/{{.Data.Group.ID}}" autocomplete="off">
+    {{template "csrf" .}}
+
+    <label for="name">Nama</label>
+    <input id="name" name="name" type="text" value="{{.Data.Name}}" required maxlength="64">
+    {{with index .Data.Errors "name"}}<p class="field-error">{{.}}</p>{{end}}
+
+    <label for="description">Deskripsi</label>
+    <textarea id="description" name="description" rows="3" maxlength="500">{{.Data.Description}}</textarea>
+    {{with index .Data.Errors "description"}}<p class="field-error">{{.}}</p>{{end}}
+
+    <button type="submit">Simpan perubahan</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Anggota ({{len .Data.Members}})</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Username</th><th>Status</th><th>Aksi</th></tr>
+      </thead>
+      <tbody>
+        {{range .Data.Members}}
+        <tr>
+          <td>{{.Username}}</td>
+          <td>{{if .IsActive}}Aktif{{else}}<span class="badge badge-cancelled">Nonaktif</span>{{end}}</td>
+          <td>
+            <form class="inline" method="post" action="/admin/groups/{{$.Data.Group.ID}}/members/{{.UserID}}/delete">
+              {{template "csrf" $}}
+              <button type="submit" class="link">Keluarkan</button>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="3" class="muted">Belum ada anggota.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{if .Data.AvailableUsers}}
+  <form method="post" action="/admin/groups/{{.Data.Group.ID}}/members">
+    {{template "csrf" .}}
+    <label for="user_id">Tambah anggota</label>
+    <select id="user_id" name="user_id" required>
+      {{range .Data.AvailableUsers}}<option value="{{.ID}}">{{.Username}}</option>{{end}}
+    </select>
+    {{with index .Data.Errors "user_id"}}<p class="field-error">{{.}}</p>{{end}}
+    <button type="submit">Tambahkan</button>
+  </form>
+  {{else}}
+  <p class="muted">Semua user aktif sudah menjadi anggota.</p>
+  {{end}}
+</section>
+
+<section class="card">
+  <h2>Akses database ({{len .Data.Accesses}})</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Database</th><th>Level</th><th>Aksi</th></tr>
+      </thead>
+      <tbody>
+        {{range .Data.Accesses}}
+        <tr>
+          <td>{{.ConnectionName}}</td>
+          <td><span class="badge badge-{{.Level}}">{{if eq .Level "view_edit"}}View + Edit{{else}}View Only{{end}}</span></td>
+          <td>
+            <form class="inline" method="post" action="/admin/groups/{{$.Data.Group.ID}}/access/{{.ConnectionID}}/delete">
+              {{template "csrf" $}}
+              <button type="submit" class="link">Cabut</button>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="3" class="muted">Belum ada akses database.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{if .Data.AvailableConnections}}
+  <form method="post" action="/admin/groups/{{.Data.Group.ID}}/access">
+    {{template "csrf" .}}
+    <label for="connection_id">Database</label>
+    <select id="connection_id" name="connection_id" required>
+      {{range .Data.AvailableConnections}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+    </select>
+    {{with index .Data.Errors "connection_id"}}<p class="field-error">{{.}}</p>{{end}}
+
+    <label for="access_level">Level akses</label>
+    <select id="access_level" name="access_level" required>
+      <option value="view_only">View Only</option>
+      <option value="view_edit">View + Edit</option>
+    </select>
+    {{with index .Data.Errors "access_level"}}<p class="field-error">{{.}}</p>{{end}}
+
+    <p class="muted">Memberi akses ke database yang sudah punya akses akan mengubah levelnya.</p>
+    <button type="submit">Simpan akses</button>
+  </form>
+  {{else}}
+  <p class="muted">Belum ada koneksi database yang aktif.</p>
+  {{end}}
+</section>
+
+<section class="card">
+  <h2>Hapus group</h2>
+  {{if .Data.CanDelete}}
+  <form method="post" action="/admin/groups/{{.Data.Group.ID}}/delete">
+    {{template "csrf" .}}
+    <button type="submit" class="danger">Hapus group</button>
+  </form>
+  {{else}}
+  <p class="muted">Group yang masih punya anggota atau akses database tidak dapat dihapus. Kosongkan dulu.</p>
+  {{end}}
+</section>
+{{end}}
