@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"dbplatform/internal/access"
+	"dbplatform/internal/admin"
 	"dbplatform/internal/appdb"
 	"dbplatform/internal/auth"
 	"dbplatform/internal/authstub"
@@ -52,13 +53,14 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 	mux := http.NewServeMux()
 
 	var hasher contract.PasswordHasher
+	var sessions contract.SessionAdmin
 	if cfg.UseStubs {
 		logger.Warn("APP_STUBS=true: autentikasi dan otorisasi DIMATIKAN, hanya untuk pengembangan")
 		stub, err := authstub.New(ctx, pool)
 		if err != nil {
 			return fail(err)
 		}
-		d.Auth, d.Authz, hasher = stub.Middleware, stub.Authorizer, stub.Hasher
+		d.Auth, d.Authz, hasher, sessions = stub.Middleware, stub.Authorizer, stub.Hasher, stub.SessionAdmin
 	} else {
 		authz := access.New(pool)
 		mod := auth.New(auth.Config{
@@ -73,7 +75,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		}, auth.Deps{
 			Pool: pool, Clock: clk, Render: render, HandleErr: handleErr, Authorizer: authz, Logger: logger,
 		})
-		d.Auth, d.Authz, hasher = mod.Middleware, authz, mod.Hasher
+		d.Auth, d.Authz, hasher, sessions = mod.Middleware, authz, mod.Hasher, mod.Sessions
 
 		created, err := auth.SeedAdmin(ctx, pool, mod.Hasher, cfg.SeedAdminUsername, cfg.SeedAdminPassword)
 		if err != nil {
@@ -95,7 +97,8 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 
 	explain.NewHandler(explain.NewService(d.Authz, drivers), render, handleErr, d.Auth).Register(mux)
 
-	_ = hasher
+	adminSvc := admin.NewService(admin.NewUserRepo(pool), hasher, sessions)
+	admin.NewUserHandler(d, adminSvc).Register(mux)
 
 	static, err := fs.Sub(webassets.FS, "static")
 	if err != nil {

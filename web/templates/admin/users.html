@@ -1,0 +1,48 @@
+{{define "title"}}Pengguna{{end}}
+
+{{define "content"}}
+<h1>Pengguna</h1>
+<p><a class="button" href="/admin/users/new">Pengguna baru</a></p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Peran</th>
+        <th>Status</th>
+        <th>Dibuat</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Data.Users}}
+      <tr>
+        <td>{{.Username}}{{if eq .ID $.Data.CurrentUserID}} <span class="muted">(Anda)</span>{{end}}</td>
+        <td>{{if .IsPlatformAdmin}}<span class="badge badge-view_edit">Platform Admin</span>{{else}}Pengguna{{end}}</td>
+        <td>{{if .IsActive}}Aktif{{else}}<span class="badge badge-cancelled">Nonaktif</span>{{end}}</td>
+        <td>{{.CreatedAt.Format "02 Jan 2006 15:04"}}</td>
+        <td>
+          <a href="/admin/users/{{.ID}}/edit">Ubah</a>
+          {{if ne .ID $.Data.CurrentUserID}}
+          {{if .IsActive}}
+          <form class="inline" method="post" action="/admin/users/{{.ID}}/deactivate">
+            {{template "csrf" $}}
+            <button type="submit" class="link">Nonaktifkan</button>
+          </form>
+          {{else}}
+          <form class="inline" method="post" action="/admin/users/{{.ID}}/activate">
+            {{template "csrf" $}}
+            <button type="submit" class="link">Aktifkan</button>
+          </form>
+          {{end}}
+          {{end}}
+        </td>
+      </tr>
+      {{else}}
+      <tr><td colspan="5" class="muted">Belum ada pengguna.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
