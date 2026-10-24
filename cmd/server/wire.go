@@ -17,6 +17,7 @@ import (
 	"dbplatform/internal/connmgr"
 	"dbplatform/internal/contract"
 	"dbplatform/internal/dbdriver/postgres"
+	"dbplatform/internal/explain"
 	"dbplatform/internal/httpx"
 	"dbplatform/internal/viewer"
 	webassets "dbplatform/web"
@@ -92,6 +93,9 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 	d.Drivers = drivers
 	connmgr.NewHandler(connmgr.NewService(connRepo, postgres.New), d).Register(mux)
 	viewer.NewHandler(viewer.NewService(d.Authz, drivers), d).Register(mux)
+
+	// ---- Bonus: explain (Kurt) ----
+	explain.NewHandler(explain.NewService(d.Authz, drivers), render, handleErr, d.Auth).Register(mux)
 
 	_ = hasher
 
