@@ -301,5 +301,11 @@ func TestResultTemplate_Renders(t *testing.T) {
 		if strings.Contains(out, "<b>") || strings.Contains(out, "t<x>") {
 			t.Fatal("data harus di-escape")
 		}
+		if strings.Contains(out, "%!") {
+			t.Fatalf("format angka rusak: %s", out)
+		}
+		if page.Analyze && (!strings.Contains(out, "0.100 ms") || !strings.Contains(out, "0.200 ms")) {
+			t.Fatal("planning dan execution time harus tampil sebagai angka")
+		}
 	}
 }

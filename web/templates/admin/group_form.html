@@ -1,0 +1,22 @@
+{{define "title"}}Group baru{{end}}
+
+{{define "content"}}
+<section class="card">
+  <h1>Group baru</h1>
+
+  <form method="post" action="/admin/groups" autocomplete="off">
+    {{template "csrf" .}}
+
+    <label for="name">Nama</label>
+    <input id="name" name="name" type="text" value="{{.Data.Name}}" required maxlength="64">
+    {{with index .Data.Errors "name"}}<p class="field-error">{{.}}</p>{{end}}
+
+    <label for="description">Deskripsi</label>
+    <textarea id="description" name="description" rows="3" maxlength="500">{{.Data.Description}}</textarea>
+    {{with index .Data.Errors "description"}}<p class="field-error">{{.}}</p>{{end}}
+
+    <button type="submit">Simpan</button>
+    <a class="button secondary" href="/admin/groups">Batal</a>
+  </form>
+</section>
+{{end}}

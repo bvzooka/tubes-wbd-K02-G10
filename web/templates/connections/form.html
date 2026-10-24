@@ -56,7 +56,8 @@
         </div>
         <div>
           <label for="port">Port</label>
-          <input id="port" name="port" type="text" inputmode="numeric" value="{{.Data.Values.Port}}" required>
+          <input id="port" name="port" type="text" inputmode="numeric" value="{{.Data.Values.Port}}" placeholder="5432 atau 3306" required>
+          <p class="hint">Bawaan: PostgreSQL 5432, MySQL dan MariaDB 3306.</p>
           {{with index .Data.Errors "port"}}<p class="field-error">{{.}}</p>{{end}}
         </div>
         <div>

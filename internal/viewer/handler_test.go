@@ -81,7 +81,7 @@ func TestViewer_Integration_ViewOnlyCanBrowse(t *testing.T) {
 
 	resp, body = a.Get(t, c, path(a, ""))
 	wantStatus(t, resp, http.StatusOK, "ringkasan")
-	for _, want := range []string{"Schema public", "Schema hr", "customers", "order_items", "active_customers", "order_totals", "employees", "View", "Mixed Case"} {
+	for _, want := range []string{"Schema <code>public</code>", "Schema <code>hr</code>", "customers", "order_items", "active_customers", "order_totals", "employees", "View", "Mixed Case"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("ringkasan tidak memuat %q", want)
 		}

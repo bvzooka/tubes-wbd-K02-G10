@@ -64,6 +64,13 @@ services:
       MYSQL_DATABASE: sampledb
     ports:
       - "3307:3306"
+    volumes:
+      - ./docker/targetmysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
 
 volumes:
   appdb_data:

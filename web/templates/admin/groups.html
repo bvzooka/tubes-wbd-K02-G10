@@ -1,0 +1,33 @@
+{{define "title"}}Group{{end}}
+
+{{define "content"}}
+<h1>Group</h1>
+<p><a class="button" href="/admin/groups/new">Group baru</a></p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Nama</th>
+        <th>Deskripsi</th>
+        <th>Anggota</th>
+        <th>Akses database</th>
+        <th>Dibuat</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Data.Groups}}
+      <tr>
+        <td><a href="/admin/groups/{{.ID}}">{{.Name}}</a></td>
+        <td>{{if .Description}}{{.Description}}{{else}}<span class="muted">-</span>{{end}}</td>
+        <td class="num">{{.MemberCount}}</td>
+        <td class="num">{{.AccessCount}}</td>
+        <td>{{.CreatedAt.Format "02 Jan 2006 15:04"}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="5" class="muted">Belum ada group.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

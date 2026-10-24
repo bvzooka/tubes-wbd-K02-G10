@@ -1,24 +1,28 @@
 package connmgr
 
 import (
+	"dbplatform/internal/domain"
+	"dbplatform/internal/httpx"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
-	"dbplatform/internal/domain"
-	"dbplatform/internal/httpx"
 )
 
 const maxFormBytes = 64 << 10
 
-// urutan tampilan di form
 var sslModeOptions = []string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
 
 type DBMSOption struct {
 	Value string
 	Label string
 }
-var dbmsOptions = []DBMSOption{{Value: string(domain.DBMSPostgres), Label: "PostgreSQL"}}
+
+var dbmsOptions = []DBMSOption{
+	{Value: string(domain.DBMSPostgres), Label: "PostgreSQL"},
+	{Value: string(domain.DBMSMySQL), Label: "MySQL"},
+	{Value: string(domain.DBMSMariaDB), Label: "MariaDB"},
+}
 
 type ListPage struct {
 	Connections []domain.Connection
@@ -100,7 +104,7 @@ func newFormPage() FormPage {
 	return FormPage{
 		Heading:     "Koneksi baru",
 		Action:      "/admin/connections",
-		Values:      FormValues{DBMS: string(domain.DBMSPostgres), Host: "localhost", Port: "5432", SSLMode: "prefer"},
+		Values:      FormValues{DBMS: string(domain.DBMSPostgres), Host: "localhost", SSLMode: "prefer"},
 		SSLModes:    sslModeOptions,
 		DBMSOptions: dbmsOptions,
 	}
@@ -146,22 +150,22 @@ func parseForm(w http.ResponseWriter, r *http.Request) (domain.ConnectionInput, 
 		return domain.ConnectionInput{}, FormValues{}, nil, err
 	}
 	vals := FormValues{
-		Name: r.PostFormValue("name"),
-		DBMS: r.PostFormValue("dbms"),
-		Host: r.PostFormValue("host"),
-		Port: strings.TrimSpace(r.PostFormValue("port")),
+		Name:         r.PostFormValue("name"),
+		DBMS:         r.PostFormValue("dbms"),
+		Host:         r.PostFormValue("host"),
+		Port:         strings.TrimSpace(r.PostFormValue("port")),
 		DatabaseName: r.PostFormValue("database_name"),
-		Username: r.PostFormValue("db_username"),
-		SSLMode: r.PostFormValue("ssl_mode"),
+		Username:     r.PostFormValue("db_username"),
+		SSLMode:      r.PostFormValue("ssl_mode"),
 	}
 	in := domain.ConnectionInput{
-		Name: vals.Name,
-		DBMS: domain.DBMS(vals.DBMS),
-		Host: vals.Host,
+		Name:         vals.Name,
+		DBMS:         domain.DBMS(vals.DBMS),
+		Host:         vals.Host,
 		DatabaseName: vals.DatabaseName,
-		Username: vals.Username,
-		Password: r.PostFormValue("password"),
-		SSLMode: vals.SSLMode,
+		Username:     vals.Username,
+		Password:     r.PostFormValue("password"),
+		SSLMode:      vals.SSLMode,
 	}
 	var perrs map[string]string
 	port, err := strconv.Atoi(vals.Port)
@@ -252,8 +256,6 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	h.d.HandleErr(w, r, err)
 }
 
-// test menguji koneksi dari isi form tanpa menyimpan. Field tersembunyi "id" (opsional)
-// menandai form ubah sehingga password kosong memakai password tersimpan.
 func (h *Handler) test(w http.ResponseWriter, r *http.Request) {
 	p, ok := h.principal(w, r)
 	if !ok {

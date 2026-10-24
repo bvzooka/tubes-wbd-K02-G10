@@ -21,8 +21,8 @@
     <h2>Ringkasan</h2>
     <dl class="summary">
       <dt>Estimasi total cost</dt><dd>{{printf "%.2f" .TotalCost}}</dd>
-      {{with .PlanningTimeMs}}<dt>Planning time</dt><dd>{{printf "%.3f" .}} ms</dd>{{end}}
-      {{with .ExecutionTimeMs}}<dt>Execution time</dt><dd>{{printf "%.3f" .}} ms</dd>{{end}}
+      {{with .PlanningTimeText}}<dt>Planning time</dt><dd>{{.}} ms</dd>{{end}}
+      {{with .ExecutionTimeText}}<dt>Execution time</dt><dd>{{.}} ms</dd>{{end}}
     </dl>
   </section>
 

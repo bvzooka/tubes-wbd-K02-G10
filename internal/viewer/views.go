@@ -1,17 +1,17 @@
 package viewer
 
 import (
+	"dbplatform/internal/domain"
 	"net/url"
 	"strconv"
 	"strings"
-	"dbplatform/internal/domain"
 )
 
 type DatabaseItem struct {
 	ID int64
 	Name string
 	DBMS string
-	DBMSLabel string
+	DBMSLabel  string
 	Level domain.AccessLevel
 	LevelLabel string
 	CanEdit bool
@@ -25,8 +25,13 @@ func newDatabaseItem(a domain.AccessibleDatabase) DatabaseItem {
 }
 
 func dbmsLabel(d domain.DBMS) string {
-	if d == domain.DBMSPostgres {
+	switch d {
+	case domain.DBMSPostgres:
 		return "PostgreSQL"
+	case domain.DBMSMySQL:
+		return "MySQL"
+	case domain.DBMSMariaDB:
+		return "MariaDB"
 	}
 	return string(d)
 }
@@ -100,7 +105,7 @@ type TableDetail struct {
 
 // data halaman isi tabel
 type DataView struct {
-	Database DatabaseItem
+	Database  DatabaseItem
 	Schema string
 	Name string
 	Result *domain.TableData
