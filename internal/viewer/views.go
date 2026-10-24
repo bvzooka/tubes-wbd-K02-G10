@@ -11,6 +11,7 @@ type DatabaseItem struct {
 	ID int64
 	Name string
 	DBMS string
+	DBMSLabel string
 	Level domain.AccessLevel
 	LevelLabel string
 	CanEdit bool
@@ -18,9 +19,16 @@ type DatabaseItem struct {
 
 func newDatabaseItem(a domain.AccessibleDatabase) DatabaseItem {
 	return DatabaseItem{
-		ID: a.ConnectionID, Name: a.Name, DBMS: string(a.DBMS),
+		ID: a.ConnectionID, Name: a.Name, DBMS: string(a.DBMS), DBMSLabel: dbmsLabel(a.DBMS),
 		Level: a.Level, LevelLabel: LevelLabel(a.Level), CanEdit: a.Level.AtLeast(domain.AccessViewEdit),
 	}
+}
+
+func dbmsLabel(d domain.DBMS) string {
+	if d == domain.DBMSPostgres {
+		return "PostgreSQL"
+	}
+	return string(d)
 }
 
 func LevelLabel(l domain.AccessLevel) string {

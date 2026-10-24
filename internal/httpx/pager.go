@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-
 	"dbplatform/internal/domain"
 )
 
@@ -16,7 +15,8 @@ func ParsePage(r *http.Request) domain.PageRequest {
 }
 
 type Pager struct {
-	Page    int
+	Page int
+	TotalPages int
 	HasPrev bool
 	HasNext bool
 	PrevURL string
@@ -35,6 +35,9 @@ func NewPager(r *http.Request, req domain.PageRequest, hasNext bool) Pager {
 		return r.URL.Path + "?" + q.Encode()
 	}
 	p := Pager{Page: req.Page, HasPrev: req.Page > 1, HasNext: hasNext}
+	if !hasNext {
+		p.TotalPages = req.Page
+	}
 	if p.HasPrev {
 		p.PrevURL = link(req.Page - 1)
 	}

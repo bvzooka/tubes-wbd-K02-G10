@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-
 	"dbplatform/internal/domain"
 	"dbplatform/internal/httpx"
 	webassets "dbplatform/web"
@@ -224,6 +223,22 @@ func TestLogging_OmitsQueryAndCookies(t *testing.T) {
 	}
 	if !strings.Contains(out, "status=418") || !strings.Contains(out, "path=/a") {
 		t.Errorf("log tidak lengkap: %s", out)
+	}
+}
+
+func TestPager_TotalPages(t *testing.T) {
+	mk := func(url string, hasNext bool) httpx.Pager {
+		req := httptest.NewRequest("GET", url, nil)
+		return httpx.NewPager(req, httpx.ParsePage(req), hasNext)
+	}
+	if p := mk("/x?page=2", true); p.TotalPages != 0 {
+		t.Errorf("masih ada halaman berikutnya, total belum diketahui: %+v", p)
+	}
+	if p := mk("/x?page=3", false); p.TotalPages != 3 {
+		t.Errorf("halaman terakhir: total = %d, want 3", p.TotalPages)
+	}
+	if p := mk("/x", false); p.TotalPages != 1 {
+		t.Errorf("satu halaman: total = %d, want 1", p.TotalPages)
 	}
 }
 

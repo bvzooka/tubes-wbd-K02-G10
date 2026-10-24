@@ -1,0 +1,66 @@
+{{define "title"}}Koneksi database{{end}}
+
+{{define "content"}}
+<section class="hero">
+  <div>
+    <span class="eyebrow"><svg class="ic"><use href="#i-plug"/></svg>Administrasi</span>
+    <h1>Koneksi <strong>database</strong></h1>
+    <p class="subtitle">Server database target. Password disimpan terenkripsi dan tidak pernah ditampilkan.</p>
+    <div class="hero-actions">
+      <a class="button primary" href="/admin/connections/new"><svg class="ic"><use href="#i-plus"/></svg>Tambah koneksi</a>
+    </div>
+  </div>
+  <div class="numbers">
+    <div class="num-item">
+      <div class="lbl"><svg class="ic"><use href="#i-server"/></svg>Total koneksi</div>
+      <div class="val">{{len .Data.Connections}}</div>
+    </div>
+  </div>
+</section>
+
+{{if .Data.Connections}}
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th>Koneksi</th><th>DBMS</th><th>Host</th><th>Database</th><th>User</th><th>SSL</th><th>Status</th><th>Aksi</th></tr>
+  </thead>
+  <tbody>
+  {{range .Data.Connections}}
+    <tr>
+      <td><div class="conn-name"><span class="card-icon"><svg class="ic"><use href="#i-db"/></svg></span>{{.Name}}</div></td>
+      <td><span class="badge badge-dbms">{{.DBMS}}</span></td>
+      <td><code>{{.Host}}:{{.Port}}</code></td>
+      <td>{{.DatabaseName}}</td>
+      <td>{{.Username}}</td>
+      <td><span class="badge">{{.SSLMode}}</span></td>
+      <td>{{if .IsActive}}<span class="badge badge-success badge-dot">Aktif</span>{{else}}<span class="badge badge-cancelled badge-dot">Nonaktif</span>{{end}}</td>
+      <td>
+        <div class="row-actions">
+          <a href="/admin/connections/{{.ID}}/edit"><svg class="ic"><use href="#i-edit"/></svg>Ubah</a>
+          {{if .IsActive}}
+          <form class="inline" method="post" action="/admin/connections/{{.ID}}/deactivate">
+            {{template "csrf" $}}
+            <button type="submit" class="link destructive">Nonaktifkan</button>
+          </form>
+          {{else}}
+          <form class="inline" method="post" action="/admin/connections/{{.ID}}/activate">
+            {{template "csrf" $}}
+            <button type="submit" class="link">Aktifkan</button>
+          </form>
+          {{end}}
+        </div>
+      </td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<div class="empty">
+  <svg class="ic"><use href="#i-plug"/></svg>
+  <strong>Belum ada koneksi</strong>
+  <p>Tambahkan koneksi pertama untuk mulai.</p>
+  <a class="button primary" href="/admin/connections/new"><svg class="ic"><use href="#i-plus"/></svg>Tambah koneksi</a>
+</div>
+{{end}}
+{{end}}

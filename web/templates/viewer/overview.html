@@ -1,0 +1,68 @@
+{{define "title"}}{{.Data.Database.Name}}{{end}}
+
+{{define "content"}}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="/databases">Database</a><span class="sep">/</span><span class="here">{{.Data.Database.Name}}</span>
+</nav>
+
+<section class="hero">
+  <div>
+    <span class="eyebrow"><svg class="ic"><use href="#i-db"/></svg>{{.Data.Database.DBMSLabel}}</span>
+    <div class="title-row">
+      <h1>{{.Data.Database.Name}}</h1>
+      <span class="badge badge-{{.Data.Database.Level}}">{{.Data.Database.LevelLabel}}</span>
+    </div>
+    <p class="subtitle">Pilih tabel atau view untuk melihat kolom, constraint, index, dan isi datanya.</p>
+    <div class="hero-actions">
+      <a class="button secondary" href="/databases/{{.Data.Database.ID}}/migrations"><svg class="ic"><use href="#i-history"/></svg>Riwayat migration</a>
+    </div>
+  </div>
+  <div class="numbers">
+    <div class="num-item">
+      <div class="lbl"><svg class="ic"><use href="#i-layers"/></svg>Schema</div>
+      <div class="val">{{len .Data.Schemas}}</div>
+    </div>
+  </div>
+</section>
+
+<div class="finder js-only">
+  <svg class="ic"><use href="#i-search"/></svg>
+  <input id="finder-input" type="text" placeholder="Cari tabel atau view..." aria-label="Cari tabel atau view" autocomplete="off">
+  <kbd>/</kbd>
+</div>
+<p id="no-match" class="no-match">Tidak ada tabel atau view yang cocok.</p>
+
+{{range .Data.Schemas}}
+<section class="surface" data-filter-block>
+  <div class="surface-head">
+    <h2><svg class="ic"><use href="#i-layers"/></svg>Schema <code>{{.Name}}</code></h2>
+    <span class="pill-count">{{len .Tables}} objek</span>
+  </div>
+  <div class="card-grid">
+    {{range .Tables}}
+    <article class="obj-card" data-filter-item="{{.Name}}">
+      <div class="card-top">
+        <span class="card-icon"><svg class="ic"><use href="#i-table"/></svg></span>
+        <span class="badge badge-dbms">{{.KindLabel}}</span>
+      </div>
+      <h3><a href="{{.Href}}">{{.Name}}</a></h3>
+      <div class="rows">
+        <span class="big">{{.RowsText}}</span>
+        <span class="cap">estimasi baris</span>
+      </div>
+      <div class="card-foot">
+        <a class="link-sub" href="{{.DataHref}}"><svg class="ic"><use href="#i-grid"/></svg>Lihat data</a>
+        <span class="go-circle" aria-hidden="true"><svg class="ic"><use href="#i-arrow"/></svg></span>
+      </div>
+    </article>
+    {{end}}
+  </div>
+</section>
+{{else}}
+<div class="empty">
+  <svg class="ic"><use href="#i-layers"/></svg>
+  <strong>Schema kosong</strong>
+  <p>Database ini belum memiliki tabel atau view.</p>
+</div>
+{{end}}
+{{end}}
