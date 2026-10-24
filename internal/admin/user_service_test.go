@@ -21,10 +21,47 @@ type createCall struct {
 	isAdmin        bool
 }
 
+type updateCall struct {
+	id      int64
+	hash    string
+	isAdmin bool
+}
+
+type activeCall struct {
+	id     int64
+	active bool
+}
+
 type fakeStore struct {
 	created   []createCall
 	createErr error
 	listed    []domain.User
+
+	got          domain.User
+	getErr       error
+	updated      []updateCall
+	updateErr    error
+	wasAdmin     bool
+	activeCalls  []activeCall
+	setActiveErr error
+}
+
+func (f *fakeStore) Get(context.Context, int64) (domain.User, error) { return f.got, f.getErr }
+
+func (f *fakeStore) Update(_ context.Context, id int64, hash string, isAdmin bool) (domain.User, bool, error) {
+	if f.updateErr != nil {
+		return domain.User{}, false, f.updateErr
+	}
+	f.updated = append(f.updated, updateCall{id, hash, isAdmin})
+	return domain.User{ID: id, Username: "target", IsPlatformAdmin: isAdmin, IsActive: true}, f.wasAdmin, nil
+}
+
+func (f *fakeStore) SetActive(_ context.Context, id int64, active bool) (domain.User, error) {
+	if f.setActiveErr != nil {
+		return domain.User{}, f.setActiveErr
+	}
+	f.activeCalls = append(f.activeCalls, activeCall{id, active})
+	return domain.User{ID: id, Username: "target", IsActive: active}, nil
 }
 
 func (f *fakeStore) Create(_ context.Context, username, hash string, isAdmin bool) (domain.User, error) {
