@@ -1,22 +1,22 @@
 package connmgr
 
 import (
+	"dbplatform/internal/domain"
 	"errors"
 	"strings"
 	"testing"
-	"dbplatform/internal/domain"
 )
 
 func validInput() domain.ConnectionInput {
 	return domain.ConnectionInput{
 		Name: "sampledb",
-		DBMS:domain.DBMSPostgres,
+		DBMS: domain.DBMSPostgres,
 		Host: "localhost",
 		Port: 5433,
-		DatabaseName:"sampledb",
+		DatabaseName: "sampledb",
 		Username: "postgres",
 		Password: "postgres",
-		SSLMode:"disable",
+		SSLMode: "disable",
 	}
 }
 
@@ -31,7 +31,7 @@ func TestValidateInput_Fields(t *testing.T) {
 		name string
 		mutate func(*domain.ConnectionInput)
 		isUpdate bool
-		wantField string 
+		wantField string
 	}{
 		{"nama kosong", func(c *domain.ConnectionInput) { c.Name = "" }, false, "name"},
 		{"nama hanya spasi", func(c *domain.ConnectionInput) { c.Name = "   " }, false, "name"},
