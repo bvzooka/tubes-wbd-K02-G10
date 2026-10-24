@@ -1,10 +1,3 @@
-{{/*
-  Kerangka semua halaman. Data: httpx.PageData.
-  Setiap halaman wajib mendefinisikan dua blok:
-    {{define "title"}}Judul halaman{{end}}
-    {{define "content"}} ... {{end}}
-  Form POST wajib memuat {{template "csrf" .}}.
-*/}}
 {{define "base"}}<!doctype html>
 <html lang="id">
 <head>
@@ -12,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{template "title" .}} · Database Management Platform</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
 </head>
-<body>
+<body class="{{if .Principal}}has-nav {{end}}sec-{{.Section}}">
   <header class="topbar">
     <a class="brand" href="/">Database Management Platform</a>
     {{with .Principal}}
@@ -35,6 +30,7 @@
 
   <main class="container">
     {{template "flash" .}}
+    {{template "icons"}}
     {{template "content" .}}
   </main>
 </body>

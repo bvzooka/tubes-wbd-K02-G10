@@ -9,21 +9,35 @@ import (
 	"path"
 	"sort"
 	"strings"
-
 	"dbplatform/internal/domain"
 )
 
 const (
 	templatesDir = "templates"
-	layoutFile   = "templates/layouts/base.html"
+	layoutFile = "templates/layouts/base.html"
 )
 
 type PageData struct {
-	Title     string
+	Title string
 	Principal *domain.Principal
 	CSRFToken string
-	Flash     *Flash
-	Data      any
+	Flash *Flash
+	Section string
+	Data any
+}
+
+func sectionOf(p string) string {
+	switch {
+	case p == "/databases" || strings.HasPrefix(p, "/databases/"):
+		return "databases"
+	case strings.HasPrefix(p, "/admin/connections"):
+		return "connections"
+	case strings.HasPrefix(p, "/admin/users"):
+		return "users"
+	case strings.HasPrefix(p, "/admin/groups"):
+		return "groups"
+	}
+	return ""
 }
 
 type Renderer struct {
@@ -71,7 +85,7 @@ func (r *Renderer) Page(w http.ResponseWriter, req *http.Request, status int, na
 		return
 	}
 
-	pd := PageData{Data: data, CSRFToken: domain.CSRFTokenFrom(req.Context())}
+	pd := PageData{Data: data, Section: sectionOf(req.URL.Path), CSRFToken: domain.CSRFTokenFrom(req.Context())}
 	if p, ok := domain.PrincipalFrom(req.Context()); ok {
 		pd.Principal = &p
 	}

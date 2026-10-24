@@ -1,0 +1,115 @@
+{{define "title"}}{{.Data.Schema}}.{{.Data.Name}}{{end}}
+
+{{define "content"}}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="/databases">Database</a><span class="sep">/</span>
+  <a href="{{.Data.BackHref}}">{{.Data.Database.Name}}</a><span class="sep">/</span>
+  <span class="here">{{.Data.Schema}}.{{.Data.Name}}</span>
+</nav>
+
+<section class="dark-card">
+  <div class="dark-top">
+    <div>
+      <span class="eyebrow"><svg class="ic"><use href="#i-table"/></svg>{{.Data.KindLabel}} · schema {{.Data.Schema}}</span>
+      <h1>{{.Data.Name}}</h1>
+    </div>
+    <a class="button lime" href="{{.Data.DataHref}}"><svg class="ic"><use href="#i-grid"/></svg>Lihat data</a>
+  </div>
+  <div class="col-strip" aria-label="Ringkasan kolom">
+    {{range .Data.Columns}}<span class="col-pill {{if .Nullable}}nullable{{else}}notnull{{end}}{{if .HasDefault}} hasdef{{end}}" title="{{.Name}}: {{.DataType}}">{{.Name}}</span>{{end}}
+  </div>
+  <div class="legend">
+    <span><i></i>NOT NULL</span>
+    <span><i class="n"></i>boleh NULL</span>
+    <span><i class="d"></i>punya default</span>
+  </div>
+</section>
+
+<div class="stat-row">
+  <div class="stat"><div class="lbl"><svg class="ic"><use href="#i-columns"/></svg>Kolom</div><div class="val">{{len .Data.Columns}}</div></div>
+  <div class="stat"><div class="lbl"><svg class="ic"><use href="#i-link"/></svg>Constraint</div><div class="val">{{len .Data.Constraints}}</div></div>
+  <div class="stat"><div class="lbl"><svg class="ic"><use href="#i-bolt"/></svg>Index</div><div class="val">{{len .Data.Indexes}}</div></div>
+  <div class="stat accent"><div class="lbl"><svg class="ic"><use href="#i-hash"/></svg>Estimasi baris</div><div class="val">{{.Data.RowsText}}</div></div>
+</div>
+
+<div class="tabs">
+  <input class="tab-input" type="radio" name="tab" id="tab-kolom" checked>
+  <input class="tab-input" type="radio" name="tab" id="tab-constraint">
+  <input class="tab-input" type="radio" name="tab" id="tab-index">
+  <div class="tab-list">
+    <label for="tab-kolom">Kolom <span class="n">{{len .Data.Columns}}</span></label>
+    <label for="tab-constraint">Constraint <span class="n">{{len .Data.Constraints}}</span></label>
+    <label for="tab-index">Index <span class="n">{{len .Data.Indexes}}</span></label>
+  </div>
+
+  <section class="panel tab-panel panel-kolom">
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th class="num">#</th><th>Nama</th><th>Tipe</th><th>Nullable</th><th>Default</th></tr></thead>
+      <tbody>
+      {{range .Data.Columns}}
+        <tr>
+          <td class="num muted">{{.Position}}</td>
+          <td class="name">{{.Name}}</td>
+          <td><code>{{.DataType}}</code></td>
+          <td>{{if .Nullable}}<span class="badge">boleh NULL</span>{{else}}<span class="badge badge-view_edit">NOT NULL</span>{{end}}</td>
+          <td>{{if .HasDefault}}<code>{{.Default}}</code>{{else}}<span class="muted">-</span>{{end}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section class="panel tab-panel panel-constraint">
+    {{if .Data.Constraints}}
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nama</th><th>Jenis</th><th>Kolom</th><th>Detail</th></tr></thead>
+      <tbody>
+      {{range .Data.Constraints}}
+        <tr>
+          <td class="name">{{.Name}}</td>
+          <td><span class="badge badge-dbms">{{.TypeLabel}}</span></td>
+          <td><code>{{.Columns}}</code></td>
+          <td>{{.Detail}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+    {{else}}
+    <div class="empty">
+      <svg class="ic"><use href="#i-link"/></svg>
+      <strong>Tidak ada constraint</strong>
+    </div>
+    {{end}}
+  </section>
+
+  <section class="panel tab-panel panel-index">
+    {{if .Data.Indexes}}
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nama</th><th>Metode</th><th>Kolom</th><th>Sifat</th><th>Definisi</th></tr></thead>
+      <tbody>
+      {{range .Data.Indexes}}
+        <tr>
+          <td class="name">{{.Name}}</td>
+          <td>{{.Method}}</td>
+          <td><code>{{.Columns}}</code></td>
+          <td>{{if .Primary}}<span class="badge badge-pk">primary</span>{{else if .Unique}}<span class="badge badge-uq">unique</span>{{else}}<span class="muted">-</span>{{end}}</td>
+          <td><code>{{.Definition}}</code></td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+    {{else}}
+    <div class="empty">
+      <svg class="ic"><use href="#i-bolt"/></svg>
+      <strong>Tidak ada index</strong>
+    </div>
+    {{end}}
+  </section>
+</div>
+{{end}}
