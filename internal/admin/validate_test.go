@@ -5,6 +5,58 @@ import (
 	"testing"
 )
 
+func TestValidateGroupName(t *testing.T) {
+	tests := []struct {
+		name     string
+		in       string
+		wantName string
+		wantErr  bool
+	}{
+		{"valid", "Tim Data", "Tim Data", false},
+		{"dirapikan", "  Tim Data  ", "Tim Data", false},
+		{"satu karakter", "a", "a", false},
+		{"batas atas", strings.Repeat("a", 64), strings.Repeat("a", 64), false},
+		{"unicode dihitung per karakter", strings.Repeat("é", 64), strings.Repeat("é", 64), false},
+		{"kosong", "", "", true},
+		{"hanya spasi", "   ", "", true},
+		{"terlalu panjang", strings.Repeat("a", 65), strings.Repeat("a", 65), true},
+		{"unicode terlalu panjang", strings.Repeat("é", 65), strings.Repeat("é", 65), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			name, msg := validateGroupName(tt.in)
+			if name != tt.wantName {
+				t.Errorf("nama = %q, mau %q", name, tt.wantName)
+			}
+			if (msg != "") != tt.wantErr {
+				t.Errorf("pesan = %q, wantErr = %v", msg, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateDescription(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{"kosong boleh", "", "", false},
+		{"dirapikan", "  catatan  ", "catatan", false},
+		{"batas atas", strings.Repeat("a", 500), strings.Repeat("a", 500), false},
+		{"terlalu panjang", strings.Repeat("a", 501), strings.Repeat("a", 501), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, msg := validateDescription(tt.in)
+			if got != tt.want || (msg != "") != tt.wantErr {
+				t.Errorf("got = %q, pesan = %q, wantErr = %v", got, msg, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateUsername(t *testing.T) {
 	tests := []struct {
 		name     string
