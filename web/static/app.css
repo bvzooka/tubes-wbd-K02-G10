@@ -545,3 +545,30 @@ td.nowrap { white-space: nowrap; }
   .sec-groups .card, .sec-users .card { padding: 1.1rem; }
   .sec-groups .card .table-wrap, .sec-users .card .table-wrap { overflow-x: auto; }
 }
+
+form.inline { display: inline-flex; align-items: center; margin: 0; }
+form.inline > button, td button, .table-wrap button { margin: 0; }
+.sec-groups .card form.inline > button, .sec-users .card form.inline > button { margin: 0; }
+td form.inline + form.inline, td a + form.inline { margin-left: 0.85rem; }
+
+.container > .card + .card,
+.container > .card + section,
+.container > section + .card,
+.container > .card + .alert,
+.container > .alert + .card,
+.container > .alert + section { margin-top: 1.5rem; }
+.sec-groups .container > .card, .sec-users .container > .card { margin-top: 0; }
+.card > h2:first-child { margin: 0 0 1rem; }
+
+.action-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.action-row > .button, .action-row > button, .action-row > form.inline { margin: 0; }
+.card > p.muted:has(+ .action-row) { margin: 0 0 1rem; }
+.form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 1.25rem; }
+.form-actions > button, .form-actions > .button { margin: 0; }
+.check { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; margin: 1rem 0 0; font-weight: 600; cursor: pointer; }
+.check input { width: 1.15rem; height: 1.15rem; margin: 0; accent-color: var(--green); }
+.card table td, .card table code { overflow-wrap: anywhere; }
+.card pre { max-width: 100%; overflow-x: auto; }
+.sec-databases .card form > label:not(.check) { display: block; margin: 1rem 0 0.4rem; }
+.sec-databases .card form > label:not(.check):first-of-type { margin-top: 0; }
+.sec-databases .card form > .field-error, .sec-databases .card form > p.muted { margin: 0.4rem 0 0; }

@@ -17,11 +17,14 @@
     <p class="muted">Seluruh SQL dijalankan dalam satu transaction. Jangan menulis BEGIN, COMMIT, atau ROLLBACK. Maksimal 256 KB.</p>
     {{with index .Data.Errors "sql"}}<p class="field-error">{{.}}</p>{{end}}
 
-    <button type="submit">Simpan draft</button>
-    <button type="submit" name="action" value="execute" class="secondary">Simpan lalu jalankan</button>
-    <button type="submit" formaction="/databases/{{.Data.DBID}}/explain" class="secondary">Analisis plan</button>
-    <label><input type="checkbox" name="analyze" value="on"> Dengan ANALYZE (benar-benar menjalankan statement lalu dibatalkan)</label>
-    <a class="button secondary" href="/databases/{{.Data.DBID}}/migrations">Batal</a>
+    <label class="check"><input type="checkbox" name="analyze" value="on"> Dengan ANALYZE (benar-benar menjalankan statement lalu dibatalkan)</label>
+
+    <div class="form-actions">
+      <button type="submit">Simpan draft</button>
+      <button type="submit" name="action" value="execute" class="secondary">Simpan lalu jalankan</button>
+      <button type="submit" formaction="/databases/{{.Data.DBID}}/explain" class="secondary">Analisis plan</button>
+      <a class="button secondary" href="/databases/{{.Data.DBID}}/migrations">Batal</a>
+    </div>
   </form>
 </section>
 {{end}}
