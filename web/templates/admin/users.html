@@ -1,0 +1,31 @@
+{{define "title"}}Pengguna{{end}}
+
+{{define "content"}}
+<h1>Pengguna</h1>
+<p><a class="button" href="/admin/users/new">Pengguna baru</a></p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Peran</th>
+        <th>Status</th>
+        <th>Dibuat</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Data.Users}}
+      <tr>
+        <td>{{.Username}}</td>
+        <td>{{if .IsPlatformAdmin}}<span class="badge badge-view_edit">Platform Admin</span>{{else}}Pengguna{{end}}</td>
+        <td>{{if .IsActive}}Aktif{{else}}<span class="badge badge-cancelled">Nonaktif</span>{{end}}</td>
+        <td>{{.CreatedAt.Format "02 Jan 2006 15:04"}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="4" class="muted">Belum ada pengguna.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
