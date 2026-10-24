@@ -20,6 +20,7 @@ import (
 	"dbplatform/internal/explain"
 	"dbplatform/internal/httpx"
 	"dbplatform/internal/migration"
+	"dbplatform/internal/schemadiff"
 	"dbplatform/internal/viewer"
 	webassets "dbplatform/web"
 )
@@ -111,6 +112,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		logger.Warn("migration yang terputus ditandai gagal", "jumlah", recovered)
 	}
 	migration.NewHandler(d, migrationSvc).Register(mux)
+	schemadiff.NewHandler(d, schemadiff.NewService(d.Authz, d.Drivers, migrationSvc)).Register(mux)
 
 	static, err := fs.Sub(webassets.FS, "static")
 	if err != nil {

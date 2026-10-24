@@ -1,0 +1,62 @@
+{{define "title"}}Schema diff{{end}}
+
+{{define "content"}}
+<p><a href="/databases/{{.Data.DBID}}/migrations">&laquo; Riwayat migration {{.Data.DBName}}</a></p>
+<h1>Buat migration dari schema diff</h1>
+<p class="muted">Membandingkan struktur database sumber dengan <strong>{{.Data.DBName}}</strong> (tujuan). Hasilnya adalah draft migration yang membuat tujuan mirip sumber. Data tidak ikut disalin, dan draft dapat ditinjau serta diubah sebelum dijalankan.</p>
+
+<section class="card">
+  <form method="post" action="/databases/{{.Data.DBID}}/schema-diff">
+    {{template "csrf" .}}
+    {{if .Data.Sources}}
+    <label for="source_id">Database sumber</label>
+    <select id="source_id" name="source_id" required>
+      {{range .Data.Sources}}<option value="{{.ConnectionID}}"{{if eq .ConnectionID $.Data.SourceID}} selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+    {{with index .Data.Errors "source_id"}}<p class="field-error">{{.}}</p>{{end}}
+    <button type="submit" name="action" value="preview">Bandingkan</button>
+    {{else}}
+    <p class="muted">Tidak ada database PostgreSQL lain yang dapat kamu baca untuk dijadikan sumber.</p>
+    {{end}}
+  </form>
+</section>
+
+{{if .Data.Compared}}
+{{if .Data.Changes}}
+<form method="post" action="/databases/{{.Data.DBID}}/schema-diff">
+  {{template "csrf" .}}
+  <input type="hidden" name="source_id" value="{{.Data.SourceID}}">
+
+  <section class="card">
+    <h2>{{len .Data.Changes}} perubahan dari {{.Data.SourceName}}</h2>
+    {{if .Data.DestructiveCount}}
+    <p class="alert alert-warning" role="alert">{{.Data.DestructiveCount}} perubahan dapat menghapus data dan tidak dicentang secara default. Centang hanya bila memang diinginkan.</p>
+    {{end}}
+    {{with index .Data.Errors "changes"}}<p class="alert alert-error" role="alert">{{.}}</p>{{end}}
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Pilih</th><th>Perubahan</th><th>Objek</th><th>SQL</th></tr>
+        </thead>
+        <tbody>
+          {{range .Data.Changes}}
+          <tr>
+            <td><input type="checkbox" name="change" id="c-{{.ID}}" value="{{.ID}}"{{if .Checked}} checked{{end}}></td>
+            <td><label for="c-{{.ID}}">{{.Label}}</label>{{if .Destructive}} <span class="badge badge-failed">Menghapus data</span>{{end}}</td>
+            <td><code>{{.Object}}</code></td>
+            <td><pre class="sql-view">{{.SQL}}</pre></td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    <button type="submit" name="action" value="create">Buat draft migration</button>
+  </section>
+</form>
+{{else}}
+<p class="alert alert-success" role="status">Tidak ada perbedaan struktur antara {{.Data.SourceName}} dan {{.Data.DBName}}.</p>
+{{end}}
+{{end}}
+{{end}}
