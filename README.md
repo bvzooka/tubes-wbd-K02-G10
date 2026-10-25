@@ -52,7 +52,7 @@ web/                template dan aset statis, di-embed ke binary
 
 ## Session
 
-Setelah login, browser hanya menerima satu nilai acak 32 byte di cookie `wbd_session`. Nilai itu tidak berisi informasi apa pun. Tabel `sessions` menyimpan hash SHA-256-nya, bukan nilai aslinya, jadi isi database yang bocor tidak bisa dipakai untuk masuk. Cookie diberi `HttpOnly` dan `SameSite=Lax`.
+Setelah login, browser hanya menerima satu nilai acak 32 byte di cookie `wbd_session`. 
 
 Semua parameter bisa diubah lewat `.env`:
 
@@ -116,8 +116,8 @@ ANALYZE benar-benar menjalankan statement, jadi selalu dibungkus transaction yan
 
 ## Pembagian tugas
 
-| Anggota                          | Bagian                                                                                                                         |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Kurt Mikhael Purba - 13524065    | Login, password, session (timeout, rotasi, grace period), CSRF, middleware otorisasi, perhitungan akses efektif, bonus EXPLAIN |
-| Reva Natania Sitohang - 13524098 | Kelola koneksi dan enkripsi kredensial, driver PostgreSQL, database viewer,  bonus MySQL/MariaDB                             |
+| Anggota                               | Bagian                                                                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Kurt Mikhael Purba - 13524065         | Login, password, session (timeout, rotasi, grace period), CSRF, middleware otorisasi, perhitungan akses efektif, bonus EXPLAIN |
+| Reva Natania Sitohang - 13524098      | Kelola koneksi dan enkripsi kredensial, driver PostgreSQL, database viewer,  bonus MySQL/MariaDB                             |
 | Amanda Aurellia Salsabilla - 13524131 | Kerangka aplikasi dan renderer, migration (editor, eksekusi, riwayat), halaman admin user dan group, bonus schema diff         |
