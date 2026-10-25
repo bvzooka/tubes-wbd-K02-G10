@@ -9,6 +9,7 @@ const (
 	csrfCtxKey
 )
 
+// User yang login disimpen di context request
 func WithPrincipal(ctx context.Context, p Principal) context.Context {
 	return context.WithValue(ctx, principalCtxKey, p)
 }
