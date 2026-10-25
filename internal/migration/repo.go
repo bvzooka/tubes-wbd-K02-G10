@@ -53,6 +53,7 @@ func scanMigration(row pgx.Row) (domain.Migration, error) {
 	return m, err
 }
 
+// Kunci per database biar pembuatan dan klaim ga balapan
 func lockMigrations(ctx context.Context, tx pgx.Tx, connID int64) error {
 	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('migration:' || $1::bigint::text, 0))`, connID)
 	if err != nil {
@@ -73,7 +74,9 @@ func (r *Repo) Create(ctx context.Context, connID int64, name, sql, checksum str
 	}
 
 	var version int
-	err = tx.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, 
+		// Versi berikutnya diitung di dalem kunci biar ga kembar
+		`
 		SELECT COALESCE(MAX(version), 0) + 1
 		FROM db_migrations
 		WHERE connection_id = $1`, connID).Scan(&version)
@@ -162,6 +165,7 @@ func (r *Repo) Cancel(ctx context.Context, connID int64, version int) error {
 	return nil
 }
 
+// Nandain running secara atomik jadi dua orang gabisa jalanin bareng
 func (r *Repo) Claim(ctx context.Context, connID int64, version int, executedBy int64, now time.Time) (domain.Migration, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -190,7 +194,9 @@ func (r *Repo) Claim(ctx context.Context, connID int64, version int, executedBy 
 	}
 
 	var blocking int
-	err = tx.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, 
+		// Berurutan, versi lebih kecil harus selesai duluan
+		`
 		SELECT version
 		FROM db_migrations
 		WHERE connection_id = $1 AND version < $2 AND status IN ('draft', 'running')
@@ -210,6 +216,7 @@ func (r *Repo) Claim(ctx context.Context, connID int64, version int, executedBy 
 		WHERE connection_id = $1 AND version = $2`,
 		connID, version, executedBy, now)
 	var pgErr *pgconn.PgError
+	// Indeks unik nolak kalau ada migration lain yang lagi running
 	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
 		return domain.Migration{}, domain.ErrMigrationOutOfOrder
 	}
@@ -242,6 +249,7 @@ func (r *Repo) Finish(ctx context.Context, connID int64, version int, status dom
 	return nil
 }
 
+// Buat migration yang nyangkut running karena server mati
 func (r *Repo) FailStuck(ctx context.Context, startedBefore time.Time, message string, finishedAt time.Time) (int, error) {
 	tag, err := r.db.Exec(ctx, `
 		UPDATE db_migrations
@@ -254,6 +262,7 @@ func (r *Repo) FailStuck(ctx context.Context, startedBefore time.Time, message s
 	return int(tag.RowsAffected()), nil
 }
 
+// Ngebedain 404 dengan dari bukan draft
 func (r *Repo) notDraftOrMissing(ctx context.Context, connID int64, version int) error {
 	var one int
 	err := r.db.QueryRow(ctx, `

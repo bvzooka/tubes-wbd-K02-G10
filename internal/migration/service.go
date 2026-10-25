@@ -32,6 +32,7 @@ func NewService(store store, authz contract.Authorizer, drivers contract.DriverP
 	return &Service{store: store, authz: authz, drivers: drivers, clock: clk}
 }
 
+// Akses dicek dulu sebelum validasi biar orang tanpa hak gabisa nebak aturan
 func (s *Service) require(ctx context.Context, actor domain.Principal, connID int64, min domain.AccessLevel) error {
 	ok, err := s.authz.Can(ctx, actor.UserID, connID, min)
 	if err != nil {

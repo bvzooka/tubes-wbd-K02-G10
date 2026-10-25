@@ -32,6 +32,7 @@ func (s *Service) Execute(ctx context.Context, actor domain.Principal, connID in
 		return domain.Migration{}, err
 	}
 
+	// Browser ditutup gaboleh bikin migration nyangkut running
 	detached := context.WithoutCancel(ctx)
 	status, errMsg, warning := s.run(detached, connID, claimed.SQL)
 	if err := s.store.Finish(detached, connID, version, status, errMsg, warning, s.clock.Now()); err != nil {
@@ -40,6 +41,7 @@ func (s *Service) Execute(ctx context.Context, actor domain.Principal, connID in
 	return s.store.Get(detached, connID, version)
 }
 
+// SQL gagal di target = status failed bukan error app
 func (s *Service) run(ctx context.Context, connID int64, sql string) (domain.MigrationStatus, string, string) {
 	if msg := CheckSQL(sql); msg != "" {
 		return domain.MigrationFailed, msg, ""
@@ -51,6 +53,7 @@ func (s *Service) run(ctx context.Context, connID int64, sql string) (domain.Mig
 	}
 
 	var warning string
+	// Peringatan MySQL gabisa rollback DDL
 	if !driver.Capabilities().TransactionalDDL {
 		if stmts, err := Split(sql); err == nil && ContainsDDL(stmts) {
 			warning = msgDDLWarning
@@ -59,6 +62,7 @@ func (s *Service) run(ctx context.Context, connID int64, sql string) (domain.Mig
 
 	execCtx, cancel := context.WithTimeout(ctx, execTimeout+execGrace)
 	defer cancel()
+	// Semua SQL satu transaction --> gagal satu gagal semu
 	err = driver.WithTx(execCtx, dbdriver.TxOptions{Timeout: execTimeout}, func(tx dbdriver.Tx) error {
 		_, err := tx.Exec(execCtx, sql)
 		return err

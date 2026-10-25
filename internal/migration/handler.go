@@ -66,6 +66,7 @@ func NewHandler(d httpx.Deps, svc migrationService) *Handler {
 	return &Handler{deps: d, svc: svc}
 }
 
+// Lihat pakai DBView, ubah pakai DBEdit
 func (h *Handler) Register(mux *http.ServeMux) {
 	view := h.deps.DBView()
 	edit := h.deps.DBEdit()
@@ -114,6 +115,7 @@ func (h *Handler) parseForm(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// Cuma buat tampilan, penjaga sebenernya ada di route dan service
 func (h *Handler) database(ctx context.Context, userID, dbID int64) (string, bool, error) {
 	list, err := h.deps.Authz.ListAccessible(ctx, userID)
 	if err != nil {
@@ -281,6 +283,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	h.afterSave(w, r, actor, dbID, version)
 }
 
+// Tombol Simpan lalu jalanin kirim action=execute
 func (h *Handler) afterSave(w http.ResponseWriter, r *http.Request, actor domain.Principal, dbID int64, version int) {
 	if r.PostFormValue("action") == actionExecute {
 		h.run(w, r, actor, dbID, version)
@@ -306,6 +309,7 @@ func (h *Handler) execute(w http.ResponseWriter, r *http.Request) {
 	h.run(w, r, actor, dbID, version)
 }
 
+// Hasil eksekusi dijadiin pesan flash
 func (h *Handler) run(w http.ResponseWriter, r *http.Request, actor domain.Principal, dbID int64, version int) {
 	m, err := h.svc.Execute(r.Context(), actor, dbID, version)
 	var ooo *OutOfOrderError
