@@ -27,6 +27,7 @@ type Flasher struct {
 	secure bool
 }
 
+// Key tanda tangan diturunin dari app secret key
 func NewFlasher(secret []byte, secure bool) *Flasher {
 	m := hmac.New(sha256.New, secret)
 	m.Write([]byte("flash"))
@@ -45,6 +46,7 @@ func (f *Flasher) Set(w http.ResponseWriter, kind, message string) {
 	http.SetCookie(w, f.cookie(payload+"."+f.sign(payload), 60))
 }
 
+// Cookie dihapus setelah dibaca
 func (f *Flasher) Take(w http.ResponseWriter, r *http.Request) *Flash {
 	c, err := r.Cookie(FlashCookieName)
 	if err != nil {

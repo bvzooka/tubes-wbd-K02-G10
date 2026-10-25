@@ -45,6 +45,7 @@ func HandleError(render *Renderer, logger *slog.Logger) contract.ErrorHandler {
 				Heading: "Database tidak dapat dijangkau",
 				Message: msg,
 			})
+		// User cuman liat nomor request, detailnya ada di log
 		default:
 			id := RequestID(r.Context())
 			logger.ErrorContext(r.Context(), "unhandled error", "request_id", id, "error", err)
