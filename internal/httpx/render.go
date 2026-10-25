@@ -45,6 +45,7 @@ type Renderer struct {
 	flash *Flasher
 }
 
+// Template dibaca sekali pas start
 func NewRenderer(fsys fs.FS, flash *Flasher) (*Renderer, error) {
 	partials, err := fs.Glob(fsys, templatesDir+"/partials/*.html")
 	if err != nil {
@@ -93,6 +94,7 @@ func (r *Renderer) Page(w http.ResponseWriter, req *http.Request, status int, na
 		pd.Flash = r.flash.Take(w, req)
 	}
 
+	// Rendernya ke buffer dulu biar ga setengah jadi diliat user
 	var buf bytes.Buffer
 	if err := t.ExecuteTemplate(&buf, "base", pd); err != nil {
 		http.Error(w, "Terjadi kesalahan pada server.", http.StatusInternalServerError)

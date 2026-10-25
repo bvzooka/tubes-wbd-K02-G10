@@ -15,6 +15,7 @@ type Middleware = func(http.Handler) http.Handler
 
 func Chain(mws ...Middleware) Middleware {
 	return func(next http.Handler) http.Handler {
+		// Dari belakang biar middleware belakang duluan
 		for i := len(mws) - 1; i >= 0; i-- {
 			next = mws[i](next)
 		}
