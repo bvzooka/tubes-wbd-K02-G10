@@ -17,7 +17,7 @@ Isi dua nilai di `.env`:
 - `APP_SECRET_KEY`: base64 dari tepat 32 byte acak untuk mengenkripsi password koneksi database dan menandatangani pesan flash.
   - Linux/macOS: `openssl rand -base64 32`
   - PowerShell: `$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Fill($b); [Convert]::ToBase64String($b)`
-- `SEED_ADMIN_PASSWORD`: password untuk Platform Admin pertama.
+- `SEED_ADMIN_PASSWORD`: password untuk Platform Admin pertama. Username-nya `admin`, bisa diganti lewat `SEED_ADMIN_USERNAME`.
 
 Lalu:
 
@@ -33,7 +33,7 @@ make test-short   # unit test saja, tidak butuh Docker
 make test         # semua test, butuh `make up` (memakai testdb di port 5434)
 ```
 
-Struktur kode
+## Struktur kode
 
 ```
 cmd/server/         titik masuk, perakitan modul (wire.go), test end-to-end
@@ -114,8 +114,10 @@ ANALYZE benar-benar menjalankan statement, jadi selalu dibungkus transaction yan
 
 **Schema diff.** Dari halaman migration, pengguna View + Edit bisa membandingkan struktur database tujuan dengan database PostgreSQL lain yang ia punya akses baca. Hasilnya daftar perbedaan beserta SQL-nya, schema dan tabel baru, kolom yang ditambah, diubah tipe, nullability, atau default-nya, serta constraint dan index. Pengguna memilih perubahan mana yang diambil, lalu aplikasi membuat draft migration yang masih bisa diedit sebelum dijalankan.
 
+## Pembagian tugas
+
 | Anggota                          | Bagian                                                                                                                         |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Kurt Mikhael Purba - 13524065    | Login, password, session (timeout, rotasi, grace period), CSRF, middleware otorisasi, perhitungan akses efektif, bonus EXPLAIN |
 | Reva Natania Sitohang - 13524098 | Kelola koneksi dan enkripsi kredensial, driver PostgreSQL, database viewer,  bonus MySQL/MariaDB                             |
-| Amanda Aurellia Salsabila        | Kerangka aplikasi dan renderer, migration (editor, eksekusi, riwayat), halaman admin user dan group, bonus schema diff         |
+| Amanda Aurellia Salsabilla - 13524131 | Kerangka aplikasi dan renderer, migration (editor, eksekusi, riwayat), halaman admin user dan group, bonus schema diff         |
