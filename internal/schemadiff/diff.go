@@ -36,6 +36,7 @@ type Change struct {
 
 type tableKey struct{ schema, name string }
 
+// View diabaikan, cuma tabel yang dibandingin
 func tablesOf(s *domain.Schema) map[tableKey]domain.Table {
 	out := map[tableKey]domain.Table{}
 	if s == nil {
@@ -135,6 +136,7 @@ func sameConstraint(a, b domain.Constraint) bool {
 	return true
 }
 
+// Index otomatis dari primary key atau constraint dilewatin
 func standaloneIndexes(t domain.Table) map[string]domain.Index {
 	backed := constraintIndex(t)
 	out := map[string]domain.Index{}
@@ -158,6 +160,7 @@ func sameDefault(a, b *string) bool {
 	return strings.TrimSpace(*a) == strings.TrimSpace(*b)
 }
 
+// PK dulu baru FK biar tabel rujukannya udah ada
 func constraintRank(t domain.ConstraintType) int {
 	switch t {
 	case domain.ConstraintPrimaryKey:
@@ -175,6 +178,7 @@ type pendingConstraint struct {
 	c     domain.Constraint
 }
 
+// current = tujuan, desired = sumber
 func Diff(current, desired *domain.Schema) []Change {
 	cur, des := tablesOf(current), tablesOf(desired)
 	curSchemas := relationSchemas(current)
@@ -232,6 +236,7 @@ func Diff(current, desired *domain.Schema) []Change {
 		}
 		for _, cc := range sortedColumns(ct) {
 			if _, ok := desCols[cc.Name]; !ok {
+				// Desctructive: true --> ngapus kolom atau tabel bisa ngilangin data
 				dropColumns = append(dropColumns, Change{Kind: KindDropColumn, Object: object + "." + cc.Name, SQL: dropColumnSQL(ct, cc), Destructive: true})
 			}
 		}
@@ -288,6 +293,7 @@ func Diff(current, desired *domain.Schema) []Change {
 	}
 
 	var all []Change
+	// Urutan gabungan: buat, ubah, lepas FK lama, tambah baru, hapus
 	for _, group := range [][]Change{
 		createSchemas, createTables, addColumns, alterColumns, dropForeignKeys, dropOtherConstraints, addConstraints,
 		dropIndexes, createIndexes, dropColumns, dropTables,

@@ -20,6 +20,7 @@ const (
 	msgStaleChoice   = "Perubahan yang dipilih sudah tidak berlaku karena schema berubah. Hitung ulang perbedaannya."
 )
 
+// Pakai service migration, ga nyentuh database platform sendiri
 type migrationCreator interface {
 	Create(ctx context.Context, actor domain.Principal, connID int64, in migration.Input) (domain.Migration, error)
 }
@@ -53,6 +54,7 @@ func (s *Service) can(ctx context.Context, actor domain.Principal, connID int64,
 	return nil
 }
 
+// PostgreSQL aja, bukan tujuan, dan harus bisa dibaca user
 func (s *Service) Sources(ctx context.Context, actor domain.Principal, targetID int64) ([]domain.AccessibleDatabase, error) {
 	if err := s.can(ctx, actor, targetID, domain.AccessViewEdit); err != nil {
 		return nil, err
@@ -70,6 +72,7 @@ func (s *Service) Sources(ctx context.Context, actor domain.Principal, targetID 
 	return out, nil
 }
 
+// Butuh view_edit di tujuan, view_only di sumber
 func (s *Service) Preview(ctx context.Context, actor domain.Principal, targetID, sourceID int64) (*Result, error) {
 	if err := s.can(ctx, actor, targetID, domain.AccessViewEdit); err != nil {
 		return nil, err
@@ -101,6 +104,7 @@ func (s *Service) Preview(ctx context.Context, actor domain.Principal, targetID,
 }
 
 func (s *Service) CreateDraft(ctx context.Context, actor domain.Principal, targetID, sourceID int64, selected []string) (domain.Migration, error) {
+	// Diff dihitung ulang di server, SQL ga pernah ambil dari browser
 	result, err := s.Preview(ctx, actor, targetID, sourceID)
 	if err != nil {
 		return domain.Migration{}, err
@@ -120,6 +124,7 @@ func (s *Service) CreateDraft(ctx context.Context, actor domain.Principal, targe
 		known[c.ID] = true
 	}
 	for id := range ids {
+		// Kalau ada ID asing, schema udah berubah sejak preview
 		if !known[id] {
 			return domain.Migration{}, &domain.ValidationError{Fields: map[string]string{"changes": msgStaleChoice}}
 		}
