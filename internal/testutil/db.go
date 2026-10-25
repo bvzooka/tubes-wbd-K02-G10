@@ -49,6 +49,7 @@ func MustExec(t *testing.T, pool *pgxpool.Pool, sql string) {
 	}
 }
 
+// Database acak yang dihapus pas tes selesai
 func newTempDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	ctx := context.Background()

@@ -59,6 +59,7 @@ func NewUserHandler(d httpx.Deps, svc userService) *UserHandler {
 	return &UserHandler{deps: d, svc: svc}
 }
 
+// Semua route dibungkus Admin()
 func (h *UserHandler) Register(mux *http.ServeMux) {
 	admin := h.deps.Admin()
 	mux.Handle("GET /admin/users", admin(http.HandlerFunc(h.list)))
@@ -138,6 +139,7 @@ func (h *UserHandler) create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.deps.Flash.Set(w, httpx.FlashSuccess, fmt.Sprintf("User %q berhasil dibuat.", u.Username))
+	// Redirest setelah POST biar refresh ga kirim ulang form
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
