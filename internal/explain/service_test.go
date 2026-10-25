@@ -155,7 +155,7 @@ func TestExplain_Integration_WithRealAuthorizer(t *testing.T) {
 	}
 }
 
-// ---- handler ----
+// handler 
 
 type recRenderer struct {
 	status int
@@ -267,7 +267,7 @@ func TestHandler_ExplainForm(t *testing.T) {
 	}
 }
 
-// ---- template ----
+//  template 
 
 const stubLayout = `{{define "base"}}{{template "content" .}}{{end}}{{define "csrf"}}<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">{{end}}`
 

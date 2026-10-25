@@ -2,9 +2,7 @@
 
 Tugas Besar IF3110 Pengembangan Aplikasi Web, Milestone 1, kelompok K02-G10.
 
-Membuat sebuah sistem yang mengatur akses ke database bersama melalui user dan group, memungkinkan pengguna menjelajahi schema dan data dari browser, serta mencatat setiap perubahan struktur sebagai migration yang dijalankan dalam transaction dan tersimpan riwayatnya.
-
-## Menjalankan
+-Menjalankan
 
 Yang perlu ada: Go 1.26 dan Docker.
 
