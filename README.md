@@ -96,6 +96,8 @@ Setiap migration punya nomor versi yang naik berurutan per database (1, 2, 3, ..
 
 Alurnya: dibuat sebagai **draft** (masih bisa diubah atau dibatalkan), lalu dijalankan. Selama berjalan statusnya **running**, kemudian menjadi **success** atau **failed**. Draft yang dibatalkan menjadi **cancelled**. Hanya draft yang bisa diubah, dijalankan, atau dibatalkan.
 
+Eksekusi harus berurutan: sebuah versi hanya bisa dijalankan kalau tidak ada versi yang lebih kecil dan masih berstatus draft atau running. Versi yang lebih kecil harus dijalankan atau dibatalkan lebih dulu. Versi yang gagal tidak menghalangi versi berikutnya, tetapi tetap memakai nomornya dan tidak bisa diubah. Untuk memperbaikinya, tombol *Salin ke migration baru* di halaman detail membuat draft baru dengan SQL yang sama.
+
 Seluruh SQL migration dijalankan dalam satu transaction di database target. Kalau satu statement gagal, semua di-rollback dan status menjadi failed beserta pesan error dari database. Karena itu SQL tidak boleh berisi `BEGIN`, `COMMIT`, `ROLLBACK`, atau sejenisnya, dan editor menolaknya sebelum disimpan. Batas eksekusi 60 detik. SQL maksimal 256 KB.
 
 Dalam satu database hanya satu migration yang boleh berjalan pada satu waktu. Ini dijaga dengan advisory lock dan unique index di tabel riwayat.

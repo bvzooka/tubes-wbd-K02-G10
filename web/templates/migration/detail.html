@@ -31,6 +31,16 @@
   <pre class="sql-view">{{$m.SQL}}</pre>
 </section>
 
+{{if and .Data.CanEdit (ne $m.Status "draft") (ne $m.Status "running")}}
+<section class="card">
+  <h2>Aksi</h2>
+  <p class="muted">Migration ini tidak dapat diubah lagi. Salin SQL-nya ke migration baru untuk memperbaiki atau menjalankannya kembali.</p>
+  <div class="action-row">
+  <a class="button secondary" href="/databases/{{.Data.DBID}}/migrations/new?from={{$m.Version}}">Salin ke migration baru</a>
+  </div>
+</section>
+{{end}}
+
 {{if and .Data.CanEdit (eq $m.Status "draft")}}
 <section class="card">
   <h2>Aksi</h2>
