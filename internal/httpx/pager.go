@@ -23,6 +23,7 @@ type Pager struct {
 	NextURL string
 }
 
+// Ada halaman berikutnya atau ngga
 func NewPager(r *http.Request, req domain.PageRequest, hasNext bool) Pager {
 	req = req.Normalize()
 	link := func(page int) string {

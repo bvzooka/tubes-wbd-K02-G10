@@ -1,4 +1,3 @@
-// Package appdb mengelola pool dan skema database platform (database internal)
 package appdb
 
 import (
@@ -32,7 +31,6 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 }
 
 // Migrate menjalankan file sql/*.sql yang belum tercatat di app_schema_versions
-// Tiap file dijalanin dalam satu transaction bersama pencatatannya
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	return migrateFS(ctx, pool, sqlFS, "sql")
 }
@@ -104,6 +102,7 @@ func migrateFS(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, dir string) 
 	return nil
 }
 
+// Tiap file dijalanin dalam satu transaction bersama pencatatannya
 func apply(ctx context.Context, conn *pgxpool.Conn, version, body string) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {

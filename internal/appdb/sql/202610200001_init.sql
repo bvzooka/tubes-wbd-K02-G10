@@ -34,7 +34,7 @@ CREATE TABLE connections (
     port            INTEGER     NOT NULL CHECK (port BETWEEN 1 AND 65535),
     database_name   TEXT        NOT NULL,
     db_username     TEXT        NOT NULL,
-    db_password_enc BYTEA       NOT NULL,
+    db_password_enc BYTEA       NOT NULL, -- Password koneksi terenkripsi
     ssl_mode        TEXT        NOT NULL DEFAULT 'prefer',
     is_active       BOOLEAN     NOT NULL DEFAULT TRUE,
     created_by      BIGINT REFERENCES users (id),
@@ -90,6 +90,7 @@ CREATE TABLE db_migrations (
     executed_by   BIGINT REFERENCES users (id),
     executed_at   TIMESTAMPTZ,
     finished_at   TIMESTAMPTZ,
+    -- Versi ga boleh kembar per database
     CONSTRAINT db_migrations_version_key UNIQUE (connection_id, version),
     CONSTRAINT db_migrations_name_len CHECK (char_length(name) BETWEEN 1 AND 120)
 );

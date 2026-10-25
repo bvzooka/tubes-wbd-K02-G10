@@ -8,6 +8,7 @@ const (
 	AccessViewEdit AccessLevel = "view_edit"
 )
 
+// Access level pakai angka/rank biar bisa bandingin antarlevel
 func (l AccessLevel) Rank() int {
 	switch l {
 	case AccessViewOnly:

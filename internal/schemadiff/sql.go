@@ -6,6 +6,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// Kutip double biar nama aneh aman dan ga bisa nyisipin SQL
 func quote(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
@@ -60,6 +61,7 @@ func addColumnSQL(t domain.Table, c domain.Column) string {
 	return "ALTER TABLE " + qualified(t.Schema, t.Name) + " ADD COLUMN " + columnDefinition(c) + ";"
 }
 
+// Pakai USING buat konversi data, bisa gagal kalau data ga cocok
 func alterTypeSQL(t domain.Table, c domain.Column) string {
 	return "ALTER TABLE " + qualified(t.Schema, t.Name) + " ALTER COLUMN " + quote(c.Name) +
 		" TYPE " + c.DataType + " USING " + quote(c.Name) + "::" + c.DataType + ";"

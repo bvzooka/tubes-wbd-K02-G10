@@ -151,6 +151,7 @@ func (h *GroupHandler) create(w http.ResponseWriter, r *http.Request) {
 	h.redirectDetail(w, r, g.ID)
 }
 
+// Form diisi ulang pas validasi gagal biar ketikan ga hilang
 func (h *GroupHandler) renderDetail(w http.ResponseWriter, r *http.Request, actor domain.Principal, id int64, status int, errs map[string]string, form *GroupInput) {
 	d, err := h.svc.GroupDetail(r.Context(), actor, id)
 	if err != nil {
@@ -308,6 +309,7 @@ func (h *GroupHandler) grantAccess(w http.ResponseWriter, r *http.Request) {
 	h.redirectDetail(w, r, id)
 }
 
+// ID database dari URL sebagai dbID
 func (h *GroupHandler) revokeAccess(w http.ResponseWriter, r *http.Request) {
 	actor, ok := h.actor(w, r)
 	if !ok {

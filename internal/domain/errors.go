@@ -2,6 +2,7 @@ package domain
 
 import "errors"
 
+// Nanti ditranslate HandleError jadi page 403/404/502
 var (
 	ErrUnauthenticated     = errors.New("unauthenticated")
 	ErrForbidden           = errors.New("forbidden")
@@ -15,7 +16,7 @@ var (
 	ErrMigrationNotDraft   = errors.New("migration is not a draft")
 )
 
-// ValidationError membawa pesan per field form dan cocok dengan errors.Is(err, ErrValidation).
+// Bawa pesan per kolom form
 type ValidationError struct {
 	Fields map[string]string
 }

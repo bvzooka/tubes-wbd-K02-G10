@@ -201,6 +201,7 @@ func (h *Handler) renderPreview(w http.ResponseWriter, r *http.Request, actor do
 	for _, c := range result.Changes {
 		v := ChangeView{ID: c.ID, Label: kindLabel(c.Kind), Object: c.Object, SQL: c.SQL, Destructive: c.Destructive}
 		if checked == nil {
+			// Yang bisa hapus data ga dicentang default
 			v.Checked = !c.Destructive
 		} else {
 			v.Checked = checked[c.ID]
@@ -225,6 +226,7 @@ func (h *Handler) previewError(w http.ResponseWriter, r *http.Request, actor dom
 	}
 }
 
+// Habis dibuat diarahin ke editor biar SQL ditinjau dulu
 func (h *Handler) create(w http.ResponseWriter, r *http.Request, actor domain.Principal, dbID, sourceID int64) {
 	selected := r.PostForm["change"]
 	m, err := h.svc.CreateDraft(r.Context(), actor, dbID, sourceID, selected)

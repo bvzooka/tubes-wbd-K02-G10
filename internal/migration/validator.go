@@ -46,6 +46,7 @@ func Validate(in Input) (Input, map[string]string) {
 	return Input{Name: name, SQL: sql}, fields
 }
 
+// BEGIN/COMMIT dilarang, semua migration udah satu transaction
 func CheckSQL(sql string) string {
 	stmts, err := Split(sql)
 	if err != nil {

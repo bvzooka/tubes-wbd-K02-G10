@@ -23,6 +23,7 @@ func logError(r *http.Request, err error) {
 	slog.ErrorContext(r.Context(), "render failed", "request_id", RequestID(r.Context()), "error", err)
 }
 
+// Nomor unik per req buat ngelacak di log
 func WithRequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b := make([]byte, 8)
@@ -71,6 +72,7 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 
 func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
+// Nyatet path
 func Logging(logger *slog.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

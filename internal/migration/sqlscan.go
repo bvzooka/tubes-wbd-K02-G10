@@ -48,19 +48,19 @@ func Split(sql string) ([]Statement, error) {
 	for i < n {
 		c := sql[i]
 		switch {
-		case c == ';':
+		case c == ';': // Titik koma di luar string dan komentar = akhir perintah
 			flush(i)
 			i++
 			start = i
 		case c == '-' && i+1 < n && sql[i+1] == '-':
 			i = skipLineComment(sql, i)
-		case c == '/' && i+1 < n && sql[i+1] == '*':
+		case c == '/' && i+1 < n && sql[i+1] == '*': // Komentar block boleh nested
 			end, ok := skipBlockComment(sql, i)
 			if !ok {
 				return nil, ErrUnterminated
 			}
 			i = end
-		case c == '\'':
+		case c == '\'': // Treat backslash secara khusus
 			backslash := i > 0 && (sql[i-1] == 'e' || sql[i-1] == 'E') && (i < 2 || !isIdentChar(sql[i-2]))
 			end, ok := skipQuoted(sql, i, '\'', backslash)
 			if !ok {
@@ -75,7 +75,7 @@ func Split(sql string) ([]Statement, error) {
 			}
 			tokens.note("")
 			i = end
-		case c == '$':
+		case c == '$': // Bisa ada titik koma di dollar-quote
 			delim, ok := dollarDelimiter(sql, i)
 			if !ok {
 				tokens.note("")
@@ -95,6 +95,7 @@ func Split(sql string) ([]Statement, error) {
 			for j < n && isIdentChar(sql[j]) {
 				j++
 			}
+			// Token awal angka bukan kata kunci
 			if c >= '0' && c <= '9' {
 				tokens.note("")
 			} else {
@@ -169,6 +170,7 @@ func skipQuoted(sql string, i int, quote byte, backslash bool) (int, bool) {
 	return len(sql), false
 }
 
+// Biar $ dilihat sebagai bagian dari parameter
 func dollarDelimiter(sql string, i int) (string, bool) {
 	if i > 0 && isIdentChar(sql[i-1]) {
 		return "", false

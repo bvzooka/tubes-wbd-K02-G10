@@ -141,6 +141,7 @@ func (r *UserRepo) SetActive(ctx context.Context, id int64, active bool) (domain
 	return u, nil
 }
 
+// Perubahan admin dijalanin satu-satu lewat kunci
 func (r *UserRepo) inAdminTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -173,6 +174,7 @@ func lockUser(ctx context.Context, tx pgx.Tx, id int64) (isAdmin, isActive bool,
 	return isAdmin, isActive, nil
 }
 
+// Pastiin masih ada admin aktif lain
 func requireOtherActiveAdmin(ctx context.Context, tx pgx.Tx, id int64) error {
 	var n int
 	err := tx.QueryRow(ctx, `

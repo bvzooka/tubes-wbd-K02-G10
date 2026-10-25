@@ -30,6 +30,7 @@ const (
 )
 
 var (
+	// Ambil token CSRF dari HTML pakai regex
 	csrfPattern     = regexp.MustCompile(`name="csrf_token" value="([^"]+)"`)
 	trailingIDMatch = regexp.MustCompile(`/(\d+)$`)
 )
@@ -47,6 +48,7 @@ type e2eClient struct {
 	jar  *cookiejar.Jar
 }
 
+// Simpan cookie tapi ga ikut redirect biar bisa dicek
 func newE2EClient(t *testing.T, base string) *e2eClient {
 	t.Helper()
 	jar, err := cookiejar.New(nil)
@@ -97,6 +99,7 @@ func (c *e2eClient) post(path string, form url.Values) e2eResponse {
 	return c.do(http.MethodPost, path, form)
 }
 
+// Token CSRF diambil dari halaman /databases
 func (c *e2eClient) csrf() string {
 	c.t.Helper()
 	resp := c.get("/databases")
@@ -120,6 +123,7 @@ func (c *e2eClient) login(username, password string) e2eResponse {
 	return c.post("/login", url.Values{"csrf_token": {m[1]}, "username": {username}, "password": {password}})
 }
 
+// Buat ngecek session lama udah ga berlaku
 func (c *e2eClient) sessionCookie() string {
 	u, _ := url.Parse(c.base)
 	for _, ck := range c.jar.Cookies(u) {
@@ -145,11 +149,13 @@ type e2eApp struct {
 	target *pgxpool.Pool
 }
 
+// Jalanin aplikasi lewat buildApp di atas database sementara
 func newE2EApp(t *testing.T) *e2eApp {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
+	// Database kosong buat platform (skema dibikin sama buildApp)
 	appPool := testutil.NewTargetDB(t)
 	cc := appPool.Config().ConnConfig
 	appURL := (&url.URL{
@@ -182,6 +188,7 @@ func newE2EApp(t *testing.T) *e2eApp {
 	t.Cleanup(cleanup)
 	t.Cleanup(srv.Close)
 
+	// Database target terpisah dari database platform
 	return &e2eApp{base: srv.URL, app: appPool, target: testutil.NewTargetDB(t)}
 }
 
@@ -245,6 +252,7 @@ func expectRedirect(t *testing.T, r e2eResponse, prefix, what string) {
 	}
 }
 
+// Ambil ID dari akhir URL redirect
 func idFromLocation(t *testing.T, r e2eResponse) int64 {
 	t.Helper()
 	m := trailingIDMatch.FindStringSubmatch(r.Location)
@@ -255,6 +263,7 @@ func idFromLocation(t *testing.T, r e2eResponse) int64 {
 	return n
 }
 
+// Satu langkah bernama, kalau gagal langsung berhenti biar langkah berikutnya ga jalan di keadaan rusak 
 func step(t *testing.T, name string, fn func(t *testing.T)) {
 	t.Helper()
 	if !t.Run(name, fn) {
@@ -262,6 +271,7 @@ func step(t *testing.T, name string, fn func(t *testing.T)) {
 	}
 }
 
+// Flow lengkapnya: admin siapin data, tiga jenis user bekerja, aturan akses dijalanin
 func TestE2E_FullFlow(t *testing.T) {
 	if testing.Short() {
 		t.Skip("e2e")
@@ -351,6 +361,7 @@ func TestE2E_FullFlow(t *testing.T) {
 		}
 	})
 
+	// Bukti rollback: tabel dari statement pertama harus ikut batal
 	step(t, "statement kedua yang gagal membatalkan seluruh perubahan di target", func(t *testing.T) {
 		sql := "CREATE TABLE e2e_gagal (id int);\nINSERT INTO e2e_gagal VALUES (1);\nINSERT INTO tidak_ada VALUES (1);"
 		r := editor.post(db("/migrations"), editor.form(url.Values{"name": {"migration rusak"}, "sql": {sql}, "action": {"execute"}}))

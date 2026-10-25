@@ -99,6 +99,8 @@ func (s *Service) UpdateUser(ctx context.Context, actor domain.Principal, id int
 			return domain.User{}, &domain.ValidationError{Fields: map[string]string{"password": msg}}
 		}
 	}
+	
+	// Admin gaboleh cabut admin dirinya sendiri
 	if actor.UserID == id && !in.IsPlatformAdmin {
 		return domain.User{}, ErrSelfDemote
 	}
@@ -117,11 +119,14 @@ func (s *Service) UpdateUser(ctx context.Context, actor domain.Principal, id int
 		return domain.User{}, err
 	}
 
+	// Ganti password maka semua session user itu dicabut
 	if in.Password != "" {
 		if err := s.sessions.RevokeAllForUser(ctx, id); err != nil {
 			return domain.User{}, fmt.Errorf("revoke sessions: %w", err)
 		}
 	}
+
+	// Hak naik, token lama diganti baru
 	if !wasAdmin && u.IsPlatformAdmin {
 		if err := s.sessions.MarkRotationNeeded(ctx, id); err != nil {
 			return domain.User{}, fmt.Errorf("mark rotation: %w", err)
@@ -134,6 +139,8 @@ func (s *Service) DeactivateUser(ctx context.Context, actor domain.Principal, id
 	if err := requireAdmin(actor); err != nil {
 		return domain.User{}, err
 	}
+
+	// Gaboleh nonaktifin diri sendiri
 	if actor.UserID == id {
 		return domain.User{}, ErrSelfDeactivate
 	}

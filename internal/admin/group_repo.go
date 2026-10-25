@@ -47,6 +47,7 @@ func (r *GroupRepo) Create(ctx context.Context, name, description string) (domai
 	return g, nil
 }
 
+// Jumlah anggota dan akses dihitung subquery, satu query aja
 func (r *GroupRepo) List(ctx context.Context) ([]GroupRow, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT g.id, g.name, g.description, g.created_at,
@@ -115,6 +116,7 @@ func (r *GroupRepo) Delete(ctx context.Context, id int64) error {
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 
 	var exists int
+	// Kunci sebelum hapus
 	err = tx.QueryRow(ctx, `SELECT 1 FROM user_groups WHERE id = $1 FOR UPDATE`, id).Scan(&exists)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ErrNotFound

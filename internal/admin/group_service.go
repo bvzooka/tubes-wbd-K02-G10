@@ -114,6 +114,7 @@ func (s *GroupService) GroupDetail(ctx context.Context, actor domain.Principal, 
 		Accesses:             access,
 		AvailableUsers:       users,
 		AvailableConnections: conns,
+		// Cuman boleh hapus kalau gaada anggota dan akses
 		CanDelete:            len(members) == 0 && len(access) == 0,
 	}, nil
 }
@@ -154,6 +155,8 @@ func (s *GroupService) AddMember(ctx context.Context, actor domain.Principal, gr
 	if err != nil {
 		return err
 	}
+
+	// Rotasi cuma kalau anggotanya bener-bener baru
 	if added {
 		if err := s.sessions.MarkRotationNeeded(ctx, userID); err != nil {
 			return fmt.Errorf("mark rotation: %w", err)
@@ -190,6 +193,7 @@ func (s *GroupService) GrantAccess(ctx context.Context, actor domain.Principal, 
 		return err
 	}
 
+	// Rotasi cuman kalau level naik
 	if level.Rank() > previous.Rank() {
 		ids, err := s.groups.MemberIDs(ctx, groupID)
 		if err != nil {

@@ -196,6 +196,7 @@ func (r *GroupRepo) RevokeAccess(ctx context.Context, groupID, connID int64) err
 	return nil
 }
 
+// Dropdown user aktif yang belum jadi anggota
 func (r *GroupRepo) AvailableUsers(ctx context.Context, groupID int64) ([]UserOption, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT u.id, u.username
