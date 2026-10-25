@@ -76,16 +76,21 @@
 
 <section>
   <h2>Statement</h2>
-  <form method="post" action="/databases/{{$d.DBID}}/explain">
+  <form method="post" action="/databases/{{$d.DBID}}/explain" autocomplete="off">
     {{template "csrf" .}}
-    <textarea name="sql" rows="10" class="sql" required>{{$d.SQL}}</textarea>
-    <label><input type="checkbox" name="analyze" value="on"{{if $d.Analyze}} checked{{end}}> Jalankan dengan ANALYZE</label>
+    <label for="name">Nama migration</label>
+    <input id="name" name="name" type="text" value="{{$d.Name}}" maxlength="120">
+    <p class="hint">Hanya diperlukan kalau statement ini mau disimpan sebagai migration.</p>
+    <label for="sql">SQL</label>
+    <textarea id="sql" name="sql" rows="10" class="sql" required spellcheck="false">{{$d.SQL}}</textarea>
+    <label class="check"><input type="checkbox" name="analyze" value="on"{{if $d.Analyze}} checked{{end}}> Jalankan dengan ANALYZE</label>
     <p class="hint">ANALYZE benar-benar menjalankan statement (dibatalkan setelahnya) dan dapat memakan waktu.</p>
-    <button type="submit">{{if or $d.Result $d.Error}}Analisis ulang{{else}}Analisis plan{{end}}</button>
+    <div class="form-actions">
+      <button type="submit">{{if or $d.Result $d.Error}}Analisis ulang{{else}}Analisis plan{{end}}</button>
+      <button type="submit" formaction="/databases/{{$d.DBID}}/migrations" class="secondary">Simpan sebagai draft</button>
+      <button type="submit" formaction="/databases/{{$d.DBID}}/migrations" name="action" value="execute" class="secondary">Simpan lalu jalankan</button>
+      <a class="button secondary" href="/databases/{{$d.DBID}}/migrations">Riwayat migration</a>
+    </div>
   </form>
-  <p>
-    <a href="/databases/{{$d.DBID}}/migrations/new">Kembali ke editor migration</a> ·
-    <a href="/databases/{{$d.DBID}}/migrations">Riwayat migration</a>
-  </p>
 </section>
 {{end}}

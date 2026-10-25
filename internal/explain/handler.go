@@ -21,6 +21,7 @@ type runner interface {
 // ResultPage adalah data template explain/result.html.
 type ResultPage struct {
 	DBID    int64
+	Name    string
 	SQL     string
 	Analyze bool
 	Error   string
@@ -75,6 +76,7 @@ func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {
 	}
 	page := ResultPage{
 		DBID:    dbID,
+		Name:    r.PostFormValue("name"),
 		SQL:     r.PostFormValue("sql"),
 		Analyze: checkboxOn(r.PostFormValue("analyze")),
 	}

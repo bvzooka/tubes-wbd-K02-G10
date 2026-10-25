@@ -219,7 +219,7 @@ func TestHandler_Explain(t *testing.T) {
 			}, passMW{principal: editor})
 			mux := http.NewServeMux()
 			h.Register(mux)
-			form := url.Values{"sql": {"SELECT 1"}, "analyze": {"on"}}
+			form := url.Values{"name": {"tambah index"}, "sql": {"SELECT 1"}, "analyze": {"on"}}
 			r := httptest.NewRequest(http.MethodPost, "/databases/7/explain", strings.NewReader(form.Encode()))
 			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			rec := httptest.NewRecorder()
@@ -229,6 +229,9 @@ func TestHandler_Explain(t *testing.T) {
 			}
 			if run.got.dbID != 7 || run.got.sql != "SELECT 1" || !run.got.analyze {
 				t.Fatalf("argumen: %+v", run.got)
+			}
+			if (tc.status == http.StatusOK || tc.wantErr) && (rr.data.Name != "tambah index" || rr.data.SQL != "SELECT 1") {
+				t.Fatalf("nama dan SQL harus dibawa ke halaman hasil: %+v", rr.data)
 			}
 			if tc.wantErr && rr.data.Error == "" {
 				t.Fatal("pesan error harus dirender")
@@ -285,7 +288,7 @@ func TestResultTemplate_Renders(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, page := range []explain.ResultPage{
-		{DBID: 3, SQL: "SELECT '<b>'", Analyze: true, Result: &explain.Result{SQL: "SELECT 1", Analyze: true, Plan: plan}},
+		{DBID: 3, Name: "cek <i>", SQL: "SELECT '<b>'", Analyze: true, Result: &explain.Result{SQL: "SELECT 1", Analyze: true, Plan: plan}},
 		{DBID: 3, SQL: "DROP TABLE t", Error: "EXPLAIN hanya mendukung statement DML"},
 		{DBID: 3, SQL: "SELECT 1", Result: &explain.Result{Dialect: domain.DBMSMySQL, RawText: "-> Table scan"}},
 		{DBID: 3},
@@ -298,7 +301,10 @@ func TestResultTemplate_Renders(t *testing.T) {
 		if !strings.Contains(out, `value="tok"`) || !strings.Contains(out, "/databases/3/explain") {
 			t.Fatal("form CSRF atau action hilang")
 		}
-		if strings.Contains(out, "<b>") || strings.Contains(out, "t<x>") {
+		if !strings.Contains(out, `formaction="/databases/3/migrations"`) || !strings.Contains(out, `value="execute"`) {
+			t.Fatal("tombol simpan sebagai migration hilang")
+		}
+		if strings.Contains(out, "<b>") || strings.Contains(out, "t<x>") || strings.Contains(out, "<i>") {
 			t.Fatal("data harus di-escape")
 		}
 		if strings.Contains(out, "%!") {
