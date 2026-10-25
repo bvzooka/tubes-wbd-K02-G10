@@ -1,0 +1,33 @@
+{{define "title"}}{{if .Data.Edit}}Ubah draft versi {{.Data.Version}}{{else}}Migration baru{{end}}{{end}}
+
+{{define "content"}}
+<p><a href="/databases/{{.Data.DBID}}/migrations">&laquo; Riwayat migration {{.Data.DBName}}</a></p>
+<h1>{{if .Data.Edit}}Ubah draft versi {{.Data.Version}}{{else}}Migration baru{{end}}</h1>
+{{if not .Data.Edit}}
+<p class="muted">Ingin membuat SQL otomatis dari perbedaan dua database? <a href="/databases/{{.Data.DBID}}/schema-diff">Buat dari schema diff</a>.</p>
+{{end}}
+
+<section class="card">
+  <form method="post" action="{{if .Data.Edit}}/databases/{{.Data.DBID}}/migrations/{{.Data.Version}}{{else}}/databases/{{.Data.DBID}}/migrations{{end}}" autocomplete="off">
+    {{template "csrf" .}}
+
+    <label for="name">Nama</label>
+    <input id="name" name="name" type="text" value="{{.Data.Name}}" required maxlength="120">
+    {{with index .Data.Errors "name"}}<p class="field-error">{{.}}</p>{{end}}
+
+    <label for="sql">SQL</label>
+    <textarea id="sql" name="sql" rows="16" class="sql" required spellcheck="false">{{.Data.SQL}}</textarea>
+    <p class="muted">Seluruh SQL dijalankan dalam satu transaction. Jangan menulis BEGIN, COMMIT, atau ROLLBACK. Maksimal 256 KB.</p>
+    {{with index .Data.Errors "sql"}}<p class="field-error">{{.}}</p>{{end}}
+
+    <label class="check"><input type="checkbox" name="analyze" value="on"> Dengan ANALYZE (benar-benar menjalankan statement lalu dibatalkan)</label>
+
+    <div class="form-actions">
+      <button type="submit">Simpan draft</button>
+      <button type="submit" name="action" value="execute" class="secondary">Simpan lalu jalankan</button>
+      <button type="submit" formaction="/databases/{{.Data.DBID}}/explain" class="secondary">Analisis plan</button>
+      <a class="button secondary" href="/databases/{{.Data.DBID}}/migrations">Batal</a>
+    </div>
+  </form>
+</section>
+{{end}}

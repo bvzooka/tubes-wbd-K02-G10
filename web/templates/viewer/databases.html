@@ -1,0 +1,47 @@
+{{define "title"}}Database{{end}}
+
+{{define "content"}}
+<section class="hero">
+  <div>
+    <span class="eyebrow"><svg class="ic"><use href="#i-bolt"/></svg>Workspace</span>
+    <h1>Halo, <strong>{{.Principal.Username}}</strong></h1>
+    <p class="subtitle">Pilih database untuk melihat struktur dan datanya. Kartu gelap berarti Anda punya hak View + Edit.</p>
+  </div>
+  <div class="numbers">
+    <div class="num-item">
+      <div class="lbl"><svg class="ic"><use href="#i-db"/></svg>Database tersedia</div>
+      <div class="val">{{len .Data.Databases}}</div>
+    </div>
+  </div>
+</section>
+
+{{if .Data.Databases}}
+<div class="card-grid">
+  {{range .Data.Databases}}
+  <article class="db-card lvl-{{.Level}}">
+    <div class="card-top">
+      <span class="card-icon"><svg class="ic"><use href="#i-db"/></svg></span>
+      <span class="badge badge-dbms">{{.DBMSLabel}}</span>
+    </div>
+    <div>
+      <h2><a href="/databases/{{.ID}}">{{.Name}}</a></h2>
+    </div>
+    <div class="access" title="{{.LevelLabel}}">
+      <span class="seg on"><svg class="ic"><use href="#i-eye"/></svg>Lihat</span>
+      <span class="seg{{if .CanEdit}} on{{end}}"><svg class="ic"><use href="#i-edit"/></svg>Edit</span>
+    </div>
+    <div class="card-foot">
+      <a class="link-sub" href="/databases/{{.ID}}/migrations"><svg class="ic"><use href="#i-history"/></svg>Migration</a>
+      <span class="go-circle" aria-hidden="true"><svg class="ic"><use href="#i-arrow"/></svg></span>
+    </div>
+  </article>
+  {{end}}
+</div>
+{{else}}
+<div class="empty">
+  <svg class="ic"><use href="#i-lock"/></svg>
+  <strong>Belum ada database</strong>
+  <p>Anda belum memiliki akses ke database mana pun. Hubungi admin untuk meminta akses.</p>
+</div>
+{{end}}
+{{end}}

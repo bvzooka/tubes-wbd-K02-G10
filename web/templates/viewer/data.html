@@ -1,0 +1,40 @@
+{{define "title"}}Data {{.Data.View.Schema}}.{{.Data.View.Name}}{{end}}
+
+{{define "content"}}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="/databases">Database</a><span class="sep">/</span>
+  <a href="/databases/{{.Data.View.Database.ID}}">{{.Data.View.Database.Name}}</a><span class="sep">/</span>
+  <a href="{{.Data.View.TableHref}}">{{.Data.View.Schema}}.{{.Data.View.Name}}</a><span class="sep">/</span>
+  <span class="here">Data</span>
+</nav>
+
+<section class="hero">
+  <div>
+    <h1>Data <strong>{{.Data.View.Name}}</strong></h1>
+  </div>
+  <div class="hero-actions">
+    <a class="button secondary" href="{{.Data.View.TableHref}}"><svg class="ic"><use href="#i-columns"/></svg>Lihat struktur</a>
+  </div>
+</section>
+
+<div class="grid-bar">
+  <span class="chip"><svg class="ic"><use href="#i-hash"/></svg><strong>{{len .Data.View.Result.Rows}}</strong> baris di halaman ini</span>
+  <span class="chip"><svg class="ic"><use href="#i-columns"/></svg><strong>{{len .Data.View.Result.Columns}}</strong> kolom</span>
+  <span class="chip">ukuran halaman <strong>{{.Data.View.Result.PageSize}}</strong></span>
+</div>
+
+<div class="table-wrap data-wrap">
+  <table class="data-table">
+    <thead><tr>{{range .Data.View.Result.Columns}}<th>{{.}}</th>{{end}}</tr></thead>
+    <tbody>
+    {{range .Data.View.Result.Rows}}
+      <tr>{{range .}}<td>{{if .Null}}<span class="null">NULL</span>{{else}}{{truncate 200 .Value}}{{end}}</td>{{end}}</tr>
+    {{else}}
+      <tr><td colspan="{{len $.Data.View.Result.Columns}}" class="muted">Tidak ada baris pada halaman ini.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+
+{{template "pagination" .Data.Pager}}
+{{end}}

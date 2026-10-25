@@ -24,7 +24,6 @@ type Group struct {
 	CreatedAt   time.Time
 }
 
-// AccessibleDatabase adalah satu database yang boleh diakses seorang user beserta level tertingginya.
 type AccessibleDatabase struct {
 	ConnectionID int64
 	Name         string

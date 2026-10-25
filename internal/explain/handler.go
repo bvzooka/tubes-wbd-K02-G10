@@ -42,7 +42,18 @@ func NewHandler(svc runner, render Renderer, handleErr contract.ErrorHandler, mw
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	edit := h.mw.RequireDBAccess(domain.AccessViewEdit)
+	mux.Handle("GET /databases/{dbID}/explain", h.mw.Authenticate(h.mw.CSRF(edit(http.HandlerFunc(h.form)))))
 	mux.Handle("POST /databases/{dbID}/explain", h.mw.Authenticate(h.mw.CSRF(edit(http.HandlerFunc(h.explain)))))
+}
+
+// form menampilkan editor kosong agar EXPLAIN bisa dipakai tanpa lewat editor migration.
+func (h *Handler) form(w http.ResponseWriter, r *http.Request) {
+	dbID, err := strconv.ParseInt(r.PathValue("dbID"), 10, 64)
+	if err != nil || dbID <= 0 {
+		h.handleErr(w, r, domain.ErrNotFound)
+		return
+	}
+	h.render.Page(w, r, http.StatusOK, resultTemplate, ResultPage{DBID: dbID})
 }
 
 func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {

@@ -13,7 +13,6 @@ type System struct{}
 
 func (System) Now() time.Time { return time.Now() }
 
-// Fake untuk test.
 type Fake struct {
 	mu sync.Mutex
 	t  time.Time

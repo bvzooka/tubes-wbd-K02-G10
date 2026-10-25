@@ -1,0 +1,42 @@
+{{define "base"}}<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{template "title" .}} · Database Management Platform</title>
+  <link rel="icon" type="image/png" href="/static/logo.png">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body class="{{if .Principal}}has-nav {{end}}sec-{{.Section}}">
+  <header class="topbar">
+    <a class="brand" href="{{if .Principal}}/databases{{else}}/{{end}}" aria-label="Database Management Platform"><span class="brand-mark" aria-hidden="true"><img src="/static/logo.png" alt="" width="44" height="44"></span><span class="brand-name">Database Management Platform</span></a>
+    {{with .Principal}}
+    {{if .IsPlatformAdmin}}
+    <nav class="nav" aria-label="Navigasi utama">
+      <a href="/databases">Database</a>
+      <a href="/admin/users">Pengguna</a>
+      <a href="/admin/groups">Group</a>
+      <a href="/admin/connections">Koneksi</a>
+    </nav>
+    {{end}}
+    <div class="account">
+      <span class="avatar" aria-hidden="true"></span>
+      <span class="who"><strong>{{.Username}}</strong><small>{{if .IsPlatformAdmin}}Platform Admin{{else}}Pengguna{{end}}</small></span>
+      <form class="inline" method="post" action="/logout">
+        {{template "csrf" $}}
+        <button type="submit" class="icon-btn" aria-label="Keluar" title="Keluar"><svg class="ic"><use href="#i-logout"/></svg></button>
+      </form>
+    </div>
+    {{end}}
+  </header>
+
+  <main class="container">
+    {{template "flash" .}}
+    {{template "icons"}}
+    {{template "content" .}}
+  </main>
+</body>
+</html>
+{{end}}

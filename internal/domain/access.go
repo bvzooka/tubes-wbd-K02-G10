@@ -1,6 +1,5 @@
 package domain
 
-// AccessLevel adalah tingkat akses sebuah group (dan user) pada sebuah database.
 type AccessLevel string
 
 const (
@@ -9,7 +8,6 @@ const (
 	AccessViewEdit AccessLevel = "view_edit"
 )
 
-// Rank mengembalikan urutan kekuatan akses: 0 tidak ada, 1 view only, 2 view edit.
 func (l AccessLevel) Rank() int {
 	switch l {
 	case AccessViewOnly:
@@ -21,10 +19,9 @@ func (l AccessLevel) Rank() int {
 	}
 }
 
-// Valid true jika level adalah salah satu level yang boleh disimpan.
 func (l AccessLevel) Valid() bool { return l.Rank() > 0 }
 
-// AtLeast true jika level ini minimal sekuat min. AccessNone tidak pernah memenuhi apa pun.
+// AtLeast selalu false untuk AccessNone, apa pun nilai min.
 func (l AccessLevel) AtLeast(min AccessLevel) bool {
 	return l.Rank() > 0 && l.Rank() >= min.Rank()
 }

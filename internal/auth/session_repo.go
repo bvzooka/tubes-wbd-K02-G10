@@ -19,7 +19,7 @@ type DB interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-// NewSession adalah data untuk membuat baris session baru.
+// newSession adalah data untuk membuat baris session baru.
 type NewSession struct {
 	UserID            int64
 	TokenHash         []byte
@@ -28,11 +28,10 @@ type NewSession struct {
 	AbsoluteExpiresAt time.Time
 }
 
-// SessionStore adalah penyimpanan session. Repo adalah implementasi PostgreSQL-nya.
+// sessionStore adalah penyimpanan session. Repo adalah implementasi PostgreSQL-nya.
 type SessionStore interface {
 	Create(ctx context.Context, s NewSession) (int64, error)
 	// FindByTokenHash mencari lewat token_hash, lalu lewat prev_token_hash yang masih dalam grace.
-	// Mengembalikan domain.ErrNotFound jika tidak ada.
 	FindByTokenHash(ctx context.Context, hash []byte, now time.Time) (Session, error)
 	Touch(ctx context.Context, id int64, now time.Time) error
 	// Rotate mengganti token_hash jika token_hash saat ini masih oldHash. false jika sudah dirotasi request lain.
@@ -43,7 +42,6 @@ type SessionStore interface {
 	DeleteExpired(ctx context.Context, now time.Time) (int64, error)
 }
 
-// Repo mengakses tabel sessions (pemilik tulis: Kurt).
 type Repo struct {
 	db DB
 }

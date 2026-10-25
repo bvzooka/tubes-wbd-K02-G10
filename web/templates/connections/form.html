@@ -1,0 +1,107 @@
+{{define "title"}}{{.Data.Heading}}{{end}}
+
+{{define "content"}}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="/admin/connections">Koneksi</a><span class="sep">/</span><span class="here">{{.Data.Heading}}</span>
+</nav>
+
+<div class="hero">
+  <div>
+    <h1>{{.Data.Heading}}</h1>
+    <p class="subtitle">Isi detail server, lalu uji koneksi sebelum menyimpan.</p>
+  </div>
+</div>
+
+{{if .Data.TestMessage}}
+<p class="alert {{if .Data.TestOK}}alert-success{{else}}alert-error{{end}}" role="status"><svg class="ic"><use href="{{if .Data.TestOK}}#i-check{{else}}#i-alert{{end}}"/></svg>{{.Data.TestMessage}}</p>
+{{end}}
+
+<div class="form-layout">
+<form method="post" action="{{.Data.Action}}" autocomplete="off" class="card form-card">
+  {{template "csrf" .}}
+  {{if .Data.IsEdit}}<input type="hidden" name="id" value="{{.Data.ID}}">{{end}}
+
+  <div class="form-section">
+    <span class="step"><svg class="ic"><use href="#i-db"/></svg></span>
+    <div class="fields">
+      <h2>Identitas</h2>
+      <p class="desc">Nama yang tampil di daftar dan jenis DBMS-nya.</p>
+      <div class="form-grid">
+        <div>
+          <label for="name">Nama koneksi</label>
+          <input id="name" name="name" type="text" value="{{.Data.Values.Name}}" maxlength="64" required>
+          {{with index .Data.Errors "name"}}<p class="field-error">{{.}}</p>{{end}}
+        </div>
+        <div>
+          <label for="dbms">DBMS</label>
+          <select id="dbms" name="dbms">
+            {{range .Data.DBMSOptions}}<option value="{{.Value}}" {{if eq .Value $.Data.Values.DBMS}}selected{{end}}>{{.Label}}</option>{{end}}
+          </select>
+          {{with index .Data.Errors "dbms"}}<p class="field-error">{{.}}</p>{{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <span class="step"><svg class="ic"><use href="#i-server"/></svg></span>
+    <div class="fields">
+      <h2>Server</h2>
+      <p class="desc">Alamat server database target.</p>
+      <div class="form-grid">
+        <div>
+          <label for="host">Host</label>
+          <input id="host" name="host" type="text" value="{{.Data.Values.Host}}" required>
+          {{with index .Data.Errors "host"}}<p class="field-error">{{.}}</p>{{end}}
+        </div>
+        <div>
+          <label for="port">Port</label>
+          <input id="port" name="port" type="text" inputmode="numeric" value="{{.Data.Values.Port}}" placeholder="5432 atau 3306" required>
+          <p class="hint">Bawaan: PostgreSQL 5432, MySQL dan MariaDB 3306.</p>
+          {{with index .Data.Errors "port"}}<p class="field-error">{{.}}</p>{{end}}
+        </div>
+        <div>
+          <label for="database_name">Nama database</label>
+          <input id="database_name" name="database_name" type="text" value="{{.Data.Values.DatabaseName}}" required>
+          {{with index .Data.Errors "database_name"}}<p class="field-error">{{.}}</p>{{end}}
+        </div>
+        <div>
+          <label for="ssl_mode">SSL mode</label>
+          <select id="ssl_mode" name="ssl_mode">
+            {{range .Data.SSLModes}}<option value="{{.}}" {{if eq . $.Data.Values.SSLMode}}selected{{end}}>{{.}}</option>{{end}}
+          </select>
+          {{with index .Data.Errors "ssl_mode"}}<p class="field-error">{{.}}</p>{{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <span class="step"><svg class="ic"><use href="#i-key"/></svg></span>
+    <div class="fields">
+      <h2>Kredensial</h2>
+      <p class="desc">Password dienkripsi sebelum disimpan dan tidak pernah ditampilkan kembali.</p>
+      <div class="form-grid">
+        <div>
+          <label for="db_username">Username database</label>
+          <input id="db_username" name="db_username" type="text" value="{{.Data.Values.Username}}" autocomplete="off" required>
+          {{with index .Data.Errors "db_username"}}<p class="field-error">{{.}}</p>{{end}}
+        </div>
+        <div>
+          <label for="password">Password database</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" {{if not .Data.IsEdit}}required{{end}}>
+          {{if .Data.IsEdit}}<p class="hint">Kosongkan jika password tidak ingin diubah.</p>{{end}}
+          {{with index .Data.Errors "password"}}<p class="field-error">{{.}}</p>{{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-footer">
+    <button type="submit" class="primary"><svg class="ic"><use href="#i-check"/></svg>Simpan</button>
+    <button type="submit" class="secondary" formaction="/admin/connections/test"><svg class="ic"><use href="#i-bolt"/></svg>Uji koneksi</button>
+    <a class="button secondary" href="/admin/connections">Batal</a>
+  </div>
+</form>
+</div>
+{{end}}

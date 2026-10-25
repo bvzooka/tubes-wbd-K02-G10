@@ -1,0 +1,7 @@
+{{define "pagination"}}
+<nav class="pagination" aria-label="Halaman">
+  {{if .HasPrev}}<a href="{{.PrevURL}}" rel="prev">&laquo; Sebelumnya</a>{{else}}<span class="disabled">&laquo; Sebelumnya</span>{{end}}
+  <span class="current">{{if .TotalPages}}{{.Page}} dari {{.TotalPages}}{{else}}Halaman {{.Page}}{{end}}</span>
+  {{if .HasNext}}<a href="{{.NextURL}}" rel="next">Berikutnya &raquo;</a>{{else}}<span class="disabled">Berikutnya &raquo;</span>{{end}}
+</nav>
+{{end}}

@@ -1,0 +1,41 @@
+{{define "title"}}Riwayat migration{{end}}
+
+{{define "content"}}
+<p><a href="/databases/{{.Data.DBID}}">&laquo; {{.Data.DBName}}</a></p>
+<h1>Riwayat migration</h1>
+{{if .Data.CanEdit}}
+<p>
+  <a class="button" href="/databases/{{.Data.DBID}}/migrations/new">Migration baru</a>
+  <a class="button secondary" href="/databases/{{.Data.DBID}}/schema-diff">Buat dari schema diff</a>
+</p>
+{{end}}
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Versi</th>
+        <th>Nama</th>
+        <th>Status</th>
+        <th>Dibuat oleh</th>
+        <th>Dibuat</th>
+        <th>Dieksekusi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Data.Migrations}}
+      <tr>
+        <td class="num"><a href="/databases/{{$.Data.DBID}}/migrations/{{.Version}}">{{.Version}}</a></td>
+        <td><a href="/databases/{{$.Data.DBID}}/migrations/{{.Version}}">{{.Name}}</a></td>
+        <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+        <td>{{.CreatedByName}}</td>
+        <td>{{.CreatedAt.Format "02 Jan 2006 15:04"}}</td>
+        <td>{{with .ExecutedAt}}{{.Format "02 Jan 2006 15:04"}}{{else}}<span class="muted">-</span>{{end}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="6" class="muted">Belum ada migration untuk database ini.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

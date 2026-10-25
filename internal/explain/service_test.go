@@ -237,6 +237,36 @@ func TestHandler_Explain(t *testing.T) {
 	}
 }
 
+func TestHandler_ExplainForm(t *testing.T) {
+	run := &fakeRunner{}
+	rr := &recRenderer{}
+	var gotErr error
+	h := explain.NewHandler(run, rr, func(w http.ResponseWriter, _ *http.Request, err error) {
+		gotErr = err
+		w.WriteHeader(http.StatusNotFound)
+	}, passMW{principal: editor})
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/databases/7/explain", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if rr.data.DBID != 7 || rr.data.SQL != "" || rr.data.Result != nil {
+		t.Fatalf("data form: %+v", rr.data)
+	}
+	if run.got.dbID != 0 {
+		t.Fatal("GET tidak boleh menjalankan EXPLAIN")
+	}
+
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/databases/abc/explain", nil))
+	if !errors.Is(gotErr, domain.ErrNotFound) {
+		t.Fatalf("dbID tidak valid: err = %v, want ErrNotFound", gotErr)
+	}
+}
+
 // ---- template ----
 
 const stubLayout = `{{define "base"}}{{template "content" .}}{{end}}{{define "csrf"}}<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">{{end}}`
@@ -258,6 +288,7 @@ func TestResultTemplate_Renders(t *testing.T) {
 		{DBID: 3, SQL: "SELECT '<b>'", Analyze: true, Result: &explain.Result{SQL: "SELECT 1", Analyze: true, Plan: plan}},
 		{DBID: 3, SQL: "DROP TABLE t", Error: "EXPLAIN hanya mendukung statement DML"},
 		{DBID: 3, SQL: "SELECT 1", Result: &explain.Result{Dialect: domain.DBMSMySQL, RawText: "-> Table scan"}},
+		{DBID: 3},
 	} {
 		var buf bytes.Buffer
 		if err := tmpl.ExecuteTemplate(&buf, "base", stubPageData{CSRFToken: "tok", Data: page}); err != nil {
@@ -269,6 +300,12 @@ func TestResultTemplate_Renders(t *testing.T) {
 		}
 		if strings.Contains(out, "<b>") || strings.Contains(out, "t<x>") {
 			t.Fatal("data harus di-escape")
+		}
+		if strings.Contains(out, "%!") {
+			t.Fatalf("format angka rusak: %s", out)
+		}
+		if page.Analyze && (!strings.Contains(out, "0.100 ms") || !strings.Contains(out, "0.200 ms")) {
+			t.Fatal("planning dan execution time harus tampil sebagai angka")
 		}
 	}
 }
