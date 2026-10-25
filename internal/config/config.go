@@ -1,4 +1,3 @@
-// Package config membaca konfigurasi aplikasi dari environment variable
 package config
 
 import (
@@ -15,7 +14,6 @@ const (
 	EnvProduction  = "production"
 )
 
-// SessionConfig adalah parameter session
 type SessionConfig struct {
 	IdleTimeout      time.Duration
 	AbsoluteTimeout  time.Duration
@@ -33,11 +31,9 @@ type Config struct {
 	SeedAdminUsername string
 	SeedAdminPassword string
 
-	// UseStubs mengganti dengan authstub
 	UseStubs bool
 }
 
-// Secure true jika cookie harus memakai atribut Secure
 func (c Config) Secure() bool { return c.Env == EnvProduction }
 
 // Load membaca konfigurasi lewat getenv
@@ -95,6 +91,7 @@ func Load(getenv func(string) string) (Config, error) {
 		errs = append(errs, errors.New("SESSION_GRACE_PERIOD: harus lebih kecil dari SESSION_ROTATION_INTERVAL"))
 	}
 
+	// Semua error config dilaporin sekaligus
 	if err := errors.Join(errs...); err != nil {
 		return Config{}, fmt.Errorf("konfigurasi tidak valid: %w", err)
 	}
