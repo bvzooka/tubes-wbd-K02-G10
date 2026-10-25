@@ -424,7 +424,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); }
 .alert-error { border-color: #f3cfca; background: #fdf3f1; color: #6e1d16; }
 .alert-error::before, .alert-error > .ic { content: "!"; background: var(--danger); color: #fff; }
 .alert-success { border-color: var(--green-mid); background: var(--green-soft); color: var(--ink-2); }
-.alert-success::before, .alert-success > .ic { content: "¹3"; background: var(--ink); color: var(--lime); }
+.alert-success::before, .alert-success > .ic { content: "\2713"; background: var(--ink); color: var(--lime); }
 .alert-warning { border-color: #f1dca8; background: #fff8e6; color: #6b3d06; }
 .alert-warning::before, .alert-warning > .ic { content: "!"; background: #b54708; color: #fff; }
 
