@@ -18,11 +18,13 @@ const (
 	diffTargetName = "e2e-diff-tujuan"
 	diffSourceName = "e2e-diff-sumber"
 
+	// Struktur tujuan: ada tabel obsolete dan kolom legacy yang harus dihapus
 	diffOldSQL = `
 CREATE TABLE people (id int PRIMARY KEY, name varchar(10) NOT NULL, legacy text);
 CREATE TABLE obsolete (id int PRIMARY KEY);
 INSERT INTO people VALUES (1, 'ani', 'x');
 `
+	// Struktur sumber: ada tabel pets dan kolom email yang harus ditambah
 	diffNewSQL = `
 CREATE TABLE people (id int PRIMARY KEY, name varchar(50) NOT NULL, email text);
 CREATE TABLE pets (id int PRIMARY KEY, owner_id int REFERENCES people (id), name text);
@@ -30,8 +32,10 @@ CREATE INDEX pets_owner_idx ON pets (owner_id);
 `
 )
 
+// Baca kotak centang perubahan dari HTML
 var changeBoxPattern = regexp.MustCompile(`name="change" id="c-[0-9a-f]{12}" value="([0-9a-f]{12})"( checked)?>`)
 
+// Isian form koneksi dibuat dari pool database tes
 func poolConnForm(name string, pool *pgxpool.Pool) url.Values {
 	cc := pool.Config().ConnConfig
 	return url.Values{
@@ -40,6 +44,7 @@ func poolConnForm(name string, pool *pgxpool.Pool) url.Values {
 	}
 }
 
+// Pisahin perubahan yang bercentang dengan yang tidak
 func listChanges(body string) (checked, unchecked []string) {
 	for _, m := range changeBoxPattern.FindAllStringSubmatch(body, -1) {
 		if m[2] != "" {
@@ -51,6 +56,7 @@ func listChanges(body string) (checked, unchecked []string) {
 	return checked, unchecked
 }
 
+// Preview, bikin draft, eksekusi lewat migration, dan penolakan akses
 func TestE2E_SchemaDiffFlow(t *testing.T) {
 	if testing.Short() {
 		t.Skip("e2e")
