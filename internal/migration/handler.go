@@ -200,7 +200,18 @@ func (h *Handler) newEditor(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	h.renderEditor(w, r, actor, http.StatusOK, EditorPage{DBID: dbID})
+	page := EditorPage{DBID: dbID}
+	// ?from=N mengisi editor dari migration lama, buat nyalin yang gagal
+	if from, err := strconv.Atoi(r.URL.Query().Get("from")); err == nil && from > 0 {
+		m, err := h.svc.Get(r.Context(), actor, dbID, from)
+		if err != nil {
+			h.deps.HandleErr(w, r, err)
+			return
+		}
+		page.Name = truncate(fmt.Sprintf("Salinan versi %d: %s", m.Version, m.Name), maxNameChars)
+		page.SQL = m.SQL
+	}
+	h.renderEditor(w, r, actor, http.StatusOK, page)
 }
 
 func (h *Handler) editEditor(w http.ResponseWriter, r *http.Request) {

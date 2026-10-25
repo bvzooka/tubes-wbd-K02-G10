@@ -529,3 +529,79 @@ func TestMigrationHandler_AccessLookupFailureIs500WithoutDetail(t *testing.T) {
 		t.Errorf("status = %d, atau detail bocor", rec.Code)
 	}
 }
+
+func TestMigrationHandler_NewEditorCopiesExistingMigration(t *testing.T) {
+	svc := &fakeMigrationService{get: sampleMigration(2, domain.MigrationFailed)}
+	rec := httpGet(editorServer(t, svc), "/databases/5/migrations/new?from=2")
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	for _, want := range []string{
+		`action="/databases/5/migrations"`, `value="Salinan versi 2: tambah &lt;tabel&gt;"`, "CREATE TABLE a (id int);", "Migration baru",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("editor salinan tidak memuat %q", want)
+		}
+	}
+	if strings.Contains(body, "Ubah draft") {
+		t.Error("salinan harus membuat migration baru, bukan mengubah yang lama")
+	}
+	if svc.writes != 0 {
+		t.Error("membuka editor salinan tidak boleh menyimpan apa pun")
+	}
+}
+
+func TestMigrationHandler_NewEditorIgnoresInvalidFrom(t *testing.T) {
+	svc := &fakeMigrationService{get: sampleMigration(2, domain.MigrationFailed)}
+	for _, q := range []string{"", "?from=abc", "?from=0", "?from=-3"} {
+		rec := httpGet(editorServer(t, svc), "/databases/5/migrations/new"+q)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%q: status = %d", q, rec.Code)
+		}
+		if strings.Contains(rec.Body.String(), "CREATE TABLE a") {
+			t.Errorf("%q: editor harus kosong", q)
+		}
+	}
+}
+
+func TestMigrationHandler_NewEditorCopyOfMissingVersionIs404(t *testing.T) {
+	svc := &fakeMigrationService{getErr: domain.ErrNotFound}
+	if rec := httpGet(editorServer(t, svc), "/databases/5/migrations/new?from=9"); rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, mau 404", rec.Code)
+	}
+}
+
+func TestMigrationHandler_NewEditorCopyNameFitsNameLimit(t *testing.T) {
+	m := sampleMigration(2, domain.MigrationFailed)
+	m.Name = strings.Repeat("a", 120)
+	rec := httpGet(editorServer(t, &fakeMigrationService{get: m}), "/databases/5/migrations/new?from=2")
+	body := rec.Body.String()
+	if !strings.Contains(body, `value="Salinan versi 2: `) {
+		t.Fatal("nama salinan tidak ada")
+	}
+	if strings.Contains(body, strings.Repeat("a", 110)) {
+		t.Error("nama salinan harus dipotong agar tidak melebihi batas 120 karakter")
+	}
+}
+
+func TestMigrationHandler_DetailCopyLinkOnlyForEditorOnFinishedMigrations(t *testing.T) {
+	link := `href="/databases/5/migrations/new?from=2"`
+
+	for _, status := range []domain.MigrationStatus{domain.MigrationFailed, domain.MigrationSuccess, domain.MigrationCancelled} {
+		svc := &fakeMigrationService{get: sampleMigration(2, status)}
+		if body := httpGet(editorServer(t, svc), "/databases/5/migrations/2").Body.String(); !strings.Contains(body, link) {
+			t.Errorf("status %s: editor harus melihat tautan salin", status)
+		}
+		if body := httpGet(readerServer(t, svc), "/databases/5/migrations/2").Body.String(); strings.Contains(body, link) {
+			t.Errorf("status %s: view_only tidak boleh melihat tautan salin", status)
+		}
+	}
+
+	for _, status := range []domain.MigrationStatus{domain.MigrationDraft, domain.MigrationRunning} {
+		svc := &fakeMigrationService{get: sampleMigration(2, status)}
+		if body := httpGet(editorServer(t, svc), "/databases/5/migrations/2").Body.String(); strings.Contains(body, link) {
+			t.Errorf("status %s: tidak boleh ada tautan salin", status)
+		}
+	}
+}
