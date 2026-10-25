@@ -71,6 +71,7 @@ func run(logger *slog.Logger) error {
 	}
 }
 
+// Load .env, variabel yang udah ada ga ditimpa
 func loadDotEnv(path string) error {
 	f, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {

@@ -25,6 +25,7 @@ import (
 	webassets "dbplatform/web"
 )
 
+// Ngerakit semua modul
 func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
 	pool, err := appdb.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -104,6 +105,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 	admin.NewGroupHandler(d, groupSvc).Register(mux)
 
 	migrationSvc := migration.NewService(migration.NewRepo(pool), d.Authz, d.Drivers, clk)
+	// Migration yang nyangkut running ditandain gagal pas start
 	recovered, err := migrationSvc.RecoverStuck(ctx)
 	if err != nil {
 		return fail(err)
@@ -112,6 +114,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		logger.Warn("migration yang terputus ditandai gagal", "jumlah", recovered)
 	}
 	migration.NewHandler(d, migrationSvc).Register(mux)
+	// Schema diff bikin draft lewat service migration
 	schemadiff.NewHandler(d, schemadiff.NewService(d.Authz, d.Drivers, migrationSvc)).Register(mux)
 
 	static, err := fs.Sub(webassets.FS, "static")
