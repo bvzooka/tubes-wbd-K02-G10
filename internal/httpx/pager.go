@@ -1,10 +1,10 @@
 package httpx
 
 import (
+	"dbplatform/internal/domain"
 	"net/http"
 	"net/url"
 	"strconv"
-	"dbplatform/internal/domain"
 )
 
 func ParsePage(r *http.Request) domain.PageRequest {
@@ -15,12 +15,12 @@ func ParsePage(r *http.Request) domain.PageRequest {
 }
 
 type Pager struct {
-	Page int
+	Page       int
 	TotalPages int
-	HasPrev bool
-	HasNext bool
-	PrevURL string
-	NextURL string
+	HasPrev    bool
+	HasNext    bool
+	PrevURL    string
+	NextURL    string
 }
 
 // Ada halaman berikutnya atau ngga

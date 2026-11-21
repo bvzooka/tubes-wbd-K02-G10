@@ -115,7 +115,7 @@ func (s *GroupService) GroupDetail(ctx context.Context, actor domain.Principal, 
 		AvailableUsers:       users,
 		AvailableConnections: conns,
 		// Cuman boleh hapus kalau gaada anggota dan akses
-		CanDelete:            len(members) == 0 && len(access) == 0,
+		CanDelete: len(members) == 0 && len(access) == 0,
 	}, nil
 }
 

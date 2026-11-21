@@ -1,12 +1,12 @@
 package viewer_test
 
 import (
+	"dbplatform/internal/dbmgmttest"
+	"dbplatform/internal/domain"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
-	"dbplatform/internal/dbmgmttest"
-	"dbplatform/internal/domain"
 )
 
 func path(a *dbmgmttest.App, suffix string) string {

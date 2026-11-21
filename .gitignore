@@ -12,3 +12,8 @@
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Frontend
+frontend/node_modules/
+web/dist/*
+!web/dist/.gitkeep

@@ -99,7 +99,7 @@ func (s *Service) UpdateUser(ctx context.Context, actor domain.Principal, id int
 			return domain.User{}, &domain.ValidationError{Fields: map[string]string{"password": msg}}
 		}
 	}
-	
+
 	// Admin gaboleh cabut admin dirinya sendiri
 	if actor.UserID == id && !in.IsPlatformAdmin {
 		return domain.User{}, ErrSelfDemote

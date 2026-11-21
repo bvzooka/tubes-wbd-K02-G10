@@ -1,18 +1,18 @@
 package postgres
 
 import (
+	"dbplatform/internal/domain"
 	"net/url"
 	"testing"
-	"dbplatform/internal/domain"
 )
 
 func testConn() domain.Connection {
 	return domain.Connection{
-		Host: "db.example.com",
-		Port: 5432,
+		Host:         "db.example.com",
+		Port:         5432,
 		DatabaseName: "sales",
-		Username: "app_user",
-		SSLMode: "require",
+		Username:     "app_user",
+		SSLMode:      "require",
 	}
 }
 

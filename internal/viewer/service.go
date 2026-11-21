@@ -2,14 +2,14 @@ package viewer
 
 import (
 	"context"
-	"strings"
 	"dbplatform/internal/contract"
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/domain"
+	"strings"
 )
 
 type Service struct {
-	authz contract.Authorizer
+	authz   contract.Authorizer
 	drivers contract.DriverProvider
 }
 
@@ -17,7 +17,7 @@ func NewService(authz contract.Authorizer, drivers contract.DriverProvider) *Ser
 	return &Service{authz: authz, drivers: drivers}
 }
 
-// mengembalikan database yg boleh diakses user 
+// mengembalikan database yg boleh diakses user
 func (s *Service) Databases(ctx context.Context, p domain.Principal) ([]DatabaseItem, error) {
 	list, err := s.authz.ListAccessible(ctx, p.UserID)
 	if err != nil {
@@ -67,7 +67,7 @@ func (s *Service) Overview(ctx context.Context, p domain.Principal, dbID int64) 
 		return nil, err
 	}
 	ov := &Overview{Database: item}
-	for _, t := range schema.Tables { 
+	for _, t := range schema.Tables {
 		if n := len(ov.Schemas); n == 0 || ov.Schemas[n-1].Name != t.Schema {
 			ov.Schemas = append(ov.Schemas, SchemaGroup{Name: t.Schema})
 		}
@@ -121,7 +121,7 @@ func (s *Service) Table(ctx context.Context, p domain.Principal, dbID int64, ref
 	return nil, domain.ErrNotFound
 }
 
-// menampilkan satu halaman isi tabel 
+// menampilkan satu halaman isi tabel
 func (s *Service) Data(ctx context.Context, p domain.Principal, dbID int64, ref domain.TableRef, page domain.PageRequest) (*DataView, error) {
 	item, drv, err := s.open(ctx, p, dbID)
 	if err != nil {

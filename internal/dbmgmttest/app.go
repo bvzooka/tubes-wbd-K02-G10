@@ -33,14 +33,14 @@ import (
 const Password = "password-rahasia-123"
 
 type App struct {
-	Pool*pgxpool.Pool 
-	Target *pgxpool.Pool 
-	Server *httptest.Server
-	Hasher *auth.Hasher
+	Pool    *pgxpool.Pool
+	Target  *pgxpool.Pool
+	Server  *httptest.Server
+	Hasher  *auth.Hasher
 	Service *connmgr.Service
-	Repo*connmgr.Repo
+	Repo    *connmgr.Repo
 	Drivers *connmgr.Provider
-	ConnID int64
+	ConnID  int64
 }
 
 var csrfRe = regexp.MustCompile(`name="csrf_token" value="([^"]+)"`)
@@ -139,7 +139,6 @@ func (a *App) Client() *http.Client {
 	return &http.Client{Jar: jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 }
 
-
 func (a *App) Login(t *testing.T, c *http.Client, username string) {
 	t.Helper()
 	_, body := a.Get(t, c, "/login")
@@ -161,7 +160,7 @@ func (a *App) Get(t *testing.T, c *http.Client, path string) (*http.Response, st
 	return resp, readBody(t, resp)
 }
 
-//  ngirim forms tanpa menambah token CSRF
+// ngirim forms tanpa menambah token CSRF
 func (a *App) PostRaw(t *testing.T, c *http.Client, path string, form url.Values) (*http.Response, string) {
 	t.Helper()
 	resp, err := c.PostForm(a.Server.URL+path, form)

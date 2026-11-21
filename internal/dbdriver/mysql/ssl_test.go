@@ -7,17 +7,17 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"dbplatform/internal/domain"
 	"errors"
 	"math/big"
 	"net"
 	"testing"
 	"time"
-	"dbplatform/internal/domain"
 )
 
 type testCert struct {
 	cert *x509.Certificate
-	key *ecdsa.PrivateKey
+	key  *ecdsa.PrivateKey
 }
 
 func newTestCert(t *testing.T, tmpl *x509.Certificate, parent *testCert) testCert {
@@ -44,22 +44,22 @@ func newTestCert(t *testing.T, tmpl *x509.Certificate, parent *testCert) testCer
 
 func newTestCA(t *testing.T, name string) testCert {
 	return newTestCert(t, &x509.Certificate{
-		Subject: pkix.Name{CommonName: name},
-		NotBefore: time.Now().Add(-time.Hour),
-		NotAfter: time.Now().Add(time.Hour),
-		IsCA: true,
+		Subject:               pkix.Name{CommonName: name},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
 		BasicConstraintsValid: true,
-		KeyUsage: x509.KeyUsageCertSign,
+		KeyUsage:              x509.KeyUsageCertSign,
 	}, nil)
 }
 
 func newTestServerCert(t *testing.T, ca testCert, host string, notAfter time.Time) testCert {
 	return newTestCert(t, &x509.Certificate{
-		Subject: pkix.Name{CommonName: host},
-		DNSNames: []string{host},
-		NotBefore: time.Now().Add(-2 * time.Hour),
-		NotAfter: notAfter,
-		KeyUsage: x509.KeyUsageDigitalSignature,
+		Subject:     pkix.Name{CommonName: host},
+		DNSNames:    []string{host},
+		NotBefore:   time.Now().Add(-2 * time.Hour),
+		NotAfter:    notAfter,
+		KeyUsage:    x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}, &ca)
 }

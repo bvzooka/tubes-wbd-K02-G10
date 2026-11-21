@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	testDB = "sampledb"
+	testDB   = "sampledb"
 	testUser = "root"
 	testPass = "root"
 )

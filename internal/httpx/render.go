@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"bytes"
+	"dbplatform/internal/domain"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -9,21 +10,20 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"dbplatform/internal/domain"
 )
 
 const (
 	templatesDir = "templates"
-	layoutFile = "templates/layouts/base.html"
+	layoutFile   = "templates/layouts/base.html"
 )
 
 type PageData struct {
-	Title string
+	Title     string
 	Principal *domain.Principal
 	CSRFToken string
-	Flash *Flash
-	Section string
-	Data any
+	Flash     *Flash
+	Section   string
+	Data      any
 }
 
 func sectionOf(p string) string {

@@ -1,6 +1,9 @@
 package httpx_test
 
 import (
+	"dbplatform/internal/domain"
+	"dbplatform/internal/httpx"
+	webassets "dbplatform/web"
 	"errors"
 	"fmt"
 	"io"
@@ -10,9 +13,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"dbplatform/internal/domain"
-	"dbplatform/internal/httpx"
-	webassets "dbplatform/web"
 )
 
 var logger = slog.New(slog.NewTextHandler(io.Discard, nil))

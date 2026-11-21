@@ -3,13 +3,13 @@ package explain
 
 import (
 	"context"
+	"dbplatform/internal/contract"
+	"dbplatform/internal/dbdriver"
+	"dbplatform/internal/domain"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
-	"dbplatform/internal/contract"
-	"dbplatform/internal/dbdriver"
-	"dbplatform/internal/domain"
 )
 
 const (
@@ -23,7 +23,7 @@ var allowedKeywords = map[string]bool{
 
 type InputError struct {
 	Kind    error
-	Message string 
+	Message string
 }
 
 func (e *InputError) Error() string { return e.Message }
@@ -31,15 +31,15 @@ func (e *InputError) Unwrap() error { return e.Kind }
 
 // hasil satu EXPLAIN
 type Result struct {
-	SQL string
+	SQL     string
 	Analyze bool
 	Dialect domain.DBMS
-	Plan *Plan
+	Plan    *Plan
 	RawText string
 }
 
 type Service struct {
-	authz contract.Authorizer
+	authz   contract.Authorizer
 	drivers contract.DriverProvider
 }
 
@@ -139,7 +139,7 @@ func explainStatement(dialect domain.DBMS, body string, analyze bool) string {
 	}
 }
 
-// resultText menggabungkan semua sel jd teks 
+// resultText menggabungkan semua sel jd teks
 func resultText(rs *domain.ResultSet) string {
 	if rs == nil {
 		return ""

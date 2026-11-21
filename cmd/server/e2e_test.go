@@ -263,7 +263,7 @@ func idFromLocation(t *testing.T, r e2eResponse) int64 {
 	return n
 }
 
-// Satu langkah bernama, kalau gagal langsung berhenti biar langkah berikutnya ga jalan di keadaan rusak 
+// Satu langkah bernama, kalau gagal langsung berhenti biar langkah berikutnya ga jalan di keadaan rusak
 func step(t *testing.T, name string, fn func(t *testing.T)) {
 	t.Helper()
 	if !t.Run(name, fn) {

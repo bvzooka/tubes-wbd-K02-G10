@@ -1,16 +1,16 @@
 package viewer
 
 import (
-	"testing"
 	"dbplatform/internal/domain"
+	"testing"
 )
 
 func TestDBMSLabel(t *testing.T) {
 	cases := map[domain.DBMS]string{
 		domain.DBMSPostgres: "PostgreSQL",
-		domain.DBMSMySQL: "MySQL",
-		domain.DBMSMariaDB: "MariaDB",
-		"oracle": "oracle",
+		domain.DBMSMySQL:    "MySQL",
+		domain.DBMSMariaDB:  "MariaDB",
+		"oracle":            "oracle",
 	}
 	for in, want := range cases {
 		if got := dbmsLabel(in); got != want {

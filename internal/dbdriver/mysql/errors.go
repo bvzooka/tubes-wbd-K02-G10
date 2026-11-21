@@ -5,32 +5,32 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql/driver"
+	"dbplatform/internal/domain"
 	"errors"
+	gomysql "github.com/go-sql-driver/mysql"
 	"net"
 	"strings"
-	gomysql "github.com/go-sql-driver/mysql"
-	"dbplatform/internal/domain"
 )
 
 type connError struct {
-	msg string
+	msg   string
 	cause error
 }
 
-func (e *connError) Error() string { return e.msg }
-func (e *connError) Cause() error { return e.cause }
-func (e *connError) Unwrap() error { return e.cause }
+func (e *connError) Error() string        { return e.msg }
+func (e *connError) Cause() error         { return e.cause }
+func (e *connError) Unwrap() error        { return e.cause }
 func (e *connError) Is(target error) bool { return target == domain.ErrConnectionFailed }
 
 const (
-	erAccessDenied = 1045 
-	erDBAccessDenied = 1044 
-	erBadDB = 1049 
-	erTooManyConn = 1040 
-	erHostNotAllowed = 1130 
-	erQueryInterrupted = 1317 
-	erMaxExecTime = 3024 
-	erNoSuchTable = 1146 
+	erAccessDenied     = 1045
+	erDBAccessDenied   = 1044
+	erBadDB            = 1049
+	erTooManyConn      = 1040
+	erHostNotAllowed   = 1130
+	erQueryInterrupted = 1317
+	erMaxExecTime      = 3024
+	erNoSuchTable      = 1146
 )
 
 func ClassifyError(err error) error {

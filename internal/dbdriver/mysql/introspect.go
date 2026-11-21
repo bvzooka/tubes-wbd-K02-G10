@@ -3,11 +3,11 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"dbplatform/internal/domain"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
-	"dbplatform/internal/domain"
 )
 
 const tablesSQL = `
@@ -56,9 +56,9 @@ FROM information_schema.STATISTICS
 WHERE TABLE_SCHEMA = ?`
 
 type serverInfo struct {
-	mariadb bool
-	hasChecks bool 
-	hasExpression bool 
+	mariadb       bool
+	hasChecks     bool
+	hasExpression bool
 }
 
 type conKey struct{ table, name string }
@@ -213,10 +213,10 @@ func isQuotedType(dataType string) bool {
 }
 
 type keyUsage struct {
-	cols []string
+	cols      []string
 	refSchema string
-	refTable string
-	refCols []string
+	refTable  string
+	refCols   []string
 }
 
 func readConstraints(ctx context.Context, tx *sql.Tx, schema string, info serverInfo, out *domain.Schema, pos map[string]int) error {
@@ -247,8 +247,8 @@ func readConstraints(ctx context.Context, tx *sql.Tx, schema string, info server
 
 	usage := map[conKey]*keyUsage{}
 	type part struct {
-		ord int
-		col, rcol string
+		ord             int
+		col, rcol       string
 		rschema, rtable sql.NullString
 	}
 	parts := map[conKey][]part{}
@@ -377,9 +377,9 @@ func checkExpr(clause string) string {
 }
 
 type indexPart struct {
-	seq int
-	text string 
-	quoted string 
+	seq    int
+	text   string
+	quoted string
 }
 
 func readIndexes(ctx context.Context, tx *sql.Tx, schema string, info serverInfo, out *domain.Schema, pos map[string]int) error {
@@ -426,10 +426,10 @@ func readIndexes(ctx context.Context, tx *sql.Tx, schema string, info serverInfo
 		}
 		sort.SliceStable(ix.parts, func(a, b int) bool { return ix.parts[a].seq < ix.parts[b].seq })
 		in := domain.Index{
-			Name: k.name,
-			Unique: ix.unique,
+			Name:    k.name,
+			Unique:  ix.unique,
 			Primary: k.name == "PRIMARY",
-			Method: ix.method,
+			Method:  ix.method,
 		}
 		quoted := make([]string, len(ix.parts))
 		for j, p := range ix.parts {

@@ -2,11 +2,11 @@ package mysql
 
 import (
 	"context"
+	"dbplatform/internal/domain"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
-	"dbplatform/internal/domain"
 )
 
 func seededTable(t *testing.T, d *Driver, n int) string {

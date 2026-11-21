@@ -3,12 +3,12 @@ package mysql
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"dbplatform/internal/domain"
 	"errors"
+	gomysql "github.com/go-sql-driver/mysql"
 	"net"
 	"strconv"
 	"strings"
-	gomysql "github.com/go-sql-driver/mysql"
-	"dbplatform/internal/domain"
 )
 
 func BuildConfig(c domain.Connection, password string) (*gomysql.Config, error) {

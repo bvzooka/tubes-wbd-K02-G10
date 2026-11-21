@@ -44,7 +44,7 @@ func newGCM(key []byte) (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
-//  mengunci plaintext, hasilnya nonce (12 byte) lalu ciphertext
+// mengunci plaintext, hasilnya nonce (12 byte) lalu ciphertext
 func Encrypt(key, plaintext []byte) ([]byte, error) {
 	gcm, err := newGCM(key)
 	if err != nil {

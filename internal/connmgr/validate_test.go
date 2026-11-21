@@ -9,14 +9,14 @@ import (
 
 func validInput() domain.ConnectionInput {
 	return domain.ConnectionInput{
-		Name: "sampledb",
-		DBMS: domain.DBMSPostgres,
-		Host: "localhost",
-		Port: 5433,
+		Name:         "sampledb",
+		DBMS:         domain.DBMSPostgres,
+		Host:         "localhost",
+		Port:         5433,
 		DatabaseName: "sampledb",
-		Username: "postgres",
-		Password: "postgres",
-		SSLMode: "disable",
+		Username:     "postgres",
+		Password:     "postgres",
+		SSLMode:      "disable",
 	}
 }
 
@@ -28,9 +28,9 @@ func TestValidateInput_Valid(t *testing.T) {
 
 func TestValidateInput_Fields(t *testing.T) {
 	tests := []struct {
-		name string
-		mutate func(*domain.ConnectionInput)
-		isUpdate bool
+		name      string
+		mutate    func(*domain.ConnectionInput)
+		isUpdate  bool
 		wantField string
 	}{
 		{"nama kosong", func(c *domain.ConnectionInput) { c.Name = "" }, false, "name"},

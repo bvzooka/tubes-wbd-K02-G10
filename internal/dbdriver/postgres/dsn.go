@@ -1,10 +1,10 @@
 package postgres
 
 import (
+	"dbplatform/internal/domain"
 	"net"
 	"net/url"
 	"strconv"
-	"dbplatform/internal/domain"
 )
 
 // BuildURL buat URL koneksi PostgreSQL dari data koneksi dan password.

@@ -19,10 +19,10 @@ type fakeDriver struct {
 func (d *fakeDriver) Close() { d.closed = true }
 
 type fakeStore struct {
-	mu sync.Mutex
-	conns map[int64]*domain.Connection
+	mu        sync.Mutex
+	conns     map[int64]*domain.Connection
 	passwords map[int64]string
-	loads int
+	loads     int
 }
 
 func newFakeStore() *fakeStore {

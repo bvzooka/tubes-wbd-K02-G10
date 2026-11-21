@@ -3,10 +3,10 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"dbplatform/internal/domain"
 	"errors"
 	"strings"
 	"testing"
-	"dbplatform/internal/domain"
 )
 
 func serverHasTLS(t *testing.T, d *Driver) bool {

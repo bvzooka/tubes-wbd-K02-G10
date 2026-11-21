@@ -2,9 +2,9 @@ package postgres
 
 import (
 	"context"
-	"time"
-	"github.com/jackc/pgx/v5"
 	"dbplatform/internal/domain"
+	"github.com/jackc/pgx/v5"
+	"time"
 )
 
 // membatasi pg_class dan pg_namespace ke objek pengguna
