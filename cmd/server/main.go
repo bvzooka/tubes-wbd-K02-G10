@@ -1,40 +1,45 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"dbplatform/internal/config"
+	"dbplatform/internal/telemetry"
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	if err := run(logger); err != nil {
-		logger.Error("server berhenti dengan error", "error", err)
+	if err := run(); err != nil {
+		slog.Error("server berhenti dengan error", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(logger *slog.Logger) error {
-	if err := loadDotEnv(".env"); err != nil {
+func run() error {
+	if err := config.LoadDotEnv(".env"); err != nil {
 		return err
 	}
 	cfg, err := config.Load(os.Getenv)
 	if err != nil {
 		return err
 	}
+	logger := telemetry.NewLogger(os.Stdout, cfg.LogLevel)
+	slog.SetDefault(logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	shutdownTracing, err := telemetry.SetupTracing(ctx, "dbplatform-api", cfg.TraceExporter, cfg.OTLPEndpoint)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = shutdownTracing(context.WithoutCancel(ctx)) }() // span terakhir best-effort
 
 	handler, cleanup, err := buildApp(ctx, cfg, logger)
 	if err != nil {
@@ -69,34 +74,4 @@ func run(logger *slog.Logger) error {
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
 	}
-}
-
-// Load .env, variabel yang udah ada ga ditimpa
-func loadDotEnv(path string) error {
-	f, err := os.Open(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("baca %s: %w", path, err)
-	}
-	defer f.Close()
-
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		key, val, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		key = strings.TrimSpace(key)
-		val = strings.Trim(strings.TrimSpace(val), `"'`)
-		if _, exists := os.LookupEnv(key); !exists {
-			_ = os.Setenv(key, val)
-		}
-	}
-	return sc.Err()
 }

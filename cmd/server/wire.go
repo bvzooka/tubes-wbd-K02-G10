@@ -6,32 +6,35 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"time"
+	"os"
 
-	"dbplatform/internal/access"
-	"dbplatform/internal/admin"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
+	"dbplatform/internal/apiv1"
 	"dbplatform/internal/appdb"
-	"dbplatform/internal/auth"
-	"dbplatform/internal/authstub"
+	"dbplatform/internal/approval"
 	"dbplatform/internal/clock"
 	"dbplatform/internal/config"
-	"dbplatform/internal/connmgr"
 	"dbplatform/internal/contract"
-	"dbplatform/internal/explain"
 	"dbplatform/internal/httpx"
-	"dbplatform/internal/migration"
-	"dbplatform/internal/schemadiff"
-	"dbplatform/internal/viewer"
+	"dbplatform/internal/middleware"
 	webassets "dbplatform/web"
 )
 
-// Ngerakit semua modul
+// buildApp merakit seluruh aplikasi API. Rincian per modul ada di wire_*.go, peta route
+// JSON ada di routes.go.
 func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
 	pool, err := appdb.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, nil, err
 	}
-	cleanup := func() { pool.Close() }
+	closers := []func(){pool.Close}
+	cleanup := func() {
+		for i := len(closers) - 1; i >= 0; i-- {
+			closers[i]()
+		}
+	}
 	fail := func(err error) (http.Handler, func(), error) {
 		cleanup()
 		return nil, nil, err
@@ -40,89 +43,68 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		return fail(err)
 	}
 
-	var clk clock.Clock = clock.System{}
+	clk := clock.System{}
 	flash := httpx.NewFlasher(cfg.SecretKey, cfg.Secure())
 	render, err := httpx.NewRenderer(webassets.FS, flash)
 	if err != nil {
 		return fail(err)
 	}
-	handleErr := httpx.HandleError(render, logger)
-
-	d := httpx.Deps{
-		Pool: pool, Clock: clk, Logger: logger,
-		Render: render, Flash: flash, HandleErr: handleErr,
-	}
+	writeAPIErr := apiv1.WriteError(logger)
+	handleErr := errorHandlerFor(writeAPIErr, httpx.HandleError(render, logger))
+	d := httpx.Deps{Pool: pool, Clock: clk, Logger: logger, Render: render, Flash: flash, HandleErr: handleErr}
 	mux := http.NewServeMux()
+	spaMode := cfg.WebDistDir != ""
 
-	var hasher contract.PasswordHasher
-	var sessions contract.SessionAdmin
-	if cfg.UseStubs {
-		logger.Warn("APP_STUBS=true: autentikasi dan otorisasi DIMATIKAN, hanya untuk pengembangan")
-		stub, err := authstub.New(ctx, pool)
-		if err != nil {
-			return fail(err)
-		}
-		d.Auth, d.Authz, hasher, sessions = stub.Middleware, stub.Authorizer, stub.Hasher, stub.SessionAdmin
-	} else {
-		authz := access.New(pool)
-		mod := auth.New(auth.Config{
-			Policy: auth.Policy{
-				IdleTimeout:      cfg.Session.IdleTimeout,
-				AbsoluteTimeout:  cfg.Session.AbsoluteTimeout,
-				RotationInterval: cfg.Session.RotationInterval,
-				GracePeriod:      cfg.Session.GracePeriod,
-			},
-			Secure:     cfg.Secure(),
-			BcryptCost: 12,
-		}, auth.Deps{
-			Pool: pool, Clock: clk, Render: render, HandleErr: handleErr, Authorizer: authz, Logger: logger,
-		})
-		d.Auth, d.Authz, hasher, sessions = mod.Middleware, authz, mod.Hasher, mod.Sessions
-
-		created, err := auth.SeedAdmin(ctx, pool, mod.Hasher, cfg.SeedAdminUsername, cfg.SeedAdminPassword)
-		if err != nil {
-			return fail(err)
-		}
-		if created {
-			logger.Info("admin pertama dibuat", "username", cfg.SeedAdminUsername)
-		}
-		mod.Handler.Register(mux)
-		go mod.Sessions.RunCleanup(ctx, time.Hour)
-	}
-	connRepo := connmgr.NewRepo(pool, cfg.SecretKey)
-	drivers := connmgr.NewProvider(connRepo, connmgr.DefaultFactory)
-	prevCleanup := cleanup
-	cleanup = func() { drivers.Close(); prevCleanup() }
-	d.Drivers = drivers
-	connmgr.NewHandler(connmgr.NewService(connRepo, connmgr.DefaultFactory), d).Register(mux)
-	viewer.NewHandler(viewer.NewService(d.Authz, drivers), d).Register(mux)
-
-	explain.NewHandler(explain.NewService(d.Authz, drivers), render, handleErr, d.Auth).Register(mux)
-
-	adminSvc := admin.NewService(admin.NewUserRepo(pool), hasher, sessions)
-	admin.NewUserHandler(d, adminSvc).Register(mux)
-	groupSvc := admin.NewGroupService(admin.NewGroupRepo(pool), sessions)
-	admin.NewGroupHandler(d, groupSvc).Register(mux)
-
-	migrationSvc := migration.NewService(migration.NewRepo(pool), d.Authz, d.Drivers, clk)
-	// Migration yang nyangkut running ditandain gagal pas start
-	recovered, err := migrationSvc.RecoverStuck(ctx)
+	authn, err := wireAuth(ctx, cfg, &d, mux, spaMode)
 	if err != nil {
 		return fail(err)
 	}
-	if recovered > 0 {
-		logger.Warn("migration yang terputus ditandai gagal", "jumlah", recovered)
-	}
-	migration.NewHandler(d, migrationSvc).Register(mux)
-	// Schema diff bikin draft lewat service migration
-	schemadiff.NewHandler(d, schemadiff.NewService(d.Authz, d.Drivers, migrationSvc)).Register(mux)
+	drivers := wireDrivers(cfg, pool, logger)
+	closers = append(closers, drivers.Close)
+	d.Drivers = drivers.Provider
 
-	static, err := fs.Sub(webassets.FS, "static")
-	if err != nil {
+	adminAPI := wireAdmin(&d, authn, mux, spaMode)
+	if err := wireLegacyPages(ctx, cfg, &d, mux); err != nil {
 		return fail(err)
 	}
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
-	mux.Handle("GET /{$}", d.Authed()(http.RedirectHandler("/databases", http.StatusSeeOther)))
+
+	api := apiv1.NewRouter(mux, authn.apiMiddleware(writeAPIErr), writeAPIErr)
+	registerAPIRoutes(api, apiHandlers{
+		auth:      authn.api,
+		admin:     adminAPI,
+		approvals: approval.NewAPIHandler(approval.NewService(pool, clk, logger)),
+	})
+
+	if err := wireStatic(mux, d, cfg, pool); err != nil {
+		return fail(err)
+	}
+
+	handler := middleware.Chain(
+		middleware.RequestID,
+		otelMiddleware,
+		middleware.Logging(logger),
+		middleware.Recover(logger, handleErr),
+		middleware.SecurityHeaders,
+	)(mux)
+	return handler, cleanup, nil
+}
+
+// errorHandlerFor memilih respons JSON untuk /api/* dan halaman HTML untuk sisanya.
+func errorHandlerFor(api, html contract.ErrorHandler) contract.ErrorHandler {
+	return func(w http.ResponseWriter, r *http.Request, err error) {
+		if apiv1.IsAPIRequest(r) {
+			api(w, r, err)
+			return
+		}
+		html(w, r, err)
+	}
+}
+
+func otelMiddleware(next http.Handler) http.Handler {
+	return otelhttp.NewHandler(next, "http.request")
+}
+
+func wireStatic(mux *http.ServeMux, d httpx.Deps, cfg config.Config, pool *pgxpool.Pool) error {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		if err := pool.Ping(r.Context()); err != nil {
 			http.Error(w, "database platform tidak terjangkau", http.StatusServiceUnavailable)
@@ -131,11 +113,15 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		fmt.Fprintln(w, "ok")
 	})
 
-	handler := httpx.Chain(
-		httpx.WithRequestID,
-		httpx.Recover(logger, handleErr),
-		httpx.Logging(logger),
-		httpx.SecurityHeaders,
-	)(mux)
-	return handler, cleanup, nil
+	if cfg.WebDistDir != "" {
+		mux.Handle("GET /", apiv1.SPA(os.DirFS(cfg.WebDistDir)))
+		return nil
+	}
+	static, err := fs.Sub(webassets.FS, "static")
+	if err != nil {
+		return err
+	}
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
+	mux.Handle("GET /{$}", d.Authed()(http.RedirectHandler("/databases", http.StatusSeeOther)))
+	return nil
 }
