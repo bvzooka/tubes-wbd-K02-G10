@@ -25,18 +25,22 @@ func TestLoad_Defaults(t *testing.T) {
 		cfg.Session.RotationInterval != 15*time.Minute || cfg.Session.GracePeriod != 30*time.Second {
 		t.Errorf("default session tidak sesuai: %+v", cfg.Session)
 	}
+	if cfg.Worker.Concurrency != 4 || cfg.Worker.Lease != 30*time.Second || cfg.Worker.Heartbeat != 10*time.Second ||
+		cfg.Worker.MaxAttempts != 3 || cfg.Worker.RetryBase != 5*time.Second || cfg.Worker.ID == "" {
+		t.Errorf("default worker tidak sesuai: %+v", cfg.Worker)
+	}
 	if len(cfg.SecretKey) != 32 || cfg.SeedAdminUsername != "admin" || cfg.UseStubs {
 		t.Errorf("default lain tidak sesuai: %+v", cfg)
 	}
 }
 
 func TestLoad_Production(t *testing.T) {
-	cfg, err := Load(env(map[string]string{"APP_SECRET_KEY": validKey(), "APP_ENV": "production", "APP_STUBS": "true"}))
+	cfg, err := Load(env(map[string]string{"APP_SECRET_KEY": validKey(), "APP_ENV": "production"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.Secure() || !cfg.UseStubs {
-		t.Errorf("production/stubs tidak terbaca: %+v", cfg)
+	if !cfg.Secure() || cfg.UseStubs {
+		t.Errorf("production tidak terbaca: %+v", cfg)
 	}
 }
 
@@ -53,6 +57,10 @@ func TestLoad_Invalid(t *testing.T) {
 		{"durasi salah", map[string]string{"APP_SECRET_KEY": validKey(), "SESSION_IDLE_TIMEOUT": "abc"}, "SESSION_IDLE_TIMEOUT"},
 		{"durasi nol", map[string]string{"APP_SECRET_KEY": validKey(), "SESSION_IDLE_TIMEOUT": "0s"}, "SESSION_IDLE_TIMEOUT"},
 		{"grace >= rotasi", map[string]string{"APP_SECRET_KEY": validKey(), "SESSION_GRACE_PERIOD": "20m"}, "SESSION_GRACE_PERIOD"},
+		{"stubs di production", map[string]string{"APP_SECRET_KEY": validKey(), "APP_ENV": "production", "APP_STUBS": "true"}, "APP_STUBS"},
+		{"heartbeat terlalu lama", map[string]string{"APP_SECRET_KEY": validKey(), "JOB_HEARTBEAT": "20s"}, "JOB_HEARTBEAT"},
+		{"concurrency nol", map[string]string{"APP_SECRET_KEY": validKey(), "WORKER_CONCURRENCY": "0"}, "WORKER_CONCURRENCY"},
+		{"exporter salah", map[string]string{"APP_SECRET_KEY": validKey(), "OTEL_TRACES_EXPORTER": "zipkin"}, "OTEL_TRACES_EXPORTER"},
 		{"stubs salah", map[string]string{"APP_SECRET_KEY": validKey(), "APP_STUBS": "mungkin"}, "APP_STUBS"},
 	}
 	for _, tt := range tests {
