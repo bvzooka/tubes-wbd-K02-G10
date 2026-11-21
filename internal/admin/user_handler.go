@@ -246,6 +246,8 @@ func (h *UserHandler) toggle(w http.ResponseWriter, r *http.Request, op func(con
 		h.deps.Flash.Set(w, httpx.FlashError, msgSelfDeactivate)
 	case errors.Is(err, ErrLastAdmin):
 		h.deps.Flash.Set(w, httpx.FlashError, msgLastAdmin)
+	case errors.Is(err, ErrDeactivateLeader):
+		h.deps.Flash.Set(w, httpx.FlashError, ErrDeactivateLeader.Message)
 	default:
 		h.deps.HandleErr(w, r, err)
 		return

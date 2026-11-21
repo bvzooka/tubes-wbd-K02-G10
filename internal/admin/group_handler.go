@@ -274,6 +274,11 @@ func (h *GroupHandler) removeMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.RemoveMember(r.Context(), actor, id, userID); err != nil {
+		if errors.Is(err, ErrRemoveLeader) {
+			h.deps.Flash.Set(w, httpx.FlashError, ErrRemoveLeader.Message)
+			h.redirectDetail(w, r, id)
+			return
+		}
 		h.deps.HandleErr(w, r, err)
 		return
 	}
