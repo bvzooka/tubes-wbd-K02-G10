@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"path"
 	"sort"
@@ -120,4 +121,8 @@ var funcs = template.FuncMap{
 		}
 		return string(rs[:n]) + "…"
 	},
+}
+
+func logError(r *http.Request, err error) {
+	slog.ErrorContext(r.Context(), "render failed", "error", err)
 }

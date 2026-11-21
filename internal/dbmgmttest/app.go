@@ -25,6 +25,7 @@ import (
 	"dbplatform/internal/dbdriver/postgres"
 	"dbplatform/internal/domain"
 	"dbplatform/internal/httpx"
+	"dbplatform/internal/middleware"
 	"dbplatform/internal/testutil"
 	"dbplatform/internal/viewer"
 	webassets "dbplatform/web"
@@ -81,8 +82,8 @@ func New(t *testing.T) *App {
 	connmgr.NewHandler(svc, d).Register(mux)
 	viewer.NewHandler(viewer.NewService(authz, provider), d).Register(mux)
 
-	srv := httptest.NewServer(httpx.Chain(
-		httpx.WithRequestID, httpx.Recover(logger, handleErr), httpx.SecurityHeaders,
+	srv := httptest.NewServer(middleware.Chain(
+		middleware.RequestID, middleware.Recover(logger, handleErr), middleware.SecurityHeaders,
 	)(mux))
 	t.Cleanup(srv.Close)
 

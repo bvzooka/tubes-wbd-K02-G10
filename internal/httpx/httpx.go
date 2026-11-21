@@ -2,26 +2,18 @@ package httpx
 
 import (
 	"log/slog"
-	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dbplatform/internal/clock"
 	"dbplatform/internal/contract"
 	"dbplatform/internal/domain"
+	"dbplatform/internal/middleware"
 )
 
-type Middleware = func(http.Handler) http.Handler
+type Middleware = middleware.Middleware
 
-func Chain(mws ...Middleware) Middleware {
-	return func(next http.Handler) http.Handler {
-		// Dari belakang biar middleware belakang duluan
-		for i := len(mws) - 1; i >= 0; i-- {
-			next = mws[i](next)
-		}
-		return next
-	}
-}
+var Chain = middleware.Chain
 
 type Deps struct {
 	Pool      *pgxpool.Pool
