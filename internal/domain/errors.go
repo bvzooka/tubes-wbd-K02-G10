@@ -14,12 +14,43 @@ var (
 	ErrConnectionInactive  = errors.New("connection inactive")
 	ErrMigrationOutOfOrder = errors.New("migration out of order")
 	ErrMigrationNotDraft   = errors.New("migration is not a draft")
+
+	ErrApprovalRequired = errors.New("approval required")
+	ErrNotReversible    = errors.New("migration not reversible")
+	ErrDatabaseBusy     = errors.New("database busy")
+	ErrDatabaseBlocked  = errors.New("database blocked")
+	ErrNoLeader         = errors.New("group has no leader")
+	ErrRateLimited      = errors.New("too many requests")
 )
 
-// Bawa pesan per kolom form
+// ValidationError membawa pesan per kolom. Cause membuat errors.Is tetap kenal
+// penyebab spesifik, misalnya ErrNoLeader.
 type ValidationError struct {
-	Fields map[string]string
+	Fields  map[string]string
+	Message string
+	Cause   error
 }
 
-func (e *ValidationError) Error() string { return "validation failed" }
-func (e *ValidationError) Unwrap() error { return ErrValidation }
+func (e *ValidationError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return "validation failed"
+}
+
+func (e *ValidationError) Unwrap() []error {
+	if e.Cause != nil {
+		return []error{ErrValidation, e.Cause}
+	}
+	return []error{ErrValidation}
+}
+
+// MessageError menempelkan pesan untuk pengguna pada error domain, misalnya
+// ErrUnauthenticated dengan "Username atau password salah."
+type MessageError struct {
+	Err     error
+	Message string
+}
+
+func (e *MessageError) Error() string { return e.Message }
+func (e *MessageError) Unwrap() error { return e.Err }
