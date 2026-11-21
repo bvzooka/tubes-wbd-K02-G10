@@ -56,7 +56,7 @@ type Handler struct {
 	d httpx.Deps
 }
 
-func NewHandler(svc *Service, d httpx.Deps) *Handler { return &Handler{svc: svc, d: d} }
+func NewHandler(d httpx.Deps, svc *Service) *Handler { return &Handler{svc: svc, d: d} }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	admin := h.d.Admin()

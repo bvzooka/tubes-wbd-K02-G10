@@ -78,8 +78,8 @@ func New(t *testing.T) *App {
 	}
 	mux := http.NewServeMux()
 	mod.Handler.Register(mux)
-	connmgr.NewHandler(svc, d).Register(mux)
-	viewer.NewHandler(viewer.NewService(authz, provider), d).Register(mux)
+	connmgr.NewHandler(d, svc).Register(mux)
+	viewer.NewHandler(d, viewer.NewService(authz, provider)).Register(mux)
 
 	srv := httptest.NewServer(httpx.Chain(
 		httpx.WithRequestID, httpx.Recover(logger, handleErr), httpx.SecurityHeaders,
