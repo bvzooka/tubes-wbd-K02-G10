@@ -34,6 +34,7 @@ type Module struct {
 	Sessions   *Manager    // contract.SessionAdmin
 	Middleware *Middleware // contract.AuthMiddleware
 	Handler    *Handler
+	API        *APIHandler
 }
 
 // New merakit modul auth.
@@ -55,7 +56,9 @@ func New(cfg Config, d Deps) *Module {
 		Secure:    cfg.Secure,
 		Logger:    d.Logger,
 	})
-	return &Module{Hasher: hasher, Sessions: sessions, Middleware: mw, Handler: h}
+	// HTML dan API berbagi satu Authenticator agar rate limit login juga sama.
+	api := NewAPIHandler(h.auth, sessions, cfg.Secure)
+	return &Module{Hasher: hasher, Sessions: sessions, Middleware: mw, Handler: h, API: api}
 }
 
 var (

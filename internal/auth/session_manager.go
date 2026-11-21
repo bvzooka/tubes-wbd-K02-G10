@@ -29,6 +29,7 @@ func NewManager(store SessionStore, policy Policy, clk clock.Clock, logger *slog
 // Started adalah hasil Start: nilai cookie mentah dan waktu kedaluwarsa mutlaknya.
 type Started struct {
 	Token     string
+	CSRFToken string
 	ExpiresAt time.Time
 }
 
@@ -63,7 +64,7 @@ func (m *Manager) Start(ctx context.Context, userID int64) (Started, error) {
 	}); err != nil {
 		return Started{}, err
 	}
-	return Started{Token: raw, ExpiresAt: expires}, nil
+	return Started{Token: raw, CSRFToken: csrf, ExpiresAt: expires}, nil
 }
 
 // Resolve memvalidasi nilai cookie. Session tidak valid menghasilkan domain.ErrUnauthenticated.
