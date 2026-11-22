@@ -19,6 +19,7 @@ type Manager struct {
 	logger *slog.Logger
 }
 
+// NewManager dibuat dengan penyimpanan, aturan waktu, clock, dan logger
 func NewManager(store SessionStore, policy Policy, clk clock.Clock, logger *slog.Logger) *Manager {
 	if logger == nil {
 		logger = slog.Default()
@@ -81,6 +82,7 @@ func (m *Manager) Resolve(ctx context.Context, raw string) (*Resolved, error) {
 		return nil, err
 	}
 
+	// Evaluate memutuskan session ini valid, perlu dicabut, atau perlu dirotasi, tanpa menyentuh database
 	d := Evaluate(now, s, m.policy)
 	if !d.Valid {
 		switch {
@@ -129,6 +131,7 @@ func (m *Manager) End(ctx context.Context, raw string) error {
 	return m.revokeToken(ctx, raw, ReasonLogout)
 }
 
+// revokeToken mencabut session dari nilai cookie, token yang tidak dikenal diam saja
 func (m *Manager) revokeToken(ctx context.Context, raw, reason string) error {
 	if raw == "" {
 		return nil

@@ -24,12 +24,14 @@ type Middleware struct {
 	secure    bool
 }
 
+// NewMiddleware dibuat dengan pembaca session, authorizer, penanganan error, dan penanda cookie Secure
 func NewMiddleware(sessions sessionResolver, authz contract.Authorizer, handleErr contract.ErrorHandler, secure bool) *Middleware {
 	return &Middleware{sessions: sessions, authz: authz, handleErr: handleErr, secure: secure}
 }
 
 var _ contract.AuthMiddleware = (*Middleware)(nil)
 
+// Authenticate memastikan request punya session valid, kalau tidak dialihkan ke halaman login
 func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(SessionCookieName)
@@ -47,6 +49,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			m.handleErr(w, r, err)
 			return
 		}
+		// session baru dirotasi, browser harus memakai token baru
 		if res.NewToken != "" {
 			http.SetCookie(w, sessionCookie(res.NewToken, res.ExpiresAt, m.secure))
 		}
@@ -59,6 +62,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// redirectToLogin menyimpan halaman tujuan di ?next hanya untuk GET, karena POST tidak bisa diulang dengan aman
 func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	target := "/login"
 	if r.Method == http.MethodGet {
@@ -67,6 +71,7 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
+// CSRF menolak request yang mengubah data kalau asalnya beda atau tokennya tidak cocok
 func (m *Middleware) CSRF(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if safeMethod(r.Method) {
@@ -82,6 +87,7 @@ func (m *Middleware) CSRF(next http.Handler) http.Handler {
 	})
 }
 
+// RequireAdmin hanya meloloskan Platform Admin
 func (m *Middleware) RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, ok := domain.PrincipalFrom(r.Context())
@@ -97,6 +103,7 @@ func (m *Middleware) RequireAdmin(next http.Handler) http.Handler {
 	})
 }
 
+// RequireDBAccess meloloskan user yang levelnya minimal min pada database di path {dbID}
 func (m *Middleware) RequireDBAccess(min domain.AccessLevel) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -6,6 +6,7 @@ import (
 	"net/url"
 )
 
+// nama field form dan header tempat token CSRF dikirim, header dipakai request AJAX atau API
 const (
 	CSRFFieldName  = "csrf_token"
 	CSRFHeaderName = "X-CSRF-Token"
@@ -31,6 +32,7 @@ func sameOrigin(r *http.Request) bool {
 	return true
 }
 
+// hostMatches membandingkan host dari Origin atau Referer dengan host request
 func hostMatches(raw, host string) bool {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
@@ -47,6 +49,7 @@ func submittedCSRFToken(r *http.Request) string {
 	return r.PostFormValue(CSRFFieldName)
 }
 
+// safeMethod true untuk method yang tidak mengubah data, jadi tidak perlu token CSRF
 func safeMethod(method string) bool {
 	switch method {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:

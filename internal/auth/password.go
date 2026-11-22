@@ -34,6 +34,7 @@ func NewHasher(cost int) *Hasher {
 	return &Hasher{cost: cost}
 }
 
+// Hash mengubah password jadi hash bcrypt, salt acak sudah ikut tersimpan di hasilnya
 func (h *Hasher) Hash(plain string) (string, error) {
 	if len(plain) > MaxPasswordBytes {
 		return "", ErrPasswordTooLong
@@ -45,6 +46,7 @@ func (h *Hasher) Hash(plain string) (string, error) {
 	return string(b), nil
 }
 
+// Verify true kalau password cocok dengan hash, password terlalu panjang langsung ditolak
 func (h *Hasher) Verify(hash, plain string) bool {
 	if len(plain) > MaxPasswordBytes {
 		return false

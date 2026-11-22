@@ -29,8 +29,10 @@ type UserRepo struct {
 	db DB
 }
 
+// NewUserRepo dibuat dengan koneksi database platform
 func NewUserRepo(db DB) *UserRepo { return &UserRepo{db: db} }
 
+// FindByUsername mengembalikan ErrNotFound kalau username tidak ada, bukan error database
 func (r *UserRepo) FindByUsername(ctx context.Context, username string) (UserCredential, error) {
 	var u UserCredential
 	err := r.db.QueryRow(ctx,

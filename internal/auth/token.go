@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 )
 
+// 32 byte acak, cukup panjang supaya tidak bisa ditebak
 const tokenBytes = 32
 
 // NewToken membuat identifier session acak 32 byte dalam base64url tanpa padding.

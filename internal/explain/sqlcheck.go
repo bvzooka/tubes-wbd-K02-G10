@@ -45,11 +45,13 @@ func scanSQL(sql string) sqlShape {
 	for i := 0; i < n; i++ {
 		c := rs[i]
 		switch {
+		// komentar baris, dilewati sampai akhir baris
 		case c == '-' && i+1 < n && rs[i+1] == '-':
 			flushWord()
 			for i < n && rs[i] != '\n' {
 				i++
 			}
+		// komentar blok yang bisa bersarang, jadi kedalamannya dihitung
 		case c == '/' && i+1 < n && rs[i+1] == '*':
 			flushWord()
 			depth := 1
@@ -66,6 +68,7 @@ func scanSQL(sql string) sqlShape {
 				}
 			}
 			i--
+		// string literal, dua kutip berurutan berarti satu kutip, dan E'..' mengenal backslash
 		case c == '\'':
 			escapes := word.Len() == 1 && (word.String() == "E" || word.String() == "e")
 			flushWord()
@@ -86,6 +89,7 @@ func scanSQL(sql string) sqlShape {
 				i++
 			}
 			lastEnd = i + 1
+		// identifier ber-quote, dua kutip berurutan berarti satu kutip
 		case c == '"':
 			flushWord()
 			startToken()
@@ -101,6 +105,7 @@ func scanSQL(sql string) sqlShape {
 				i++
 			}
 			lastEnd = i + 1
+		// dollar-quoted string seperti $$..$$ atau $tag$..$tag$, isinya dilewati sampai penutup yang sama
 		case c == '$' && word.Len() == 0:
 			if tag, ok := dollarTag(rs, i); ok {
 				startToken()
@@ -115,12 +120,15 @@ func scanSQL(sql string) sqlShape {
 			}
 			startToken()
 			lastEnd = i + 1
+		// titik koma di luar string dan komentar memisahkan statement
 		case c == ';':
 			flushWord()
 			inStatement = false
 			lastSemi = i
+		// spasi mengakhiri kata yang sedang dibaca
 		case unicode.IsSpace(c):
 			flushWord()
+		// token biasa, huruf dikumpulkan jadi kata untuk mencari keyword pertama
 		default:
 			startToken()
 			if unicode.IsLetter(c) || c == '_' || (word.Len() > 0 && unicode.IsDigit(c)) {
@@ -152,6 +160,7 @@ func dollarTag(rs []rune, i int) ([]rune, bool) {
 	return nil, false
 }
 
+// indexRunes mencari sub mulai dari posisi from, -1 kalau tidak ada
 func indexRunes(rs []rune, from int, sub []rune) int {
 	for i := from; i+len(sub) <= len(rs); i++ {
 		match := true
