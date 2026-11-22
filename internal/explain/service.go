@@ -56,7 +56,7 @@ func NewService(authz contract.Authorizer, drivers contract.DriverProvider) *Ser
 func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql string, analyze bool) (*Result, error) {
 	ok, err := s.authz.Can(ctx, p.UserID, dbID, domain.AccessViewEdit)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("check access: %w", err)
 	}
 	if !ok {
 		return nil, domain.ErrForbidden
@@ -69,7 +69,7 @@ func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql s
 
 	drv, err := s.drivers.Get(ctx, dbID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get driver: %w", err)
 	}
 
 	res := &Result{SQL: body, Analyze: analyze, Dialect: drv.Dialect()}
