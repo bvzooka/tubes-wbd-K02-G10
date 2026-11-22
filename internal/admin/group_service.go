@@ -80,14 +80,21 @@ func (s *GroupService) CreateGroup(ctx context.Context, actor domain.Principal, 
 	if errors.Is(err, domain.ErrConflict) {
 		return domain.Group{}, &domain.ValidationError{Fields: map[string]string{"name": msgGroupNameTaken}}
 	}
-	return g, err
+	if err != nil {
+		return domain.Group{}, fmt.Errorf("create group: %w", err)
+	}
+	return g, nil
 }
 
 func (s *GroupService) ListGroups(ctx context.Context, actor domain.Principal) ([]GroupRow, error) {
 	if err := requireAdmin(actor); err != nil {
 		return nil, err
 	}
-	return s.groups.List(ctx)
+	rows, err := s.groups.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list groups: %w", err)
+	}
+	return rows, nil
 }
 
 // GroupDetail mengumpulkan semua data halaman group dalam satu panggilan
@@ -97,23 +104,23 @@ func (s *GroupService) GroupDetail(ctx context.Context, actor domain.Principal, 
 	}
 	g, err := s.groups.Get(ctx, id)
 	if err != nil {
-		return GroupDetail{}, err
+		return GroupDetail{}, fmt.Errorf("get group: %w", err)
 	}
 	members, err := s.groups.ListMembers(ctx, id)
 	if err != nil {
-		return GroupDetail{}, err
+		return GroupDetail{}, fmt.Errorf("list members: %w", err)
 	}
 	access, err := s.groups.ListAccess(ctx, id)
 	if err != nil {
-		return GroupDetail{}, err
+		return GroupDetail{}, fmt.Errorf("list access: %w", err)
 	}
 	users, err := s.groups.AvailableUsers(ctx, id)
 	if err != nil {
-		return GroupDetail{}, err
+		return GroupDetail{}, fmt.Errorf("list available users: %w", err)
 	}
 	conns, err := s.groups.AvailableConnections(ctx)
 	if err != nil {
-		return GroupDetail{}, err
+		return GroupDetail{}, fmt.Errorf("list available connections: %w", err)
 	}
 	return GroupDetail{
 		Group:                g,
@@ -138,14 +145,20 @@ func (s *GroupService) UpdateGroup(ctx context.Context, actor domain.Principal, 
 	if errors.Is(err, domain.ErrConflict) {
 		return domain.Group{}, &domain.ValidationError{Fields: map[string]string{"name": msgGroupNameTaken}}
 	}
-	return g, err
+	if err != nil {
+		return domain.Group{}, fmt.Errorf("update group: %w", err)
+	}
+	return g, nil
 }
 
 func (s *GroupService) DeleteGroup(ctx context.Context, actor domain.Principal, id int64) error {
 	if err := requireAdmin(actor); err != nil {
 		return err
 	}
-	return s.groups.Delete(ctx, id)
+	if err := s.groups.Delete(ctx, id); err != nil {
+		return fmt.Errorf("delete group: %w", err)
+	}
+	return nil
 }
 
 // AddMember menambah anggota, user yang tidak ada jadi pesan validasi bukan error server
@@ -154,14 +167,14 @@ func (s *GroupService) AddMember(ctx context.Context, actor domain.Principal, gr
 		return err
 	}
 	if _, err := s.groups.Get(ctx, groupID); err != nil {
-		return err
+		return fmt.Errorf("get group: %w", err)
 	}
 	added, err := s.groups.AddMember(ctx, groupID, userID)
 	if errors.Is(err, domain.ErrNotFound) {
 		return &domain.ValidationError{Fields: map[string]string{"user_id": msgUserMissing}}
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("add member: %w", err)
 	}
 
 	// Rotasi cuma kalau anggotanya bener-bener baru
@@ -177,7 +190,10 @@ func (s *GroupService) RemoveMember(ctx context.Context, actor domain.Principal,
 	if err := requireAdmin(actor); err != nil {
 		return err
 	}
-	return s.groups.RemoveMember(ctx, groupID, userID)
+	if err := s.groups.RemoveMember(ctx, groupID, userID); err != nil {
+		return fmt.Errorf("remove member: %w", err)
+	}
+	return nil
 }
 
 // GrantAccess memberi atau mengubah level akses group ke satu database
@@ -189,7 +205,7 @@ func (s *GroupService) GrantAccess(ctx context.Context, actor domain.Principal, 
 		return &domain.ValidationError{Fields: map[string]string{"access_level": msgAccessLevelInvalid}}
 	}
 	if _, err := s.groups.Get(ctx, groupID); err != nil {
-		return err
+		return fmt.Errorf("get group: %w", err)
 	}
 
 	previous, err := s.groups.GrantAccess(ctx, groupID, connID, level, actor.UserID)
@@ -199,14 +215,14 @@ func (s *GroupService) GrantAccess(ctx context.Context, actor domain.Principal, 
 	case errors.Is(err, domain.ErrNotFound):
 		return &domain.ValidationError{Fields: map[string]string{"connection_id": msgConnectionMissing}}
 	case err != nil:
-		return err
+		return fmt.Errorf("grant access: %w", err)
 	}
 
 	// Rotasi cuman kalau level naik
 	if level.Rank() > previous.Rank() {
 		ids, err := s.groups.MemberIDs(ctx, groupID)
 		if err != nil {
-			return err
+			return fmt.Errorf("list member ids: %w", err)
 		}
 		if len(ids) > 0 {
 			if err := s.sessions.MarkRotationNeeded(ctx, ids...); err != nil {
@@ -221,5 +237,8 @@ func (s *GroupService) RevokeAccess(ctx context.Context, actor domain.Principal,
 	if err := requireAdmin(actor); err != nil {
 		return err
 	}
-	return s.groups.RevokeAccess(ctx, groupID, connID)
+	if err := s.groups.RevokeAccess(ctx, groupID, connID); err != nil {
+		return fmt.Errorf("revoke access: %w", err)
+	}
+	return nil
 }
