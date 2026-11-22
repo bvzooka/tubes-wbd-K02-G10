@@ -7,12 +7,15 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"dbplatform/internal/dbdriver/pgmeta"
 	"dbplatform/internal/domain"
 )
 
-// userRel membatasi pg_class dan pg_namespace ke objek pengguna, tanpa schema sistem dan temporary
+// userRel membatasi pg_class dan pg_namespace ke objek pengguna, tanpa schema sistem dan temporary.
+// Schema meta platform (_dbplatform) ikut disembunyikan, karena tableExistsSQL memakai userRel yang
+// sama maka TableData untuk tabel meta juga ErrNotFound.
 const userRel = `c.relkind IN ('r', 'p', 'v', 'm')
-	AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+	AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast', '` + pgmeta.Schema + `')
 	AND n.nspname NOT LIKE 'pg\_temp\_%'
 	AND n.nspname NOT LIKE 'pg\_toast\_temp\_%'`
 
