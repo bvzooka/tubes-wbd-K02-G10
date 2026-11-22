@@ -187,52 +187,14 @@ func (r *Repo) Claim(ctx context.Context, connID int64, version int, executedBy 
 	if err := lockMigrations(ctx, tx, connID); err != nil {
 		return domain.Migration{}, err
 	}
-
-	var status string
-	err = tx.QueryRow(ctx, `
-		SELECT status
-		FROM db_migrations
-		WHERE connection_id = $1 AND version = $2
-		FOR UPDATE`, connID, version).Scan(&status)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Migration{}, domain.ErrNotFound
+	if err := requireDraft(ctx, tx, connID, version); err != nil {
+		return domain.Migration{}, err
 	}
-	if err != nil {
-		return domain.Migration{}, fmt.Errorf("read migration status: %w", err)
+	if err := requireNoEarlierPending(ctx, tx, connID, version); err != nil {
+		return domain.Migration{}, err
 	}
-	if domain.MigrationStatus(status) != domain.MigrationDraft {
-		return domain.Migration{}, domain.ErrMigrationNotDraft
-	}
-
-	var blocking int
-	err = tx.QueryRow(ctx,
-		// Berurutan, versi lebih kecil harus selesai duluan
-		`
-		SELECT version
-		FROM db_migrations
-		WHERE connection_id = $1 AND version < $2 AND status IN ('draft', 'running')
-		ORDER BY version
-		LIMIT 1`, connID, version).Scan(&blocking)
-	switch {
-	case err == nil:
-		return domain.Migration{}, &OutOfOrderError{Blocking: blocking}
-	case !errors.Is(err, pgx.ErrNoRows):
-		return domain.Migration{}, fmt.Errorf("check order: %w", err)
-	}
-
-	_, err = tx.Exec(ctx, `
-		UPDATE db_migrations
-		SET status = 'running', executed_by = $3, executed_at = $4, finished_at = NULL,
-		    error_message = '', warning = '', updated_at = $4
-		WHERE connection_id = $1 AND version = $2`,
-		connID, version, executedBy, now)
-	var pgErr *pgconn.PgError
-	// Indeks unik nolak kalau ada migration lain yang lagi running
-	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
-		return domain.Migration{}, domain.ErrMigrationOutOfOrder
-	}
-	if err != nil {
-		return domain.Migration{}, fmt.Errorf("mark running: %w", err)
+	if err := markRunning(ctx, tx, connID, version, executedBy, now); err != nil {
+		return domain.Migration{}, err
 	}
 
 	m, err := scanMigration(tx.QueryRow(ctx, selectFull+` WHERE m.connection_id = $1 AND m.version = $2`, connID, version))
@@ -243,6 +205,65 @@ func (r *Repo) Claim(ctx context.Context, connID int64, version int, executedBy 
 		return domain.Migration{}, fmt.Errorf("commit claim: %w", err)
 	}
 	return m, nil
+}
+
+// requireDraft mengunci baris migration lalu memastikan statusnya masih draft
+func requireDraft(ctx context.Context, tx pgx.Tx, connID int64, version int) error {
+	var status string
+	err := tx.QueryRow(ctx, `
+		SELECT status
+		FROM db_migrations
+		WHERE connection_id = $1 AND version = $2
+		FOR UPDATE`, connID, version).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read migration status: %w", err)
+	}
+	if domain.MigrationStatus(status) != domain.MigrationDraft {
+		return domain.ErrMigrationNotDraft
+	}
+	return nil
+}
+
+// requireNoEarlierPending menolak kalau masih ada versi lebih kecil yang draft atau running
+func requireNoEarlierPending(ctx context.Context, tx pgx.Tx, connID int64, version int) error {
+	var blocking int
+	err := tx.QueryRow(ctx,
+		// Berurutan, versi lebih kecil harus selesai duluan
+		`
+		SELECT version
+		FROM db_migrations
+		WHERE connection_id = $1 AND version < $2 AND status IN ('draft', 'running')
+		ORDER BY version
+		LIMIT 1`, connID, version).Scan(&blocking)
+	switch {
+	case err == nil:
+		return &OutOfOrderError{Blocking: blocking}
+	case !errors.Is(err, pgx.ErrNoRows):
+		return fmt.Errorf("check order: %w", err)
+	}
+	return nil
+}
+
+// markRunning mengubah status jadi running dan mencatat siapa yang menjalankan dan kapan
+func markRunning(ctx context.Context, tx pgx.Tx, connID int64, version int, executedBy int64, now time.Time) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE db_migrations
+		SET status = 'running', executed_by = $3, executed_at = $4, finished_at = NULL,
+		    error_message = '', warning = '', updated_at = $4
+		WHERE connection_id = $1 AND version = $2`,
+		connID, version, executedBy, now)
+	var pgErr *pgconn.PgError
+	// Indeks unik nolak kalau ada migration lain yang lagi running
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		return domain.ErrMigrationOutOfOrder
+	}
+	if err != nil {
+		return fmt.Errorf("mark running: %w", err)
+	}
+	return nil
 }
 
 // Finish mencatat hasil eksekusi, hanya untuk migration yang berstatus running
