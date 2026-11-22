@@ -5,20 +5,24 @@ import (
 	"strings"
 )
 
+// ErrUnterminated dikembalikan kalau ada kutip, komentar, atau dollar-quote yang tidak ditutup
 var ErrUnterminated = errors.New("unterminated quote, comment, or dollar-quote")
 
+// Statement adalah satu perintah SQL beserta dua kata pertamanya, dipakai untuk mengenali jenis perintah
 type Statement struct {
 	Text    string
 	Keyword string
 	Second  string
 }
 
+// tokenTracker mencatat jumlah token dan dua kata pertama dari statement yang sedang dibaca
 type tokenTracker struct {
 	count  int
 	first  string
 	second string
 }
 
+// note dipanggil untuk tiap token, kata kosong berarti token itu bukan kata kunci (angka, string, simbol)
 func (t *tokenTracker) note(word string) {
 	t.count++
 	switch {
@@ -29,11 +33,13 @@ func (t *tokenTracker) note(word string) {
 	}
 }
 
+// Split memecah SQL jadi statement dengan membaca karakter satu per satu, supaya titik koma di dalam string, komentar, atau dollar-quote tidak ikut memecah
 func Split(sql string) ([]Statement, error) {
 	var stmts []Statement
 	var tokens tokenTracker
 	start, i, n := 0, 0, len(sql)
 
+	// flush menutup statement yang sedang dibaca dan mulai pencatatan baru
 	flush := func(end int) {
 		if tokens.count > 0 {
 			stmts = append(stmts, Statement{
@@ -111,18 +117,22 @@ func Split(sql string) ([]Statement, error) {
 	return stmts, nil
 }
 
+// isSpace true untuk karakter spasi, tab, dan baris baru
 func isSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'
 }
 
+// isIdentChar true untuk karakter yang boleh ada di nama: huruf, angka, garis bawah, dolar, dan karakter non-ASCII
 func isIdentChar(c byte) bool {
 	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '$' || c >= 0x80
 }
 
+// isTagChar sama dengan isIdentChar tapi tanpa dolar, karena dolar membatasi tag dollar-quote
 func isTagChar(c byte) bool {
 	return c != '$' && isIdentChar(c)
 }
 
+// skipLineComment mengembalikan posisi akhir baris, isi komentarnya dilewati
 func skipLineComment(sql string, i int) int {
 	j := strings.IndexByte(sql[i:], '\n')
 	if j < 0 {
@@ -131,6 +141,7 @@ func skipLineComment(sql string, i int) int {
 	return i + j
 }
 
+// skipBlockComment melewati komentar blok yang bisa bersarang, false kalau tidak ditutup
 func skipBlockComment(sql string, i int) (int, bool) {
 	depth := 1
 	j := i + 2
@@ -152,6 +163,7 @@ func skipBlockComment(sql string, i int) (int, bool) {
 	return len(sql), false
 }
 
+// skipQuoted melewati string atau identifier ber-quote, dua kutip berurutan berarti kutip itu sendiri
 func skipQuoted(sql string, i int, quote byte, backslash bool) (int, bool) {
 	j := i + 1
 	for j < len(sql) {
@@ -191,6 +203,7 @@ func dollarDelimiter(sql string, i int) (string, bool) {
 	return "", false
 }
 
+// skipDollarQuoted mencari penutup yang sama persis dengan pembukanya
 func skipDollarQuoted(sql string, i int, delim string) (int, bool) {
 	from := i + len(delim)
 	j := strings.Index(sql[from:], delim)
@@ -200,6 +213,7 @@ func skipDollarQuoted(sql string, i int, delim string) (int, bool) {
 	return from + j + len(delim), true
 }
 
+// IsTransactionControl true untuk perintah pengatur transaction, dilarang karena semua migration sudah satu transaction
 func IsTransactionControl(s Statement) bool {
 	switch s.Keyword {
 	case "BEGIN", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE", "END", "ABORT":
@@ -210,6 +224,7 @@ func IsTransactionControl(s Statement) bool {
 	return false
 }
 
+// FirstTransactionControl mengembalikan perintah transaction pertama kalau ada
 func FirstTransactionControl(stmts []Statement) (Statement, bool) {
 	for _, s := range stmts {
 		if IsTransactionControl(s) {
@@ -219,6 +234,7 @@ func FirstTransactionControl(stmts []Statement) (Statement, bool) {
 	return Statement{}, false
 }
 
+// ContainsDDL true kalau ada perintah yang mengubah struktur, yang di MySQL tidak bisa di-rollback
 func ContainsDDL(stmts []Statement) bool {
 	for _, s := range stmts {
 		switch s.Keyword {

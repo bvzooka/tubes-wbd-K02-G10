@@ -12,6 +12,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// DB adalah bagian dari pool yang dipakai repo, supaya mudah diganti di test
 type DB interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
@@ -19,15 +20,19 @@ type DB interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 
+// Repo menyimpan migration di tabel db_migrations
 type Repo struct{ db DB }
 
+// NewRepo dibuat dengan koneksi database platform
 func NewRepo(db DB) *Repo { return &Repo{db: db} }
 
+// kode error PostgreSQL untuk nilai kembar dan rujukan yang tidak ada
 const (
 	uniqueViolation     = "23505"
 	foreignKeyViolation = "23503"
 )
 
+// query dasar dengan dua versi, selectFull membawa SQL sedangkan selectSummary tidak supaya daftar tetap ringan
 const selectMigration = `
 	SELECT m.id, m.connection_id, m.version, m.name, %s, m.checksum, m.status, m.error_message, m.warning,
 	       m.created_by, cu.username, m.created_at, m.updated_at,
@@ -41,6 +46,7 @@ var (
 	selectSummary = fmt.Sprintf(selectMigration, "''::text")
 )
 
+// scanMigration mengisi Migration dari satu baris hasil query
 func scanMigration(row pgx.Row) (domain.Migration, error) {
 	var m domain.Migration
 	var status string
@@ -62,6 +68,7 @@ func lockMigrations(ctx context.Context, tx pgx.Tx, connID int64) error {
 	return nil
 }
 
+// Create menyimpan migration baru dengan versi berikutnya
 func (r *Repo) Create(ctx context.Context, connID int64, name, sql, checksum string, createdBy int64) (domain.Migration, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -106,6 +113,7 @@ func (r *Repo) Create(ctx context.Context, connID int64, name, sql, checksum str
 	return m, nil
 }
 
+// Get mengembalikan satu migration lengkap dengan SQL-nya
 func (r *Repo) Get(ctx context.Context, connID int64, version int) (domain.Migration, error) {
 	m, err := scanMigration(r.db.QueryRow(ctx, selectFull+` WHERE m.connection_id = $1 AND m.version = $2`, connID, version))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -117,6 +125,7 @@ func (r *Repo) Get(ctx context.Context, connID int64, version int) (domain.Migra
 	return m, nil
 }
 
+// List mengembalikan ringkasan tanpa isi SQL, versi terbaru di atas
 func (r *Repo) List(ctx context.Context, connID int64) ([]domain.Migration, error) {
 	rows, err := r.db.Query(ctx, selectSummary+` WHERE m.connection_id = $1 ORDER BY m.version DESC`, connID)
 	if err != nil {
@@ -135,6 +144,7 @@ func (r *Repo) List(ctx context.Context, connID int64) ([]domain.Migration, erro
 	return list, rows.Err()
 }
 
+// UpdateDraft mengubah migration yang masih draft, status lain ditolak
 func (r *Repo) UpdateDraft(ctx context.Context, connID int64, version int, name, sql, checksum string) (domain.Migration, error) {
 	tag, err := r.db.Exec(ctx, `
 		UPDATE db_migrations
@@ -150,6 +160,7 @@ func (r *Repo) UpdateDraft(ctx context.Context, connID int64, version int, name,
 	return r.Get(ctx, connID, version)
 }
 
+// Cancel membatalkan draft
 func (r *Repo) Cancel(ctx context.Context, connID int64, version int) error {
 	tag, err := r.db.Exec(ctx, `
 		UPDATE db_migrations
@@ -234,6 +245,7 @@ func (r *Repo) Claim(ctx context.Context, connID int64, version int, executedBy 
 	return m, nil
 }
 
+// Finish mencatat hasil eksekusi, hanya untuk migration yang berstatus running
 func (r *Repo) Finish(ctx context.Context, connID int64, version int, status domain.MigrationStatus, errMsg, warning string, finishedAt time.Time) error {
 	tag, err := r.db.Exec(ctx, `
 		UPDATE db_migrations

@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 )
 
+// batas input dan pesan error form migration
 const (
 	maxNameChars = 120
 	maxSQLBytes  = 256 * 1024
@@ -19,11 +20,13 @@ const (
 	msgSQLTransaction  = "SQL tidak boleh berisi perintah kontrol transaksi (%s). Seluruh migration sudah dijalankan dalam satu transaction."
 )
 
+// Input adalah isi form migration: nama dan SQL
 type Input struct {
 	Name string
 	SQL  string
 }
 
+// Validate merapikan input lalu mengembalikan pesan error per field, kosong kalau valid
 func Validate(in Input) (Input, map[string]string) {
 	fields := map[string]string{}
 
@@ -61,6 +64,7 @@ func CheckSQL(sql string) string {
 	return ""
 }
 
+// describe menamai perintah transaksi untuk pesan error, START dan PREPARE selalu diikuti kata TRANSACTION
 func describe(s Statement) string {
 	if s.Second == "TRANSACTION" && (s.Keyword == "START" || s.Keyword == "PREPARE") {
 		return s.Keyword + " TRANSACTION"
@@ -68,6 +72,7 @@ func describe(s Statement) string {
 	return s.Keyword
 }
 
+// Checksum adalah SHA-256 dari SQL, dipakai untuk mengetahui apakah isi migration berubah
 func Checksum(sql string) string {
 	sum := sha256.Sum256([]byte(sql))
 	return hex.EncodeToString(sum[:])
