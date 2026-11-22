@@ -134,6 +134,11 @@ func (r *UserRepo) SetActive(ctx context.Context, id int64, active bool) (domain
 				return err
 			}
 		}
+		if !active {
+			if err := rejectIfLeader(ctx, tx, id); err != nil {
+				return err
+			}
+		}
 		u = domain.User{ID: id}
 		return tx.QueryRow(ctx, `
 			UPDATE users
@@ -197,6 +202,17 @@ func requireOtherActiveAdmin(ctx context.Context, tx pgx.Tx, id int64) error {
 	}
 	if n == 0 {
 		return ErrLastAdmin
+	}
+	return nil
+}
+
+func rejectIfLeader(ctx context.Context, tx pgx.Tx, id int64) error {
+	var leader bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM user_groups WHERE leader_id = $1)`, id).Scan(&leader); err != nil {
+		return fmt.Errorf("check leader: %w", err)
+	}
+	if leader {
+		return ErrDeactivateLeader
 	}
 	return nil
 }

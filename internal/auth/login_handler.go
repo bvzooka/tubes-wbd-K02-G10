@@ -6,22 +6,14 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"dbplatform/internal/clock"
 	"dbplatform/internal/contract"
-	"dbplatform/internal/domain"
 )
 
 // Renderer adalah bagian httpx.Renderer yang dipakai handler di package ini.
 type Renderer interface {
 	Page(w http.ResponseWriter, r *http.Request, status int, name string, data any)
-}
-
-// credentialVerifier adalah bagian Hasher yang dipakai saat login.
-type credentialVerifier interface {
-	Verify(hash, plain string) bool
-	VerifyDummy(plain string) bool
 }
 
 // data template auth/login.html.
@@ -33,28 +25,19 @@ type LoginPage struct {
 }
 
 const (
-	loginTemplate      = "auth/login.html"
-	defaultAfterLogin  = "/databases"
-	maxLoginFormBytes  = 64 << 10
-	loginMaxFailures   = 5
-	loginFailureWindow = 15 * time.Minute
-
-	msgInvalidCredentials = "Username atau password salah."
-	msgFormExpired        = "Formulir login kedaluwarsa. Silakan coba lagi."
-	msgTooManyAttempts    = "Terlalu banyak percobaan login gagal. Coba lagi dalam beberapa menit."
+	loginTemplate     = "auth/login.html"
+	defaultAfterLogin = "/databases"
+	maxLoginFormBytes = 64 << 10
 )
 
 // Handler melayani GET/POST /login dan POST /logout.
 type Handler struct {
 	sessions  *Manager
-	users     UserFinder
-	verifier  credentialVerifier
+	auth      *Authenticator
 	render    Renderer
 	handleErr contract.ErrorHandler
 	mw        contract.AuthMiddleware
-	limiter   *loginLimiter
 	secure    bool
-	logger    *slog.Logger
 }
 
 type HandlerDeps struct {
@@ -70,20 +53,13 @@ type HandlerDeps struct {
 }
 
 func NewHandler(d HandlerDeps) *Handler {
-	logger := d.Logger
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &Handler{
 		sessions:  d.Sessions,
-		users:     d.Users,
-		verifier:  d.Verifier,
+		auth:      NewAuthenticator(d.Sessions, d.Users, d.Verifier, d.Clock, d.Logger),
 		render:    d.Render,
 		handleErr: d.HandleErr,
 		mw:        d.MW,
-		limiter:   newLoginLimiter(d.Clock, loginMaxFailures, loginFailureWindow),
 		secure:    d.Secure,
-		logger:    logger,
 	}
 }
 
@@ -114,8 +90,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		h.renderLogin(w, r, http.StatusBadRequest, LoginPage{Error: msgFormExpired})
 		return
 	}
-	username := strings.ToLower(strings.TrimSpace(r.PostFormValue("username")))
-	password := r.PostFormValue("password")
+	username := NormalizeUsername(r.PostFormValue("username"))
 	next := safeNext(r.PostFormValue("next"))
 	page := LoginPage{Username: username, Next: next}
 
@@ -126,47 +101,26 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := clientIP(r)
-	if h.limiter.Blocked(username, ip) {
-		h.logger.WarnContext(r.Context(), "login rate limited", "username", username, "ip", ip)
+	res, err := h.auth.Login(r.Context(), LoginInput{
+		Username:      username,
+		Password:      r.PostFormValue("password"),
+		IP:            clientIP(r),
+		PreviousToken: cookieValue(r, SessionCookieName),
+	})
+	switch {
+	case errors.Is(err, ErrTooManyAttempts):
 		page.Error = msgTooManyAttempts
 		h.renderLogin(w, r, http.StatusTooManyRequests, page)
 		return
-	}
-
-	user, err := h.users.FindByUsername(r.Context(), username)
-	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		h.handleErr(w, r, err)
-		return
-	}
-	var ok bool
-	if err == nil && user.IsActive {
-		ok = h.verifier.Verify(user.PasswordHash, password)
-	} else {
-		ok = h.verifier.VerifyDummy(password)
-	}
-	if !ok {
-		h.limiter.Fail(username, ip)
-		h.logger.InfoContext(r.Context(), "login failed", "username", username, "ip", ip)
+	case errors.Is(err, ErrInvalidCredentials):
 		page.Error = msgInvalidCredentials
 		h.renderLogin(w, r, http.StatusUnauthorized, page)
 		return
-	}
-	h.limiter.Reset(username, ip)
-
-	// Login selalu membuat session baru; session lama dari cookie yang dibawa dicabut.
-	if old, err := r.Cookie(SessionCookieName); err == nil && old.Value != "" {
-		if err := h.sessions.revokeToken(r.Context(), old.Value, ReasonRelogin); err != nil {
-			h.handleErr(w, r, err)
-			return
-		}
-	}
-	started, err := h.sessions.Start(r.Context(), user.ID)
-	if err != nil {
+	case err != nil:
 		h.handleErr(w, r, err)
 		return
 	}
-	h.logger.InfoContext(r.Context(), "login succeeded", "user_id", user.ID)
+	started := res.Session
 	http.SetCookie(w, sessionCookie(started.Token, started.ExpiresAt, h.secure))
 	http.SetCookie(w, clearLoginCSRFCookie(h.secure))
 	http.Redirect(w, r, next, http.StatusSeeOther)
@@ -217,4 +171,12 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+func cookieValue(r *http.Request, name string) string {
+	c, err := r.Cookie(name)
+	if err != nil {
+		return ""
+	}
+	return c.Value
 }

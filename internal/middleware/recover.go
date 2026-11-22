@@ -18,7 +18,7 @@ func Recover(logger *slog.Logger, handleErr contract.ErrorHandler) Middleware {
 					if p == http.ErrAbortHandler {
 						panic(p)
 					}
-					logger.ErrorContext(r.Context(), "panic", "request_id", RequestID(r.Context()), "panic", fmt.Sprint(p))
+					logger.ErrorContext(r.Context(), "panic", "event", "http.panic", "panic", fmt.Sprint(p))
 					handleErr(w, r, fmt.Errorf("panic: %v", p))
 				}
 			}()

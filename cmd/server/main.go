@@ -1,43 +1,49 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"dbplatform/internal/config"
+	"dbplatform/internal/telemetry"
 )
 
 // titik masuk program: siapkan logger, jalankan run, kalau gagal catat errornya lalu keluar dengan kode 1
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	if err := run(logger); err != nil {
-		logger.Error("server berhenti dengan error", "error", err)
+	if err := run(); err != nil {
+		slog.Error("server berhenti dengan error", "error", err)
 		os.Exit(1)
 	}
 }
 
-// urutan start: baca .env, load config, rakit modul (buildApp), jalankan server, lalu tunggu error atau sinyal berhenti
-func run(logger *slog.Logger) error {
-	if err := loadDotEnv(".env"); err != nil {
+// urutan start: baca .env, load config, siapkan log dan tracing, rakit modul (buildApp), jalankan server, lalu tunggu error atau sinyal berhenti
+func run() error {
+	if err := config.LoadDotEnv(".env"); err != nil {
 		return err
 	}
 	cfg, err := config.Load(os.Getenv)
 	if err != nil {
 		return err
 	}
+	logger := telemetry.NewLogger(os.Stdout, cfg.LogLevel)
+	slog.SetDefault(logger)
 
 	// ctx otomatis dibatalkan saat ada Ctrl+C atau SIGTERM, jadi bisa dipakai sebagai tanda "waktunya berhenti"
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// tracing di-flush terakhir saat berhenti, kegagalannya tidak perlu menggagalkan shutdown
+	shutdownTracing, err := telemetry.SetupTracing(ctx, "dbplatform-api", cfg.TraceExporter, cfg.OTLPEndpoint)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = shutdownTracing(context.WithoutCancel(ctx)) }()
 
 	// buildApp merakit semua modul, cleanup menutup koneksi database saat server berhenti
 	handler, cleanup, err := buildApp(ctx, cfg, logger)
@@ -78,38 +84,4 @@ func run(logger *slog.Logger) error {
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
 	}
-}
-
-// Load .env, variabel yang udah ada ga ditimpa
-func loadDotEnv(path string) error {
-	f, err := os.Open(path)
-	// tidak ada file .env itu normal
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("baca %s: %w", path, err)
-	}
-	defer f.Close()
-
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		// baris kosong dan baris komentar (#) dilewati
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		// pisahkan KEY=value di tanda sama dengan yang pertama
-		key, val, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		key = strings.TrimSpace(key)
-		val = strings.Trim(strings.TrimSpace(val), `"'`)
-		// variabel yang sudah diset di lingkungan menang atas isi .env
-		if _, exists := os.LookupEnv(key); !exists {
-			_ = os.Setenv(key, val)
-		}
-	}
-	return sc.Err()
 }

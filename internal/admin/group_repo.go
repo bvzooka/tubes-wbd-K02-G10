@@ -18,6 +18,7 @@ type GroupRow struct {
 	ID          int64
 	Name        string
 	Description string
+	LeaderName  string
 	MemberCount int
 	AccessCount int
 	CreatedAt   time.Time
@@ -56,10 +57,11 @@ func (r *GroupRepo) Create(ctx context.Context, name, description string) (domai
 // Jumlah anggota dan akses dihitung subquery, satu query aja
 func (r *GroupRepo) List(ctx context.Context) ([]GroupRow, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT g.id, g.name, g.description, g.created_at,
+		SELECT g.id, g.name, g.description, COALESCE(l.username, ''), g.created_at,
 		       (SELECT count(*) FROM group_members m WHERE m.group_id = g.id),
 		       (SELECT count(*) FROM group_database_access a WHERE a.group_id = g.id)
 		FROM user_groups g
+		LEFT JOIN users l ON l.id = g.leader_id
 		ORDER BY lower(g.name), g.id`)
 	if err != nil {
 		return nil, fmt.Errorf("list groups: %w", err)
@@ -69,7 +71,7 @@ func (r *GroupRepo) List(ctx context.Context) ([]GroupRow, error) {
 	var groups []GroupRow
 	for rows.Next() {
 		var g GroupRow
-		if err := rows.Scan(&g.ID, &g.Name, &g.Description, &g.CreatedAt, &g.MemberCount, &g.AccessCount); err != nil {
+		if err := rows.Scan(&g.ID, &g.Name, &g.Description, &g.LeaderName, &g.CreatedAt, &g.MemberCount, &g.AccessCount); err != nil {
 			return nil, fmt.Errorf("scan group: %w", err)
 		}
 		groups = append(groups, g)
@@ -81,10 +83,10 @@ func (r *GroupRepo) List(ctx context.Context) ([]GroupRow, error) {
 func (r *GroupRepo) Get(ctx context.Context, id int64) (domain.Group, error) {
 	g := domain.Group{ID: id}
 	err := r.db.QueryRow(ctx, `
-		SELECT name, description, created_at
+		SELECT name, description, leader_id, created_at
 		FROM user_groups
 		WHERE id = $1`, id,
-	).Scan(&g.Name, &g.Description, &g.CreatedAt)
+	).Scan(&g.Name, &g.Description, &g.LeaderID, &g.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Group{}, domain.ErrNotFound
 	}
@@ -101,9 +103,9 @@ func (r *GroupRepo) Update(ctx context.Context, id int64, name, description stri
 		UPDATE user_groups
 		SET name = $2, description = $3
 		WHERE id = $1
-		RETURNING name, description, created_at`,
+		RETURNING name, description, leader_id, created_at`,
 		id, name, description,
-	).Scan(&g.Name, &g.Description, &g.CreatedAt)
+	).Scan(&g.Name, &g.Description, &g.LeaderID, &g.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Group{}, domain.ErrNotFound
 	}

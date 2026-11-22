@@ -9,6 +9,7 @@ import (
 
 	"dbplatform/internal/contract"
 	"dbplatform/internal/domain"
+	"dbplatform/internal/telemetry"
 )
 
 // sessionResolver adalah bagian Manager yang dipakai middleware.
@@ -22,6 +23,7 @@ type Middleware struct {
 	authz     contract.Authorizer
 	handleErr contract.ErrorHandler
 	secure    bool
+	api       bool
 }
 
 // NewMiddleware dibuat dengan pembaca session, authorizer, penanganan error, dan penanda cookie Secure
@@ -31,18 +33,35 @@ func NewMiddleware(sessions sessionResolver, authz contract.Authorizer, handleEr
 
 var _ contract.AuthMiddleware = (*Middleware)(nil)
 
-// Authenticate memastikan request punya session valid, kalau tidak dialihkan ke halaman login
+// ForAPI membuat salinan middleware untuk /api: yang belum login dijawab 401 lewat handleErr, bukan dialihkan ke /login
+func (m *Middleware) ForAPI(handleErr contract.ErrorHandler) *Middleware {
+	api := *m
+	api.handleErr = handleErr
+	api.api = true
+	return &api
+}
+
+// unauthenticated menjawab request tanpa session: 401 untuk API, redirect ke login untuk halaman
+func (m *Middleware) unauthenticated(w http.ResponseWriter, r *http.Request) {
+	if m.api {
+		m.handleErr(w, r, domain.ErrUnauthenticated)
+		return
+	}
+	redirectToLogin(w, r)
+}
+
+// Authenticate memastikan request punya session valid, kalau tidak dijawab lewat unauthenticated
 func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(SessionCookieName)
 		if err != nil || c.Value == "" {
-			redirectToLogin(w, r)
+			m.unauthenticated(w, r)
 			return
 		}
 		res, err := m.sessions.Resolve(r.Context(), c.Value)
 		if errors.Is(err, domain.ErrUnauthenticated) {
 			http.SetCookie(w, clearSessionCookie(m.secure))
-			redirectToLogin(w, r)
+			m.unauthenticated(w, r)
 			return
 		}
 		if err != nil {
@@ -56,6 +75,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 		// Halaman terautentikasi tidak boleh disimpan cache bersama.
 		w.Header().Set("Cache-Control", "no-store")
 
+		telemetry.SetActor(r.Context(), res.Principal.Username)
 		ctx := domain.WithPrincipal(r.Context(), res.Principal)
 		ctx = domain.WithCSRFToken(ctx, res.CSRFToken)
 		next.ServeHTTP(w, r.WithContext(ctx))

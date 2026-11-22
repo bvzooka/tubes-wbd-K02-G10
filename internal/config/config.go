@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,17 @@ type SessionConfig struct {
 	GracePeriod      time.Duration
 }
 
+// WorkerConfig adalah pengaturan worker: berapa job paralel, seberapa sering mengecek antrean, dan batas lease, heartbeat, serta percobaan ulang
+type WorkerConfig struct {
+	ID           string
+	Concurrency  int
+	PollInterval time.Duration
+	Lease        time.Duration
+	Heartbeat    time.Duration
+	MaxAttempts  int
+	RetryBase    time.Duration
+}
+
 // semua pengaturan aplikasi yang dibaca dari environment sekali saat start
 type Config struct {
 	Env         string
@@ -35,6 +47,12 @@ type Config struct {
 	SeedAdminPassword string
 
 	UseStubs bool
+
+	LogLevel      string
+	TraceExporter string
+	OTLPEndpoint  string
+	Worker        WorkerConfig
+	WebDistDir    string
 }
 
 // cookie ditandai Secure hanya di production karena butuh HTTPS
@@ -48,6 +66,13 @@ func Load(getenv func(string) string) (Config, error) {
 			return v
 		}
 		return def
+	}
+	num := func(key, def string) int {
+		n, err := strconv.Atoi(str(key, def))
+		if err != nil || n <= 0 {
+			errs = append(errs, fmt.Errorf("%s: harus bilangan bulat positif", key))
+		}
+		return n
 	}
 	dur := func(key, def string) time.Duration {
 		d, err := time.ParseDuration(str(key, def))
@@ -69,6 +94,19 @@ func Load(getenv func(string) string) (Config, error) {
 		},
 		SeedAdminUsername: str("SEED_ADMIN_USERNAME", "admin"),
 		SeedAdminPassword: getenv("SEED_ADMIN_PASSWORD"),
+		LogLevel:          str("LOG_LEVEL", "info"),
+		TraceExporter:     str("OTEL_TRACES_EXPORTER", "console"),
+		OTLPEndpoint:      str("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+		WebDistDir:        str("WEB_DIST_DIR", ""),
+		Worker: WorkerConfig{
+			ID:           str("WORKER_ID", defaultWorkerID()),
+			Concurrency:  num("WORKER_CONCURRENCY", "4"),
+			PollInterval: dur("WORKER_POLL_INTERVAL", "1s"),
+			Lease:        dur("JOB_LEASE", "30s"),
+			Heartbeat:    dur("JOB_HEARTBEAT", "10s"),
+			MaxAttempts:  num("JOB_MAX_ATTEMPTS", "3"),
+			RetryBase:    dur("JOB_RETRY_BASE", "5s"),
+		},
 	}
 
 	if cfg.Env != EnvDevelopment && cfg.Env != EnvProduction {
@@ -100,9 +138,24 @@ func Load(getenv func(string) string) (Config, error) {
 		errs = append(errs, errors.New("SESSION_GRACE_PERIOD: harus lebih kecil dari SESSION_ROTATION_INTERVAL"))
 	}
 
+	// heartbeat harus sempat gagal dua kali sebelum lease habis
+	if cfg.Worker.Heartbeat*3 > cfg.Worker.Lease {
+		errs = append(errs, errors.New("JOB_HEARTBEAT: maksimal sepertiga JOB_LEASE"))
+	}
+	switch cfg.TraceExporter {
+	case "console", "otlp", "none":
+	default:
+		errs = append(errs, errors.New("OTEL_TRACES_EXPORTER: harus console, otlp, atau none"))
+	}
+
 	// Semua error config dilaporin sekaligus
 	if err := errors.Join(errs...); err != nil {
 		return Config{}, fmt.Errorf("konfigurasi tidak valid: %w", err)
 	}
 	return cfg, nil
+}
+
+func defaultWorkerID() string {
+	host, _ := os.Hostname()
+	return fmt.Sprintf("%s-%d", host, os.Getpid())
 }

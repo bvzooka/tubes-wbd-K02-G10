@@ -45,7 +45,7 @@ func loginCSRFCookie(value string, secure bool) *http.Cookie {
 	return &http.Cookie{
 		Name:     LoginCSRFCookieName,
 		Value:    value,
-		Path:     "/login",
+		Path:     "/",
 		MaxAge:   int(loginCSRFMaxAge.Seconds()),
 		HttpOnly: true,
 		Secure:   secure,
@@ -57,7 +57,7 @@ func clearLoginCSRFCookie(secure bool) *http.Cookie {
 	return &http.Cookie{
 		Name:     LoginCSRFCookieName,
 		Value:    "",
-		Path:     "/login",
+		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   secure,
