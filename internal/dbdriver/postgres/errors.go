@@ -11,7 +11,8 @@ import (
 	"dbplatform/internal/domain"
 )
 
-// ErrConnectionFailed dgn pesan utk ditampilkan
+// connError membawa pesan aman untuk ditampilkan, penyebab aslinya disimpan di cause dan tidak ikut tampil.
+// Method Is membuat errors.Is(err, domain.ErrConnectionFailed) bernilai true.
 type connError struct {
 	msg   string
 	cause error
@@ -21,7 +22,18 @@ func (e *connError) Error() string        { return e.msg }
 func (e *connError) Cause() error         { return e.cause }
 func (e *connError) Is(target error) bool { return target == domain.ErrConnectionFailed }
 
-// mengubah error koneksi/driver jadi domain.ErrConnectionFailed
+// SQLSTATE PostgreSQL yang dikenali, lihat https://www.postgresql.org/docs/current/errcodes-appendix.html
+const (
+	sqlstateInvalidPassword      = "28P01"
+	sqlstateInvalidAuthorization = "28000"
+	sqlstateInvalidCatalogName   = "3D000"
+	sqlstateConnectionClassPfx   = "08"
+	sqlstateCannotConnectNow     = "57P03"
+	sqlstateQueryCanceled        = "57014"
+)
+
+// ClassifyError mengubah error koneksi atau driver menjadi domain.ErrConnectionFailed dengan pesan yang aman
+// ditampilkan. Error lain (misalnya kesalahan SQL) dikembalikan apa adanya.
 func ClassifyError(err error) error {
 	if err == nil {
 		return nil
@@ -34,13 +46,13 @@ func ClassifyError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch {
-		case pgErr.Code == "28P01" || pgErr.Code == "28000":
+		case pgErr.Code == sqlstateInvalidPassword || pgErr.Code == sqlstateInvalidAuthorization:
 			return &connError{"Autentikasi database gagal", err}
-		case pgErr.Code == "3D000":
+		case pgErr.Code == sqlstateInvalidCatalogName:
 			return &connError{"Database tidak ditemukan di server", err}
-		case strings.HasPrefix(pgErr.Code, "08") || pgErr.Code == "57P03":
+		case strings.HasPrefix(pgErr.Code, sqlstateConnectionClassPfx) || pgErr.Code == sqlstateCannotConnectNow:
 			return &connError{"Tidak dapat terhubung ke database", err}
-		case pgErr.Code == "57014":
+		case pgErr.Code == sqlstateQueryCanceled:
 			return &connError{"Koneksi ke database melewati batas waktu", err}
 		}
 		return err

@@ -2,14 +2,16 @@ package connmgr
 
 import (
 	"context"
+	"fmt"
+
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/dbdriver/mysql"
 	"dbplatform/internal/dbdriver/postgres"
 	"dbplatform/internal/domain"
-	"fmt"
 )
 
-// DefaultFactory memilih driver sesuai jenis DBMS koneksi, DBMS yang belum didukung ditolak
+// DefaultFactory memilih driver sesuai jenis DBMS koneksi, DBMS yang belum didukung ditolak.
+// Error dari driver tidak dibungkus karena pesannya ditampilkan apa adanya saat uji koneksi.
 func DefaultFactory(ctx context.Context, conn domain.Connection, password string) (dbdriver.Driver, error) {
 	switch conn.DBMS {
 	case domain.DBMSPostgres:

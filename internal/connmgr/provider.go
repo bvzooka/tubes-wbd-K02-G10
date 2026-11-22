@@ -88,6 +88,8 @@ func (p *Provider) evict(id int64) {
 	p.evictLocked(id)
 }
 
+// evictLocked sama dengan evict tetapi dipakai saat mu sudah dipegang pemanggil.
+// sync.Mutex tidak bisa dikunci dua kali oleh goroutine yang sama, jadi perlu versi tanpa Lock.
 func (p *Provider) evictLocked(id int64) {
 	if e, ok := p.cache[id]; ok {
 		e.drv.Close()

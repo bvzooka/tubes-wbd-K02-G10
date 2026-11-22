@@ -16,11 +16,14 @@ import (
 	"unicode/utf8"
 )
 
-// batas koneksi per database target, waktu tunggu konek, dan batas waktu default satu transaction
+// batas koneksi per database target, waktu tunggu konek, batas waktu default satu transaction,
+// umur maksimum satu koneksi di pool, dan batas waktu mengembalikan pengaturan sesi
 const (
-	maxConns       = 5
+	maxConns = 5
 	connectTimeout = 5 * time.Second
 	defaultTxLimit = 30 * time.Second
+	connMaxLifetime = 5 * time.Minute
+	resetTimeout = 2 * time.Second
 )
 
 // Driver memakai dua pool: ro untuk baca, dan rw yang baru dibuka saat ada yang menulis karena butuh MultiStatements
@@ -76,7 +79,7 @@ func openPool(cfg *gomysql.Config) (*sql.DB, error) {
 	db := sql.OpenDB(conn)
 	db.SetMaxOpenConns(maxConns)
 	db.SetMaxIdleConns(maxConns)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxLifetime(connMaxLifetime)
 	return db, nil
 }
 
@@ -216,6 +219,8 @@ type myTx struct {
 	ctx context.Context
 }
 
+var _ dbdriver.Tx = myTx{}
+
 // bind membatalkan operasi kalau context transaction-nya selesai lebih dulu
 func (t myTx) bind(ctx context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -223,6 +228,7 @@ func (t myTx) bind(ctx context.Context) (context.Context, context.CancelFunc) {
 	return ctx, func() { stop(); cancel() }
 }
 
+// menjalankan satu atau beberapa statement dan mengembalikan jumlah baris terdampak
 func (t myTx) Exec(ctx context.Context, sqlText string) (int64, error) {
 	ctx, done := t.bind(ctx)
 	defer done()
@@ -245,6 +251,7 @@ func (t myTx) Exec(ctx context.Context, sqlText string) (int64, error) {
 	return res.RowsAffected()
 }
 
+// menjalankan tepat satu statement dan membaca seluruh hasilnya sebagai teks
 func (t myTx) Query(ctx context.Context, sqlText string) (*domain.ResultSet, error) {
 	if hasMultipleStatements(sqlText) {
 		return nil, fmt.Errorf("query harus satu statement: %w", domain.ErrUnsupported)

@@ -226,7 +226,7 @@ type errProvider struct{ err error }
 
 func (p errProvider) Get(context.Context, int64) (dbdriver.Driver, error) { return nil, p.err }
 
-func TestHelpers(t *testing.T) {
+func TestViews_LabelsAndHrefs(t *testing.T) {
 	if rowsText(-1) != "tidak diketahui" || rowsText(0) != "0" || rowsText(42) != "42" {
 		t.Error("rowsText")
 	}

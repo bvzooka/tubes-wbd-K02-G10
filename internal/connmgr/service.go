@@ -22,14 +22,7 @@ func NewService(repo *Repo, factory DriverFactory) *Service {
 	return &Service{repo: repo, factory: factory}
 }
 
-// requireAdmin dicek di service dan bukan hanya di middleware, supaya aturannya tetap berlaku dari pemanggil mana pun
-func requireAdmin(p domain.Principal) error {
-	if !p.IsPlatformAdmin {
-		return domain.ErrForbidden
-	}
-	return nil
-}
-
+// Create memvalidasi input lalu menyimpan koneksi baru atas nama admin p
 func (s *Service) Create(ctx context.Context, p domain.Principal, in domain.ConnectionInput) (domain.Connection, error) {
 	if err := requireAdmin(p); err != nil {
 		return domain.Connection{}, err
@@ -40,6 +33,7 @@ func (s *Service) Create(ctx context.Context, p domain.Principal, in domain.Conn
 	return s.repo.Insert(ctx, NormalizeInput(in), p.UserID)
 }
 
+// Update memvalidasi input lalu mengubah koneksi id, password kosong berarti tidak diubah
 func (s *Service) Update(ctx context.Context, p domain.Principal, id int64, in domain.ConnectionInput) (domain.Connection, error) {
 	if err := requireAdmin(p); err != nil {
 		return domain.Connection{}, err
@@ -50,6 +44,7 @@ func (s *Service) Update(ctx context.Context, p domain.Principal, id int64, in d
 	return s.repo.Update(ctx, id, NormalizeInput(in))
 }
 
+// setActive mengaktifkan atau menonaktifkan koneksi id
 func (s *Service) SetActive(ctx context.Context, p domain.Principal, id int64, active bool) error {
 	if err := requireAdmin(p); err != nil {
 		return err
@@ -57,6 +52,7 @@ func (s *Service) SetActive(ctx context.Context, p domain.Principal, id int64, a
 	return s.repo.SetActive(ctx, id, active)
 }
 
+// list mengembalikan semua koneksi tanpa password
 func (s *Service) List(ctx context.Context, p domain.Principal) ([]domain.Connection, error) {
 	if err := requireAdmin(p); err != nil {
 		return nil, err
@@ -64,6 +60,7 @@ func (s *Service) List(ctx context.Context, p domain.Principal) ([]domain.Connec
 	return s.repo.List(ctx)
 }
 
+//  mengembalikan satu koneksi tanpa password, ErrNotFound bila tidak ada
 func (s *Service) Get(ctx context.Context, p domain.Principal, id int64) (domain.Connection, error) {
 	if err := requireAdmin(p); err != nil {
 		return domain.Connection{}, err
@@ -100,4 +97,12 @@ func (s *Service) TestConnection(ctx context.Context, p domain.Principal, id int
 	}
 	defer drv.Close()
 	return drv.Ping(ctx)
+}
+
+// requireAdmin dicek di service dan bukan hanya di middleware, supaya aturannya tetap berlaku dari pemanggil mana pun
+func requireAdmin(p domain.Principal) error {
+	if !p.IsPlatformAdmin {
+		return domain.ErrForbidden
+	}
+	return nil
 }
