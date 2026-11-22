@@ -1,31 +1,45 @@
-# Ganti @github-reva dan @github-aurel dengan username GitHub masing-masing.
-/internal/apiv1/               @Kurt-Mikhael
-/internal/telemetry/           @Kurt-Mikhael
-/internal/middleware/          @Kurt-Mikhael
-/internal/queue/               @Kurt-Mikhael
-/internal/approval/            @Kurt-Mikhael
-/internal/admin/               @Kurt-Mikhael
-/internal/auth/                @Kurt-Mikhael
-/internal/access/              @Kurt-Mikhael
-/internal/dbdriver/obs/        @Kurt-Mikhael
-/cmd/worker/                   @Kurt-Mikhael
-/frontend/src/pages/auth/      @Kurt-Mikhael
-/frontend/src/pages/admin/     @Kurt-Mikhael
-/frontend/src/pages/approvals/ @Kurt-Mikhael
-/internal/connmgr/             @github-reva
-/internal/viewer/              @github-reva
-/internal/dbdriver/postgres/   @github-reva
-/internal/dbdriver/pgmeta/     @github-reva
-/internal/dbdriver/mysql/      @github-reva
-/frontend/                     @github-reva
-/Dockerfile                    @github-reva
-/docker-compose.yml            @github-reva
-/loadtest/                     @github-reva
-/internal/migration/           @github-aurel
-/internal/explain/             @github-aurel
-/internal/schemadiff/          @github-aurel
-/internal/e2e/                 @github-aurel
-/internal/appdb/               @github-aurel
-/frontend/src/pages/migrations/ @github-aurel
-/internal/domain/              @github-aurel @Kurt-Mikhael @github-reva
-/internal/contract/            @github-aurel @Kurt-Mikhael @github-reva
+# Kepemilikan paket mengikuti WORKFLOW.md bagian 3.1
+# Pola yang lebih spesifik ditulis di bawah pola umum, karena baris terakhir yang cocok yang berlaku
+
+# Reva
+/internal/connmgr/              @revanatania
+/internal/viewer/               @revanatania
+/internal/dbdriver/             @revanatania
+/frontend/                      @revanatania
+/Dockerfile                     @revanatania
+/docker-compose.yml             @revanatania
+/loadtest/                      @revanatania
+/.github/workflows/ci.yml       @revanatania
+
+# Kurt
+/internal/auth/                 @Kurt-Mikhael
+/internal/access/               @Kurt-Mikhael
+/internal/explain/              @Kurt-Mikhael
+/internal/dbmgmttest/           @Kurt-Mikhael
+/internal/approval/             @Kurt-Mikhael
+/internal/queue/                @Kurt-Mikhael
+/internal/apiv1/                @Kurt-Mikhael
+/internal/telemetry/            @Kurt-Mikhael
+/internal/middleware/           @Kurt-Mikhael
+/cmd/worker/                    @Kurt-Mikhael
+/.github/workflows/codeql.yml   @Kurt-Mikhael
+/frontend/src/pages/auth/       @Kurt-Mikhael
+/frontend/src/pages/approvals/  @Kurt-Mikhael
+/frontend/src/pages/explain/    @Kurt-Mikhael
+
+# Aurel
+/internal/admin/                @bvzooka
+/internal/migration/            @bvzooka
+/internal/schemadiff/           @bvzooka
+/internal/authstub/             @bvzooka
+/internal/testutil/             @bvzooka
+/internal/appdb/                @bvzooka
+/internal/config/               @bvzooka
+/cmd/server/                    @bvzooka
+/frontend/src/pages/admin/      @bvzooka
+/frontend/src/pages/migrations/ @bvzooka
+/frontend/src/pages/schemadiff/ @bvzooka
+
+# Bersama: perubahan butuh persetujuan dua orang lain, jumlah persetujuan diatur di branch protection GitHub
+/internal/domain/               @bvzooka @Kurt-Mikhael @revanatania
+/internal/contract/             @bvzooka @Kurt-Mikhael @revanatania
