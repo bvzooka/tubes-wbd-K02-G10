@@ -9,11 +9,13 @@ import (
 	"time"
 )
 
+// nilai APP_ENV yang diterima, production mengaktifkan cookie Secure dan melarang APP_STUBS
 const (
 	EnvDevelopment = "development"
 	EnvProduction  = "production"
 )
 
+// batas waktu session, diisi dari env SESSION_*
 type SessionConfig struct {
 	IdleTimeout      time.Duration
 	AbsoluteTimeout  time.Duration
@@ -21,6 +23,7 @@ type SessionConfig struct {
 	GracePeriod      time.Duration
 }
 
+// semua pengaturan aplikasi yang dibaca dari environment sekali saat start
 type Config struct {
 	Env         string
 	Addr        string
@@ -34,6 +37,7 @@ type Config struct {
 	UseStubs bool
 }
 
+// cookie ditandai Secure hanya di production karena butuh HTTPS
 func (c Config) Secure() bool { return c.Env == EnvProduction }
 
 // Load membaca konfigurasi lewat getenv
@@ -85,6 +89,11 @@ func Load(getenv func(string) string) (Config, error) {
 			errs = append(errs, errors.New("APP_STUBS: harus true atau false"))
 		}
 		cfg.UseStubs = b
+	}
+	
+	// APP_STUBS mematikan login dan otorisasi, jadi dilarang di production
+	if cfg.UseStubs && cfg.Env == EnvProduction {
+		errs = append(errs, errors.New("APP_STUBS: tidak boleh true saat APP_ENV=production"))
 	}
 
 	if cfg.Session.GracePeriod >= cfg.Session.RotationInterval {

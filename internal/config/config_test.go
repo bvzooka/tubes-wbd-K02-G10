@@ -31,12 +31,22 @@ func TestLoad_Defaults(t *testing.T) {
 }
 
 func TestLoad_Production(t *testing.T) {
-	cfg, err := Load(env(map[string]string{"APP_SECRET_KEY": validKey(), "APP_ENV": "production", "APP_STUBS": "true"}))
+	cfg, err := Load(env(map[string]string{"APP_SECRET_KEY": validKey(), "APP_ENV": "production"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.Secure() || !cfg.UseStubs {
-		t.Errorf("production/stubs tidak terbaca: %+v", cfg)
+	if !cfg.Secure() || cfg.UseStubs {
+		t.Errorf("production tidak terbaca: %+v", cfg)
+	}
+}
+
+func TestLoad_StubsBolehDiDevelopment(t *testing.T) {
+	cfg, err := Load(env(map[string]string{"APP_SECRET_KEY": validKey(), "APP_STUBS": "true"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.UseStubs {
+		t.Errorf("APP_STUBS tidak terbaca: %+v", cfg)
 	}
 }
 
@@ -54,6 +64,7 @@ func TestLoad_Invalid(t *testing.T) {
 		{"durasi nol", map[string]string{"APP_SECRET_KEY": validKey(), "SESSION_IDLE_TIMEOUT": "0s"}, "SESSION_IDLE_TIMEOUT"},
 		{"grace >= rotasi", map[string]string{"APP_SECRET_KEY": validKey(), "SESSION_GRACE_PERIOD": "20m"}, "SESSION_GRACE_PERIOD"},
 		{"stubs salah", map[string]string{"APP_SECRET_KEY": validKey(), "APP_STUBS": "mungkin"}, "APP_STUBS"},
+		{"stubs di production", map[string]string{"APP_SECRET_KEY": validKey(), "APP_ENV": "production", "APP_STUBS": "true"}, "APP_STUBS"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
