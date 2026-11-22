@@ -19,11 +19,11 @@ import (
 // batas koneksi per database target, waktu tunggu konek, batas waktu default satu transaction,
 // umur maksimum satu koneksi di pool, dan batas waktu mengembalikan pengaturan sesi
 const (
-	maxConns = 5
-	connectTimeout = 5 * time.Second
-	defaultTxLimit = 30 * time.Second
+	maxConns        = 5
+	connectTimeout  = 5 * time.Second
+	defaultTxLimit  = 30 * time.Second
 	connMaxLifetime = 5 * time.Minute
-	resetTimeout = 2 * time.Second
+	resetTimeout    = 2 * time.Second
 )
 
 // Driver memakai dua pool: ro untuk baca, dan rw yang baru dibuka saat ada yang menulis karena butuh MultiStatements

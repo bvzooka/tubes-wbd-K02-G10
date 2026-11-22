@@ -60,7 +60,7 @@ func (s *Service) List(ctx context.Context, p domain.Principal) ([]domain.Connec
 	return s.repo.List(ctx)
 }
 
-//  mengembalikan satu koneksi tanpa password, ErrNotFound bila tidak ada
+// mengembalikan satu koneksi tanpa password, ErrNotFound bila tidak ada
 func (s *Service) Get(ctx context.Context, p domain.Principal, id int64) (domain.Connection, error) {
 	if err := requireAdmin(p); err != nil {
 		return domain.Connection{}, err

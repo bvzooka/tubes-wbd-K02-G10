@@ -45,9 +45,9 @@ WHERE CONSTRAINT_SCHEMA = ?`
 // nilai kolom CONSTRAINT_TYPE yang dikenali
 const (
 	ctypePrimaryKey = "PRIMARY KEY"
-	ctypeUnique = "UNIQUE"
+	ctypeUnique     = "UNIQUE"
 	ctypeForeignKey = "FOREIGN KEY"
-	ctypeCheck = "CHECK"
+	ctypeCheck      = "CHECK"
 )
 
 // menunjuk satu constraint lewat nama tabel dan nama constraint-nya
@@ -55,16 +55,16 @@ type conKey struct{ table, name string }
 
 // adalah satu baris TABLE_CONSTRAINTS, sebelum dilengkapi kolom dan aturannya
 type constraintDecl struct {
-	key conKey
+	key   conKey
 	ctype string
 }
 
-//  adalah kolom yang dipakai satu constraint, dan tabel rujukannya untuk foreign key
+// adalah kolom yang dipakai satu constraint, dan tabel rujukannya untuk foreign key
 type keyUsage struct {
-	cols []string
+	cols      []string
 	refSchema string
 	refTable  string
-	refCols []string
+	refCols   []string
 }
 
 // aturan ON UPDATE dan ON DELETE sebuah foreign key
