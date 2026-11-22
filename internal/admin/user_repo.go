@@ -11,6 +11,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// DB adalah bagian dari pool yang dipakai repo, supaya mudah diganti di test
 type DB interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
@@ -18,15 +19,19 @@ type DB interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 
+// UserRepo menulis tabel users, yang dibaca modul auth hanya untuk login
 type UserRepo struct{ db DB }
 
+// NewUserRepo dibuat dengan koneksi database platform
 func NewUserRepo(db DB) *UserRepo { return &UserRepo{db: db} }
 
+// kode error PostgreSQL untuk nama kembar, dan kunci advisory untuk menjaga admin terakhir
 const (
 	uniqueViolation = "23505"
 	adminLockKey    = "platform-admins"
 )
 
+// Create menyimpan user baru yang langsung aktif, username kembar jadi ErrConflict
 func (r *UserRepo) Create(ctx context.Context, username, passwordHash string, isAdmin bool) (domain.User, error) {
 	u := domain.User{Username: username, IsPlatformAdmin: isAdmin, IsActive: true}
 	err := r.db.QueryRow(ctx, `
@@ -45,6 +50,7 @@ func (r *UserRepo) Create(ctx context.Context, username, passwordHash string, is
 	return u, nil
 }
 
+// List mengembalikan semua user menurut username
 func (r *UserRepo) List(ctx context.Context) ([]domain.User, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, username, is_platform_admin, is_active, created_at
@@ -66,6 +72,7 @@ func (r *UserRepo) List(ctx context.Context) ([]domain.User, error) {
 	return users, rows.Err()
 }
 
+// Get mengembalikan satu user tanpa password hash
 func (r *UserRepo) Get(ctx context.Context, id int64) (domain.User, error) {
 	u := domain.User{ID: id}
 	err := r.db.QueryRow(ctx, `
@@ -82,6 +89,7 @@ func (r *UserRepo) Get(ctx context.Context, id int64) (domain.User, error) {
 	return u, nil
 }
 
+// Update mengembalikan user baru dan apakah sebelumnya admin, password kosong berarti tidak diubah
 func (r *UserRepo) Update(ctx context.Context, id int64, passwordHash string, isAdmin bool) (domain.User, bool, error) {
 	var u domain.User
 	var wasAdmin bool
@@ -113,6 +121,7 @@ func (r *UserRepo) Update(ctx context.Context, id int64, passwordHash string, is
 	return u, wasAdmin, nil
 }
 
+// SetActive mengaktifkan atau menonaktifkan user, admin aktif terakhir tidak boleh dinonaktifkan
 func (r *UserRepo) SetActive(ctx context.Context, id int64, active bool) (domain.User, error) {
 	var u domain.User
 	err := r.inAdminTx(ctx, func(tx pgx.Tx) error {
@@ -158,6 +167,7 @@ func (r *UserRepo) inAdminTx(ctx context.Context, fn func(tx pgx.Tx) error) erro
 	return tx.Commit(ctx)
 }
 
+// lockUser mengunci baris user dan mengembalikan statusnya, supaya perubahan bersamaan menunggu giliran
 func lockUser(ctx context.Context, tx pgx.Tx, id int64) (isAdmin, isActive bool, err error) {
 	err = tx.QueryRow(ctx, `
 		SELECT is_platform_admin, is_active

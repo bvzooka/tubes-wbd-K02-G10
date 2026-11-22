@@ -9,6 +9,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// groupStore adalah penyimpanan group yang dibutuhkan service, implementasinya GroupRepo
 type groupStore interface {
 	Create(ctx context.Context, name, description string) (domain.Group, error)
 	List(ctx context.Context) ([]GroupRow, error)
@@ -26,11 +27,13 @@ type groupStore interface {
 	AvailableConnections(ctx context.Context) ([]ConnOption, error)
 }
 
+// GroupInput adalah isi form buat atau ubah group
 type GroupInput struct {
 	Name        string
 	Description string
 }
 
+// GroupDetail adalah semua yang ditampilkan di halaman satu group: anggota, akses, dan pilihan dropdown
 type GroupDetail struct {
 	Group                domain.Group
 	Members              []GroupMember
@@ -40,15 +43,18 @@ type GroupDetail struct {
 	CanDelete            bool
 }
 
+// GroupService berisi aturan pengelolaan group, sessions dipakai untuk memaksa rotasi saat hak akses berubah
 type GroupService struct {
 	groups   groupStore
 	sessions contract.SessionAdmin
 }
 
+// NewGroupService dibuat dengan penyimpanan group dan pengelola session
 func NewGroupService(groups groupStore, sessions contract.SessionAdmin) *GroupService {
 	return &GroupService{groups: groups, sessions: sessions}
 }
 
+// validateGroupInput memvalidasi nama dan deskripsi sekaligus, hasilnya sudah dirapikan
 func validateGroupInput(in GroupInput) (GroupInput, map[string]string) {
 	fields := map[string]string{}
 	name, msg := validateGroupName(in.Name)
@@ -84,6 +90,7 @@ func (s *GroupService) ListGroups(ctx context.Context, actor domain.Principal) (
 	return s.groups.List(ctx)
 }
 
+// GroupDetail mengumpulkan semua data halaman group dalam satu panggilan
 func (s *GroupService) GroupDetail(ctx context.Context, actor domain.Principal, id int64) (GroupDetail, error) {
 	if err := requireAdmin(actor); err != nil {
 		return GroupDetail{}, err
@@ -141,6 +148,7 @@ func (s *GroupService) DeleteGroup(ctx context.Context, actor domain.Principal, 
 	return s.groups.Delete(ctx, id)
 }
 
+// AddMember menambah anggota, user yang tidak ada jadi pesan validasi bukan error server
 func (s *GroupService) AddMember(ctx context.Context, actor domain.Principal, groupID, userID int64) error {
 	if err := requireAdmin(actor); err != nil {
 		return err
@@ -172,6 +180,7 @@ func (s *GroupService) RemoveMember(ctx context.Context, actor domain.Principal,
 	return s.groups.RemoveMember(ctx, groupID, userID)
 }
 
+// GrantAccess memberi atau mengubah level akses group ke satu database
 func (s *GroupService) GrantAccess(ctx context.Context, actor domain.Principal, groupID, connID int64, level domain.AccessLevel) error {
 	if err := requireAdmin(actor); err != nil {
 		return err
