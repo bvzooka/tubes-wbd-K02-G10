@@ -72,12 +72,21 @@ func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql s
 		return nil, fmt.Errorf("get driver: %w", err)
 	}
 
+	rs, err := runExplain(ctx, drv, explainStatement(drv.Dialect(), body, analyze), analyze)
+	if err != nil {
+		return nil, err
+	}
 	res := &Result{SQL: body, Analyze: analyze, Dialect: drv.Dialect()}
-	stmt := explainStatement(drv.Dialect(), body, analyze)
+	res.fill(drv.Dialect(), resultText(rs))
+	return res, nil
+}
+
+// runExplain menjalankan perintah EXPLAIN di transaction yang selalu di-rollback, error dari statement user dijadikan InputError
+func runExplain(ctx context.Context, drv dbdriver.Driver, stmt string, analyze bool) (*domain.ResultSet, error) {
 	var rs *domain.ResultSet
 	// tnpa ANALYZE statement tidak dieksekusi, jadi transaction READ ONLY aman
 	opts := dbdriver.TxOptions{ReadOnly: !analyze, Timeout: explainTimeout}
-	err = drv.WithTx(ctx, opts, func(tx dbdriver.Tx) error {
+	err := drv.WithTx(ctx, opts, func(tx dbdriver.Tx) error {
 		var qerr error
 		rs, qerr = tx.Query(ctx, stmt)
 		if qerr != nil {
@@ -93,17 +102,18 @@ func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql s
 		// kesalahan dari statement user ditampilkan, pesan dri DBMS tidak memuat kredensial koneksi
 		return nil, &InputError{Kind: domain.ErrValidation, Message: "Database menolak statement: " + truncate(err.Error(), maxErrorChars)}
 	}
+	return rs, nil
+}
 
-	text := resultText(rs)
-	// Postgres menghasilkan JSON yang diparse jadi tabel plan, dialek lain ditampilkan sebagai teks mentah
-	if drv.Dialect() == domain.DBMSPostgres {
-		if plan, perr := ParsePostgresPlan(text); perr == nil {
-			res.Plan = plan
-			return res, nil
+// fill mengisi hasil: Postgres menghasilkan JSON yang diparse jadi tabel plan, dialek lain atau JSON yang gagal diparse ditampilkan sebagai teks mentah
+func (r *Result) fill(dialect domain.DBMS, text string) {
+	if dialect == domain.DBMSPostgres {
+		if plan, err := ParsePostgresPlan(text); err == nil {
+			r.Plan = plan
+			return
 		}
 	}
-	res.RawText = text
-	return res, nil
+	r.RawText = text
 }
 
 // validateSQL memastikan SQL tidak kosong, tidak terlalu panjang, hanya satu statement, dan hanya DML
