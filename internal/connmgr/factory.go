@@ -9,6 +9,7 @@ import (
 	"fmt"
 )
 
+// DefaultFactory memilih driver sesuai jenis DBMS koneksi, DBMS yang belum didukung ditolak
 func DefaultFactory(ctx context.Context, conn domain.Connection, password string) (dbdriver.Driver, error) {
 	switch conn.DBMS {
 	case domain.DBMSPostgres:

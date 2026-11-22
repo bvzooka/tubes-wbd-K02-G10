@@ -1,3 +1,4 @@
+// Package connmgr mengelola koneksi ke database target: simpan, ubah, uji, dan sediakan driver-nya
 package connmgr
 
 import (
@@ -7,17 +8,21 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// batas waktu uji koneksi supaya host yang tidak merespons tidak menahan request
 const testTimeout = 10 * time.Second
 
+// Service berisi aturan pengelolaan koneksi, semuanya hanya boleh dilakukan Platform Admin
 type Service struct {
 	repo    *Repo
 	factory DriverFactory
 }
 
+// NewService dibuat dengan repo koneksi dan pembuat driver untuk uji koneksi
 func NewService(repo *Repo, factory DriverFactory) *Service {
 	return &Service{repo: repo, factory: factory}
 }
 
+// requireAdmin dicek di service dan bukan hanya di middleware, supaya aturannya tetap berlaku dari pemanggil mana pun
 func requireAdmin(p domain.Principal) error {
 	if !p.IsPlatformAdmin {
 		return domain.ErrForbidden
@@ -66,6 +71,7 @@ func (s *Service) Get(ctx context.Context, p domain.Principal, id int64) (domain
 	return s.repo.Get(ctx, id)
 }
 
+// TestConnection mencoba terhubung memakai input form, password kosong saat edit berarti memakai password tersimpan
 func (s *Service) TestConnection(ctx context.Context, p domain.Principal, id int64, in domain.ConnectionInput) error {
 	if err := requireAdmin(p); err != nil {
 		return err

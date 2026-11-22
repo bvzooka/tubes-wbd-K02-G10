@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// Repo menyimpan koneksi di tabel connections, password dienkripsi dengan key sebelum disimpan
 type Repo struct {
 	pool *pgxpool.Pool
 	key  []byte
@@ -18,10 +19,13 @@ type Repo struct {
 
 var _ Store = (*Repo)(nil)
 
+// NewRepo dibuat dengan pool database platform dan kunci enkripsi 32 byte
 func NewRepo(pool *pgxpool.Pool, key []byte) *Repo { return &Repo{pool: pool, key: key} }
 
+// kolom yang dibaca untuk Connection, sengaja tanpa db_password_enc
 const connColumns = `id, name, dbms, host, port, database_name, db_username, ssl_mode, is_active, created_at, updated_at`
 
+// scanConn mengisi Connection dari satu baris hasil query
 func scanConn(row pgx.Row) (domain.Connection, error) {
 	var c domain.Connection
 	var dbms string
@@ -99,6 +103,7 @@ func (r *Repo) SetActive(ctx context.Context, id int64, active bool) error {
 	return nil
 }
 
+// Get mengembalikan satu koneksi tanpa password
 func (r *Repo) Get(ctx context.Context, id int64) (domain.Connection, error) {
 	c, err := scanConn(r.pool.QueryRow(ctx, `SELECT `+connColumns+` FROM connections WHERE id = $1`, id))
 	if err != nil {

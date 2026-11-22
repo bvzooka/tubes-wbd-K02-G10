@@ -1,3 +1,4 @@
+// Package viewer menampilkan daftar database, schema, dan isi tabel yang boleh dilihat user
 package viewer
 
 import (
@@ -8,11 +9,13 @@ import (
 	"strings"
 )
 
+// Service menyiapkan data tampilan setelah memeriksa akses user ke database
 type Service struct {
 	authz   contract.Authorizer
 	drivers contract.DriverProvider
 }
 
+// NewService dibuat dengan authorizer dan penyedia driver database target
 func NewService(authz contract.Authorizer, drivers contract.DriverProvider) *Service {
 	return &Service{authz: authz, drivers: drivers}
 }
@@ -44,6 +47,7 @@ func (s *Service) access(ctx context.Context, p domain.Principal, dbID int64) (D
 	return DatabaseItem{}, domain.ErrForbidden
 }
 
+// open memeriksa akses lalu mengambil driver database, semua halaman memakainya sebagai pintu masuk
 func (s *Service) open(ctx context.Context, p domain.Principal, dbID int64) (DatabaseItem, dbdriver.Driver, error) {
 	item, err := s.access(ctx, p, dbID)
 	if err != nil {
@@ -67,6 +71,7 @@ func (s *Service) Overview(ctx context.Context, p domain.Principal, dbID int64) 
 		return nil, err
 	}
 	ov := &Overview{Database: item}
+	// tabel dari Introspect sudah berurutan per schema, jadi grup baru dibuat tiap schema berganti
 	for _, t := range schema.Tables {
 		if n := len(ov.Schemas); n == 0 || ov.Schemas[n-1].Name != t.Schema {
 			ov.Schemas = append(ov.Schemas, SchemaGroup{Name: t.Schema})

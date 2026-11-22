@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// cek tabel ada, di MySQL schema sama dengan nama database
 const tableExistsSQL = `
 SELECT TABLE_NAME
 FROM information_schema.TABLES
@@ -21,6 +22,7 @@ FROM information_schema.STATISTICS
 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = 'PRIMARY'
 ORDER BY SEQ_IN_INDEX`
 
+// TableData membaca satu halaman isi tabel, urut menurut primary key supaya isi halaman konsisten
 func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain.PageRequest) (*domain.TableData, error) {
 	page = page.Normalize()
 	out := &domain.TableData{Page: page.Page, PageSize: page.PageSize}
@@ -38,6 +40,7 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 		if err != nil {
 			return err
 		}
+		// nama di MySQL bisa tidak peka huruf besar-kecil, hanya yang persis sama dianggap ada
 		if canonical != ref.Table {
 			return domain.ErrNotFound
 		}
@@ -65,6 +68,7 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 	return out, nil
 }
 
+// primaryKeyColumns mengambil kolom primary key berurutan
 func primaryKeyColumns(ctx context.Context, tx *sql.Tx, ref domain.TableRef) ([]string, error) {
 	rows, err := tx.QueryContext(ctx, primaryKeySQL, ref.Schema, ref.Table)
 	if err != nil {
@@ -85,6 +89,7 @@ func primaryKeyColumns(ctx context.Context, tx *sql.Tx, ref domain.TableRef) ([]
 	return pk, nil
 }
 
+// selectSQL menyusun query halaman, limit dan offset diisi sebagai parameter
 func selectSQL(ref domain.TableRef, pk []string) string {
 	var b strings.Builder
 	b.WriteString("SELECT * FROM ")
@@ -99,6 +104,7 @@ func selectSQL(ref domain.TableRef, pk []string) string {
 	return b.String()
 }
 
+// notFoundOnMissing mengubah error tabel tidak ada jadi ErrNotFound
 func notFoundOnMissing(err error) error {
 	var me *gomysql.MySQLError
 	if errors.As(err, &me) && me.Number == erNoSuchTable {
@@ -107,6 +113,7 @@ func notFoundOnMissing(err error) error {
 	return err
 }
 
+// jaga ErrNotFound biar tetap dikenali
 func unwrapNotFound(err error) error {
 	if errors.Is(err, domain.ErrNotFound) {
 		return domain.ErrNotFound

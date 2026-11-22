@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// DatabaseItem adalah satu baris di daftar database, label sudah berupa teks siap tampil
 type DatabaseItem struct {
 	ID         int64
 	Name       string
@@ -24,6 +25,7 @@ func newDatabaseItem(a domain.AccessibleDatabase) DatabaseItem {
 	}
 }
 
+// dbmsLabel mengubah kode DBMS jadi nama yang enak dibaca
 func dbmsLabel(d domain.DBMS) string {
 	switch d {
 	case domain.DBMSPostgres:
@@ -36,6 +38,7 @@ func dbmsLabel(d domain.DBMS) string {
 	return string(d)
 }
 
+// LevelLabel mengubah level akses jadi teks untuk ditampilkan
 func LevelLabel(l domain.AccessLevel) string {
 	switch l {
 	case domain.AccessViewEdit:
@@ -46,6 +49,7 @@ func LevelLabel(l domain.AccessLevel) string {
 	return "Tidak ada"
 }
 
+// TableItem, SchemaGroup, dan Overview membentuk halaman ringkasan: tabel dikelompokkan per schema
 type TableItem struct {
 	Schema    string
 	Name      string
@@ -65,6 +69,7 @@ type Overview struct {
 	Schemas  []SchemaGroup
 }
 
+// ColumnRow, ConstraintRow, IndexRow, dan TableDetail membentuk halaman detail satu tabel
 type ColumnRow struct {
 	Position   int
 	Name       string
@@ -112,12 +117,14 @@ type DataView struct {
 	TableHref string
 }
 
+// dbHref dan tableHref membuat alamat halaman, nama schema dan tabel di-escape karena bisa berisi karakter khusus
 func dbHref(id int64) string { return "/databases/" + strconv.FormatInt(id, 10) }
 
 func tableHref(id int64, schema, table string) string {
 	return dbHref(id) + "/tables/" + url.PathEscape(schema) + "/" + url.PathEscape(table)
 }
 
+// rowsText menampilkan perkiraan jumlah baris, negatif berarti database tidak tahu
 func rowsText(n int64) string {
 	if n < 0 {
 		return "tidak diketahui"
@@ -132,6 +139,7 @@ func kindLabel(k domain.TableKind) string {
 	return "Tabel"
 }
 
+// constraintRow menyusun label dan detail constraint, foreign key menampilkan tabel tujuan dan aturan ON UPDATE/DELETE
 func constraintRow(c domain.Constraint) ConstraintRow {
 	row := ConstraintRow{Name: c.Name, Columns: strings.Join(c.Columns, ", ")}
 	switch c.Type {

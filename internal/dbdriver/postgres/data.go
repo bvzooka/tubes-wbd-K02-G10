@@ -9,12 +9,14 @@ import (
 	"time"
 )
 
+// cek tabel ada di schema itu dan bukan tabel sistem
 const tableExistsSQL = `
 SELECT 1
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = $1 AND c.relname = $2 AND ` + userRel
 
+// kolom primary key berurutan sesuai posisinya di key
 const primaryKeySQL = `
 SELECT a.attname::text
 FROM pg_index i
@@ -31,6 +33,7 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 	out := &domain.TableData{Page: page.Page, PageSize: page.PageSize}
 	spec := txSpec{readOnly: true, timeout: 10 * time.Second}
 	err := d.runTx(ctx, spec, func(tx pgx.Tx) error {
+		// cek tabelnya ada dulu supaya nama yang salah jadi ErrNotFound, bukan error SQL
 		var one int
 		if err := tx.QueryRow(ctx, tableExistsSQL, ref.Schema, ref.Table).Scan(&one); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -39,6 +42,7 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 			return err
 		}
 
+		// urut menurut primary key supaya isi halaman konsisten antar request
 		pkRows, err := tx.Query(ctx, primaryKeySQL, ref.Schema, ref.Table)
 		if err != nil {
 			return err
@@ -57,6 +61,7 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 			return err
 		}
 
+		// Sanitize memberi quote pada nama schema dan tabel yang berasal dari URL, mencegah SQL injection
 		sql := "SELECT * FROM " + pgx.Identifier{ref.Schema, ref.Table}.Sanitize()
 		if len(order) > 0 {
 			sql += " ORDER BY " + strings.Join(order, ", ")

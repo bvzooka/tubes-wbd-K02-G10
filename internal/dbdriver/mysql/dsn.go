@@ -11,6 +11,7 @@ import (
 	"strings"
 )
 
+// BuildConfig menyusun konfigurasi koneksi MySQL dari data koneksi, ssl_mode ala PostgreSQL diterjemahkan ke pengaturan TLS-nya
 func BuildConfig(c domain.Connection, password string) (*gomysql.Config, error) {
 	cfg := gomysql.NewConfig()
 	cfg.User = c.Username
@@ -20,6 +21,7 @@ func BuildConfig(c domain.Connection, password string) (*gomysql.Config, error) 
 	cfg.DBName = c.DatabaseName
 	cfg.Timeout = connectTimeout
 	cfg.Collation = "utf8mb4_general_ci"
+	// parameter disisipkan di sisi client, jadi satu query dikirim sekali jalan
 	cfg.InterpolateParams = true
 	cfg.ParseTime = false
 	if err := applySSLMode(cfg, c.SSLMode); err != nil {
@@ -28,6 +30,7 @@ func BuildConfig(c domain.Connection, password string) (*gomysql.Config, error) 
 	return cfg, nil
 }
 
+// applySSLMode menerjemahkan mode SSL ke pengaturan TLS go-sql-driver
 func applySSLMode(cfg *gomysql.Config, mode string) error {
 	switch strings.TrimSpace(mode) {
 	case "disable":
@@ -46,6 +49,7 @@ func applySSLMode(cfg *gomysql.Config, mode string) error {
 	return nil
 }
 
+// verifyCAConfig memeriksa rantai sertifikat server tapi tidak nama hostnya, itulah beda verify-ca dengan verify-full
 func verifyCAConfig(roots *x509.CertPool) *tls.Config {
 	return &tls.Config{
 		MinVersion:         tls.VersionTLS12,
@@ -64,6 +68,7 @@ func verifyCAConfig(roots *x509.CertPool) *tls.Config {
 	}
 }
 
+// quoteIdent memberi backtick pada nama dan menggandakan backtick di dalamnya, supaya aman dipakai di SQL
 func quoteIdent(s string) string {
 	return "`" + strings.ReplaceAll(s, "`", "``") + "`"
 }
