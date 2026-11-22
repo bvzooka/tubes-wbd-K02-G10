@@ -19,7 +19,7 @@ WHERE TABLE_SCHEMA = ?`
 // nama index primary key di MySQL, dan nilai COLLATION untuk urutan menurun
 const (
 	primaryIndexName = "PRIMARY"
-	collationDesc = "D"
+	collationDesc    = "D"
 )
 
 // menunjuk satu index lewat nama tabel dan nama index-nya
@@ -29,13 +29,13 @@ type indexKey struct{ table, name string }
 type indexAcc struct {
 	unique bool
 	method string
-	parts []indexPart
+	parts  []indexPart
 }
 
 // satu kolom atau ekspresi dalam sebuah index, seq menunjukkan urutannya
 type indexPart struct {
-	seq int
-	text string
+	seq    int
+	text   string
 	quoted string
 }
 
@@ -55,7 +55,7 @@ func readIndexes(ctx context.Context, tx *sql.Tx, schema string, info serverInfo
 	return nil
 }
 
-//  membaca STATISTICS dan mengelompokkan barisnya per index
+// membaca STATISTICS dan mengelompokkan barisnya per index
 func readIndexParts(ctx context.Context, tx *sql.Tx, schema string, info serverInfo) (map[indexKey]*indexAcc, error) {
 	expr := "NULL"
 	if info.hasExpression {
@@ -93,10 +93,10 @@ func readIndexParts(ctx context.Context, tx *sql.Tx, schema string, info serverI
 func buildIndex(schema string, k indexKey, acc *indexAcc) domain.Index {
 	sort.SliceStable(acc.parts, func(a, b int) bool { return acc.parts[a].seq < acc.parts[b].seq })
 	in := domain.Index{
-		Name: k.name,
-		Unique: acc.unique,
+		Name:    k.name,
+		Unique:  acc.unique,
 		Primary: k.name == primaryIndexName,
-		Method: acc.method,
+		Method:  acc.method,
 	}
 	quoted := make([]string, len(acc.parts))
 	for j, p := range acc.parts {

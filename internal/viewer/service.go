@@ -12,7 +12,7 @@ import (
 
 // menyiapkan data tampilan setelah memeriksa akses user ke database
 type Service struct {
-	authz contract.Authorizer
+	authz   contract.Authorizer
 	drivers contract.DriverProvider
 }
 
