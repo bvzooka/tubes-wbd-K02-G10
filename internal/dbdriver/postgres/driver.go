@@ -16,7 +16,7 @@ import (
 
 // batas koneksi per database target, waktu tunggu konek, dan batas waktu default satu transaction
 const (
-	maxConns       = 5
+	maxConns = 5
 	connectTimeout = 5 * time.Second
 	defaultTxLimit = 30 * time.Second
 )
@@ -28,8 +28,7 @@ type Driver struct {
 
 var _ dbdriver.Driver = (*Driver)(nil)
 
-// New membangun driver untuk satu koneksi dan memastikan server terjangkau.
-// Signature-nya cocok dengan connmgr.DriverFactory.
+// membangun driver untuk satu koneksi dan memastikan server terjangkau, signature-nya cocok dengan connmgr.DriverFactory.
 func New(ctx context.Context, c domain.Connection, password string) (dbdriver.Driver, error) {
 	if c.DBMS != domain.DBMSPostgres {
 		return nil, fmt.Errorf("driver postgres tidak mendukung dbms %q: %w", c.DBMS, domain.ErrUnsupported)
@@ -41,11 +40,11 @@ func New(ctx context.Context, c domain.Connection, password string) (dbdriver.Dr
 	return d, nil
 }
 
-// NewFromURL membuat driver dari URL koneksi dan melakukan Ping awal.
+// membuat driver dari URL koneksi dan melakukan Ping awal.
 func NewFromURL(ctx context.Context, connURL string) (*Driver, error) {
 	cfg, err := pgxpool.ParseConfig(connURL)
 	if err != nil {
-		// Pesan parse bisa memuat URL (termasuk password): jangan diteruskan.
+		// pesan parse bisa memuat URL (termasuk password): jangan diteruskan
 		return nil, errors.New("konfigurasi koneksi tidak valid")
 	}
 	cfg.MaxConns = maxConns
@@ -63,10 +62,10 @@ func NewFromURL(ctx context.Context, connURL string) (*Driver, error) {
 	return d, nil
 }
 
-// NewFromPool membungkus pool yang sudah ada (dipakai test). Pool ditutup oleh Close.
+// membungkus pool yang sudah ada (dipakai test). Pool ditutup oleh Close.
 func NewFromPool(pool *pgxpool.Pool) *Driver { return &Driver{pool: pool} }
 
-// Dialect dan Capabilities memberi tahu platform bahwa ini PostgreSQL dan DDL-nya ikut transaction
+//memberi tahu platform bahwa ini PostgreSQL dan DDL-nya ikut transaction
 func (d *Driver) Dialect() domain.DBMS { return domain.DBMSPostgres }
 
 func (d *Driver) Capabilities() dbdriver.Capabilities {
@@ -83,13 +82,13 @@ func (d *Driver) Ping(ctx context.Context) error {
 	return nil
 }
 
-// Close menutup semua koneksi di pool
+// menutup semua koneksi di pool
 func (d *Driver) Close() { d.pool.Close() }
 
-// txSpec adalah pengaturan transaction untuk runTx: hanya baca, level isolasi, dan batas waktu
+// pengaturan transaction untuk runTx: hanya baca, level isolasi, dan batas waktu
 type txSpec struct {
 	readOnly bool
-	iso      pgx.TxIsoLevel
+	iso pgx.TxIsoLevel
 	timeout  time.Duration
 }
 
@@ -97,15 +96,26 @@ type txSpec struct {
 // fn nil: commit. ErrForceRollback: rollback dan nil. Lainnya: rollback dan error.
 // Panic di fn tetap menghasilkan rollback.
 func (d *Driver) runTx(ctx context.Context, spec txSpec, fn func(pgx.Tx) error) error {
+	return runTxOn(ctx, d.pool, spec, fn)
+}
+
+// sumber transaction: pool (koneksi bebas) atau satu koneksi terpin punya Session
+// *pgxpool.Pool dan *pgxpool.Conn sama-sama memenuhi
+type txBeginner interface {
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
+}
+
+//  si runTx yang dipakai bersama oleh Driver (lewat pool) dan Session (lewat koneksi terpin)
+func runTxOn(ctx context.Context, b txBeginner, spec txSpec, fn func(pgx.Tx) error) error {
 	mode := pgx.ReadWrite
 	if spec.readOnly {
 		mode = pgx.ReadOnly
 	}
-	tx, err := d.pool.BeginTx(ctx, pgx.TxOptions{AccessMode: mode, IsoLevel: spec.iso})
+	tx, err := b.BeginTx(ctx, pgx.TxOptions{AccessMode: mode, IsoLevel: spec.iso})
 	if err != nil {
 		return ClassifyError(err)
 	}
-	// Rollback setelah commit mengembalikan ErrTxClosed dan diabaikan.
+	// rollback setelah commit mengembalikan ErrTxClosed dan diabaikan.
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 
 	timeout := spec.timeout
