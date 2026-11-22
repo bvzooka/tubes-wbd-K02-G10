@@ -9,7 +9,7 @@ import (
 	"dbplatform/internal/dbdriver"
 )
 
-//  menambahkan eksekusi berparameter ke pgTx biar memenuhi dbdriver.ArgTx
+// menambahkan eksekusi berparameter ke pgTx biar memenuhi dbdriver.ArgTx
 type pgArgTx struct{ pgTx }
 
 var _ dbdriver.ArgTx = pgArgTx{}

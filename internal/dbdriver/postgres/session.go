@@ -16,8 +16,8 @@ const releaseTimeout = 5 * time.Second
 
 // SQL advisory lock tingkat sesi: terikat ke koneksi, ga ke transaction
 const (
-	tryLockSQL = `SELECT pg_try_advisory_lock($1)`
-	unlockSQL = `SELECT pg_advisory_unlock($1)`
+	tryLockSQL   = `SELECT pg_try_advisory_lock($1)`
+	unlockSQL    = `SELECT pg_advisory_unlock($1)`
 	unlockAllSQL = `SELECT pg_advisory_unlock_all()`
 )
 
@@ -31,7 +31,7 @@ type session struct {
 var _ dbdriver.Session = (*session)(nil)
 
 // mengambil satu koneksi dari pool dan memegangnya sampai Close
-//koneksi harus dipin karena advisory lock sesi hilang kalau koneksinya dipakai atau ditutup pihak lain
+// koneksi harus dipin karena advisory lock sesi hilang kalau koneksinya dipakai atau ditutup pihak lain
 func (d *Driver) OpenSession(ctx context.Context) (dbdriver.Session, error) {
 	conn, err := d.pool.Acquire(ctx)
 	if err != nil {

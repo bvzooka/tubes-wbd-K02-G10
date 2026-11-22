@@ -16,7 +16,7 @@ import (
 
 // batas koneksi per database target, waktu tunggu konek, dan batas waktu default satu transaction
 const (
-	maxConns = 5
+	maxConns       = 5
 	connectTimeout = 5 * time.Second
 	defaultTxLimit = 30 * time.Second
 )
@@ -65,7 +65,7 @@ func NewFromURL(ctx context.Context, connURL string) (*Driver, error) {
 // membungkus pool yang sudah ada (dipakai test). Pool ditutup oleh Close.
 func NewFromPool(pool *pgxpool.Pool) *Driver { return &Driver{pool: pool} }
 
-//memberi tahu platform bahwa ini PostgreSQL dan DDL-nya ikut transaction
+// memberi tahu platform bahwa ini PostgreSQL dan DDL-nya ikut transaction
 func (d *Driver) Dialect() domain.DBMS { return domain.DBMSPostgres }
 
 func (d *Driver) Capabilities() dbdriver.Capabilities {
@@ -88,7 +88,7 @@ func (d *Driver) Close() { d.pool.Close() }
 // pengaturan transaction untuk runTx: hanya baca, level isolasi, dan batas waktu
 type txSpec struct {
 	readOnly bool
-	iso pgx.TxIsoLevel
+	iso      pgx.TxIsoLevel
 	timeout  time.Duration
 }
 
@@ -105,7 +105,7 @@ type txBeginner interface {
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
 }
 
-//  si runTx yang dipakai bersama oleh Driver (lewat pool) dan Session (lewat koneksi terpin)
+// si runTx yang dipakai bersama oleh Driver (lewat pool) dan Session (lewat koneksi terpin)
 func runTxOn(ctx context.Context, b txBeginner, spec txSpec, fn func(pgx.Tx) error) error {
 	mode := pgx.ReadWrite
 	if spec.readOnly {
