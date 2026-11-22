@@ -17,6 +17,7 @@ type FakeDriverProvider struct {
 
 var _ contract.DriverProvider = (*FakeDriverProvider)(nil)
 
+// NewFakeDriverProvider membuat penyedia driver kosong, isinya diisi lewat Set
 func NewFakeDriverProvider() *FakeDriverProvider {
 	return &FakeDriverProvider{drivers: map[int64]dbdriver.Driver{}}
 }
@@ -29,6 +30,7 @@ func (p *FakeDriverProvider) Set(connectionID int64, d dbdriver.Driver) *FakeDri
 	return p
 }
 
+// Get mengembalikan driver yang didaftarkan, ErrNotFound kalau koneksi itu belum didaftarkan
 func (p *FakeDriverProvider) Get(_ context.Context, connectionID int64) (dbdriver.Driver, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -48,6 +50,7 @@ type SpySessionAdmin struct {
 
 var _ contract.SessionAdmin = (*SpySessionAdmin)(nil)
 
+// RevokeAllForUser hanya mencatat id user, tidak ada session sungguhan yang dicabut
 func (s *SpySessionAdmin) RevokeAllForUser(_ context.Context, userID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -55,6 +58,7 @@ func (s *SpySessionAdmin) RevokeAllForUser(_ context.Context, userID int64) erro
 	return nil
 }
 
+// MarkRotationNeeded hanya mencatat id user, supaya test bisa memastikan service memanggilnya
 func (s *SpySessionAdmin) MarkRotationNeeded(_ context.Context, userIDs ...int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

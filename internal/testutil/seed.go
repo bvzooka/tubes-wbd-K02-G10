@@ -16,6 +16,7 @@ func SeedUser(t *testing.T, pool *pgxpool.Pool, username string, admin bool) dom
 	return SeedUserWithHash(t, pool, username, "stub:x", admin)
 }
 
+// SeedUserWithHash sama dengan SeedUser tapi hash password ditentukan sendiri
 func SeedUserWithHash(t *testing.T, pool *pgxpool.Pool, username, passwordHash string, admin bool) domain.User {
 	t.Helper()
 	u := domain.User{Username: username, IsPlatformAdmin: admin, IsActive: true}
@@ -28,6 +29,7 @@ func SeedUserWithHash(t *testing.T, pool *pgxpool.Pool, username, passwordHash s
 	return u
 }
 
+// SetUserActive mengaktifkan atau menonaktifkan user langsung di tabel
 func SetUserActive(t *testing.T, pool *pgxpool.Pool, userID int64, active bool) {
 	t.Helper()
 	if _, err := pool.Exec(context.Background(), `UPDATE users SET is_active = $2 WHERE id = $1`, userID, active); err != nil {

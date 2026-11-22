@@ -12,6 +12,7 @@ import (
 	"dbplatform/internal/migration"
 )
 
+// batas nama migration dan pesan error form schema diff
 const (
 	maxNameChars = 120
 
@@ -25,16 +26,19 @@ type migrationCreator interface {
 	Create(ctx context.Context, actor domain.Principal, connID int64, in migration.Input) (domain.Migration, error)
 }
 
+// Service menghitung perbedaan schema dan membuat draft migration dari perubahan yang dipilih user
 type Service struct {
 	authz      contract.Authorizer
 	drivers    contract.DriverProvider
 	migrations migrationCreator
 }
 
+// NewService dibuat dengan authorizer, penyedia driver, dan pembuat migration
 func NewService(authz contract.Authorizer, drivers contract.DriverProvider, migrations migrationCreator) *Service {
 	return &Service{authz: authz, drivers: drivers, migrations: migrations}
 }
 
+// Result adalah hasil perbandingan: database tujuan dan sumber beserta daftar perubahannya
 type Result struct {
 	TargetID   int64
 	TargetName string
@@ -43,6 +47,7 @@ type Result struct {
 	Changes    []Change
 }
 
+// can memeriksa akses user ke satu database, ErrForbidden kalau levelnya kurang
 func (s *Service) can(ctx context.Context, actor domain.Principal, connID int64, min domain.AccessLevel) error {
 	ok, err := s.authz.Can(ctx, actor.UserID, connID, min)
 	if err != nil {
@@ -103,6 +108,7 @@ func (s *Service) Preview(ctx context.Context, actor domain.Principal, targetID,
 	}, nil
 }
 
+// CreateDraft membuat migration draft di database tujuan dari perubahan yang dipilih
 func (s *Service) CreateDraft(ctx context.Context, actor domain.Principal, targetID, sourceID int64, selected []string) (domain.Migration, error) {
 	// Diff dihitung ulang di server, SQL ga pernah ambil dari browser
 	result, err := s.Preview(ctx, actor, targetID, sourceID)
@@ -134,6 +140,7 @@ func (s *Service) CreateDraft(ctx context.Context, actor domain.Principal, targe
 	return s.migrations.Create(ctx, actor, targetID, migration.Input{Name: name, SQL: SQL(Select(result.Changes, ids))})
 }
 
+// introspect membaca schema satu database, hanya PostgreSQL karena SQL yang dibuat memakai sintaks PostgreSQL
 func (s *Service) introspect(ctx context.Context, connID int64) (*domain.Schema, error) {
 	d, err := s.drivers.Get(ctx, connID)
 	if err != nil {
@@ -145,6 +152,7 @@ func (s *Service) introspect(ctx context.Context, connID int64) (*domain.Schema,
 	return introspectWith(ctx, d)
 }
 
+// introspectWith membungkus error pembacaan schema dengan konteksnya
 func introspectWith(ctx context.Context, d dbdriver.Driver) (*domain.Schema, error) {
 	schema, err := d.Introspect(ctx)
 	if err != nil {
@@ -153,6 +161,7 @@ func introspectWith(ctx context.Context, d dbdriver.Driver) (*domain.Schema, err
 	return schema, nil
 }
 
+// names mencari nama database untuk judul hasil, id yang tidak ditemukan diberi nama cadangan
 func (s *Service) names(ctx context.Context, actor domain.Principal, ids ...int64) (map[int64]string, error) {
 	all, err := s.authz.ListAccessible(ctx, actor.UserID)
 	if err != nil {
@@ -170,6 +179,7 @@ func (s *Service) names(ctx context.Context, actor domain.Principal, ids ...int6
 	return out, nil
 }
 
+// truncate memotong berdasarkan karakter, bukan byte, supaya tidak memutus karakter di tengah
 func truncate(s string, max int) string {
 	if utf8.RuneCountInString(s) <= max {
 		return s
