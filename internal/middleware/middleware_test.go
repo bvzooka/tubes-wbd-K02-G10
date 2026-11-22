@@ -1,6 +1,8 @@
 package middleware_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,6 +12,7 @@ import (
 
 	"dbplatform/internal/httpx"
 	"dbplatform/internal/middleware"
+	"dbplatform/internal/telemetry"
 	webassets "dbplatform/web"
 )
 
@@ -46,7 +49,7 @@ func TestChain_Order(t *testing.T) {
 
 func TestMiddleware_SecurityHeadersAndRequestID(t *testing.T) {
 	h := middleware.Chain(middleware.WithRequestID, middleware.SecurityHeaders)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if middleware.RequestID(r.Context()) == "" {
+		if telemetry.CorrelationID(r.Context()) == "" {
 			t.Error("request id kosong di context")
 		}
 	}))
@@ -92,5 +95,57 @@ func TestLogging_OmitsQueryAndCookies(t *testing.T) {
 	}
 	if !strings.Contains(out, "status=418") || !strings.Contains(out, "path=/a") {
 		t.Errorf("log tidak lengkap: %s", out)
+	}
+}
+
+func TestWithRequestID_HonorsValidHeader(t *testing.T) {
+	var seen string
+	h := middleware.WithRequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = telemetry.CorrelationID(r.Context())
+	}))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("X-Request-ID", "client-req-001")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if seen != "client-req-001" || rec.Header().Get("X-Request-ID") != "client-req-001" {
+		t.Fatalf("header valid harus dipakai, dapat %q", seen)
+	}
+
+	req.Header.Set("X-Request-ID", "bad id!")
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	if seen == "bad id!" || seen == "" {
+		t.Fatalf("header invalid harus diganti, dapat %q", seen)
+	}
+}
+
+func TestLogging_RecordsActorAndStatus(t *testing.T) {
+	var buf bytes.Buffer
+	h := middleware.Logging(telemetry.NewLogger(&buf, "info"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		telemetry.SetActor(r.Context(), "alice")
+		w.WriteHeader(http.StatusTeapot)
+	}))
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/x", nil))
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatal(err)
+	}
+	if entry["actor"] != "alice" || entry["status"] != float64(http.StatusTeapot) || entry["event"] != "http.request" {
+		t.Fatalf("log = %v", entry)
+	}
+}
+
+func TestRecover_UsesErrorHandler(t *testing.T) {
+	var got error
+	h := middleware.Recover(telemetry.NewLogger(&bytes.Buffer{}, "info"), func(w http.ResponseWriter, r *http.Request, err error) {
+		got = err
+		w.WriteHeader(http.StatusInternalServerError)
+	})(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("boom") }))
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if rec.Code != http.StatusInternalServerError || got == nil || !strings.Contains(got.Error(), "boom") {
+		t.Fatalf("code=%d err=%v", rec.Code, got)
 	}
 }

@@ -7,7 +7,7 @@ import (
 
 	"dbplatform/internal/contract"
 	"dbplatform/internal/domain"
-	"dbplatform/internal/middleware"
+	"dbplatform/internal/telemetry"
 )
 
 type ErrorPage struct {
@@ -36,7 +36,7 @@ func HandleError(render *Renderer, logger *slog.Logger) contract.ErrorHandler {
 			})
 		case errors.Is(err, domain.ErrConnectionFailed), errors.Is(err, domain.ErrConnectionInactive):
 			// Pesan error koneksi sudah dijamin aman (tanpa kredensial) oleh driver.
-			logger.WarnContext(r.Context(), "target database unavailable", "request_id", middleware.RequestID(r.Context()), "error", err)
+			logger.WarnContext(r.Context(), "target database unavailable", "request_id", telemetry.CorrelationID(r.Context()), "error", err)
 			msg := "Database tujuan tidak dapat dijangkau saat ini. Coba lagi nanti atau hubungi admin."
 			if errors.Is(err, domain.ErrConnectionInactive) {
 				msg = "Koneksi database ini sedang dinonaktifkan oleh admin."
@@ -48,7 +48,7 @@ func HandleError(render *Renderer, logger *slog.Logger) contract.ErrorHandler {
 			})
 		// User cuman liat nomor request, detailnya ada di log
 		default:
-			id := middleware.RequestID(r.Context())
+			id := telemetry.CorrelationID(r.Context())
 			logger.ErrorContext(r.Context(), "unhandled error", "request_id", id, "error", err)
 			render.Page(w, r, http.StatusInternalServerError, "errors/500.html", ErrorPage{
 				Status:    http.StatusInternalServerError,

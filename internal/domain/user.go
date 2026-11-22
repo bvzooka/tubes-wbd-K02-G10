@@ -23,6 +23,7 @@ type Group struct {
 	ID          int64
 	Name        string
 	Description string
+	LeaderID    *int64
 	CreatedAt   time.Time
 }
 

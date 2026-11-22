@@ -36,6 +36,8 @@ type fakeGroupStore struct {
 	addErr       error
 	removed      [][2]int64
 	removeErr    error
+	leaders      [][2]int64
+	leaderErr    error
 	grants       []grantCall
 	grantPrev    domain.AccessLevel
 	grantErr     error
@@ -88,6 +90,15 @@ func (f *fakeGroupStore) AddMember(_ context.Context, groupID, userID int64) (bo
 	f.mutatingCall++
 	f.added = append(f.added, [2]int64{groupID, userID})
 	return f.addResult, nil
+}
+
+func (f *fakeGroupStore) SetLeader(_ context.Context, groupID, userID int64) error {
+	if f.leaderErr != nil {
+		return f.leaderErr
+	}
+	f.mutatingCall++
+	f.leaders = append(f.leaders, [2]int64{groupID, userID})
+	return nil
 }
 
 func (f *fakeGroupStore) RemoveMember(_ context.Context, groupID, userID int64) error {

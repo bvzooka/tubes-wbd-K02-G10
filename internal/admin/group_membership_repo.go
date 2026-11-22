@@ -101,16 +101,49 @@ func (r *GroupRepo) AddMember(ctx context.Context, groupID, userID int64) (bool,
 	return tag.RowsAffected() > 0, nil
 }
 
-// RemoveMember mengeluarkan anggota, ErrNotFound kalau memang bukan anggota
+// RemoveMember menolak mengeluarkan leader dalam satu statement, supaya tidak balapan dengan penggantian leader
 func (r *GroupRepo) RemoveMember(ctx context.Context, groupID, userID int64) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM group_members WHERE group_id = $1 AND user_id = $2`, groupID, userID)
+	tag, err := r.db.Exec(ctx, `
+		DELETE FROM group_members
+		WHERE group_id = $1 AND user_id = $2
+		  AND NOT EXISTS (SELECT 1 FROM user_groups WHERE id = $1 AND leader_id = $2)`,
+		groupID, userID)
 	if err != nil {
 		return fmt.Errorf("remove member: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
-		return domain.ErrNotFound
+	if tag.RowsAffected() > 0 {
+		return nil
 	}
-	return nil
+	if r.isLeader(ctx, groupID, userID) {
+		return ErrRemoveLeader
+	}
+	return domain.ErrNotFound
+}
+
+// SetLeader hanya berhasil bila userID anggota group.
+func (r *GroupRepo) SetLeader(ctx context.Context, groupID, userID int64) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE user_groups SET leader_id = $2
+		WHERE id = $1
+		  AND EXISTS (SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2)`,
+		groupID, userID)
+	if err != nil {
+		return fmt.Errorf("set leader: %w", err)
+	}
+	if tag.RowsAffected() > 0 {
+		return nil
+	}
+	if _, err := r.Get(ctx, groupID); err != nil {
+		return err
+	}
+	return ErrLeaderNotMember
+}
+
+func (r *GroupRepo) isLeader(ctx context.Context, groupID, userID int64) bool {
+	var leader bool
+	_ = r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM user_groups WHERE id = $1 AND leader_id = $2)`,
+		groupID, userID).Scan(&leader) // gagal baca = anggap bukan leader, caller kembali ke ErrNotFound
+	return leader
 }
 
 // ListAccess mengembalikan database yang boleh diakses group beserta levelnya

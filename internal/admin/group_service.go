@@ -20,6 +20,7 @@ type groupStore interface {
 	MemberIDs(ctx context.Context, groupID int64) ([]int64, error)
 	AddMember(ctx context.Context, groupID, userID int64) (bool, error)
 	RemoveMember(ctx context.Context, groupID, userID int64) error
+	SetLeader(ctx context.Context, groupID, userID int64) error
 	ListAccess(ctx context.Context, groupID int64) ([]GroupAccess, error)
 	GrantAccess(ctx context.Context, groupID, connID int64, level domain.AccessLevel, grantedBy int64) (domain.AccessLevel, error)
 	RevokeAccess(ctx context.Context, groupID, connID int64) error
@@ -239,6 +240,20 @@ func (s *GroupService) RevokeAccess(ctx context.Context, actor domain.Principal,
 	}
 	if err := s.groups.RevokeAccess(ctx, groupID, connID); err != nil {
 		return fmt.Errorf("revoke access: %w", err)
+	}
+	return nil
+}
+
+func (s *GroupService) SetLeader(ctx context.Context, actor domain.Principal, groupID, userID int64) error {
+	if err := requireAdmin(actor); err != nil {
+		return err
+	}
+	if err := s.groups.SetLeader(ctx, groupID, userID); err != nil {
+		return err
+	}
+	// Leader mendapat hak baru (menyetujui eksekusi), sama seperti kenaikan akses.
+	if err := s.sessions.MarkRotationNeeded(ctx, userID); err != nil {
+		return fmt.Errorf("mark rotation: %w", err)
 	}
 	return nil
 }
