@@ -62,7 +62,7 @@ func (m *Manager) Start(ctx context.Context, userID int64) (Started, error) {
 		CreatedAt:         now,
 		AbsoluteExpiresAt: expires,
 	}); err != nil {
-		return Started{}, err
+		return Started{}, fmt.Errorf("create session: %w", err)
 	}
 	return Started{Token: raw, ExpiresAt: expires}, nil
 }
@@ -79,7 +79,7 @@ func (m *Manager) Resolve(ctx context.Context, raw string) (*Resolved, error) {
 		return nil, domain.ErrUnauthenticated
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("find session: %w", err)
 	}
 
 	// Evaluate memutuskan session ini valid, perlu dicabut, atau perlu dirotasi, tanpa menyentuh database
@@ -112,7 +112,7 @@ func (m *Manager) Resolve(ctx context.Context, raw string) (*Resolved, error) {
 		}
 		ok, err := m.store.Rotate(ctx, s.ID, hash, HashToken(newRaw), now, now.Add(m.policy.GracePeriod))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("rotate session: %w", err)
 		}
 		// ok false: request paralel sudah merotasi lebih dulu; token ini masih berlaku dalam grace.
 		if ok {
@@ -142,9 +142,12 @@ func (m *Manager) revokeToken(ctx context.Context, raw, reason string) error {
 		return nil
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("find session: %w", err)
 	}
-	return m.store.Revoke(ctx, s.ID, now, reason)
+	if err := m.store.Revoke(ctx, s.ID, now, reason); err != nil {
+		return fmt.Errorf("revoke session: %w", err)
+	}
+	return nil
 }
 
 // RevokeAllForUser memenuhi contract.SessionAdmin.
