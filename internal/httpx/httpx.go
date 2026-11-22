@@ -2,26 +2,14 @@ package httpx
 
 import (
 	"log/slog"
-	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dbplatform/internal/clock"
 	"dbplatform/internal/contract"
 	"dbplatform/internal/domain"
+	"dbplatform/internal/middleware"
 )
-
-type Middleware = func(http.Handler) http.Handler
-
-func Chain(mws ...Middleware) Middleware {
-	return func(next http.Handler) http.Handler {
-		// Dari belakang biar middleware belakang duluan
-		for i := len(mws) - 1; i >= 0; i-- {
-			next = mws[i](next)
-		}
-		return next
-	}
-}
 
 type Deps struct {
 	Pool      *pgxpool.Pool
@@ -36,18 +24,18 @@ type Deps struct {
 	Drivers contract.DriverProvider
 }
 
-func (d Deps) Authed() Middleware {
-	return Chain(d.Auth.Authenticate, d.Auth.CSRF)
+func (d Deps) Authed() middleware.Middleware {
+	return middleware.Chain(d.Auth.Authenticate, d.Auth.CSRF)
 }
 
-func (d Deps) Admin() Middleware {
-	return Chain(d.Auth.Authenticate, d.Auth.CSRF, d.Auth.RequireAdmin)
+func (d Deps) Admin() middleware.Middleware {
+	return middleware.Chain(d.Auth.Authenticate, d.Auth.CSRF, d.Auth.RequireAdmin)
 }
 
-func (d Deps) DBView() Middleware {
-	return Chain(d.Auth.Authenticate, d.Auth.CSRF, d.Auth.RequireDBAccess(domain.AccessViewOnly))
+func (d Deps) DBView() middleware.Middleware {
+	return middleware.Chain(d.Auth.Authenticate, d.Auth.CSRF, d.Auth.RequireDBAccess(domain.AccessViewOnly))
 }
 
-func (d Deps) DBEdit() Middleware {
-	return Chain(d.Auth.Authenticate, d.Auth.CSRF, d.Auth.RequireDBAccess(domain.AccessViewEdit))
+func (d Deps) DBEdit() middleware.Middleware {
+	return middleware.Chain(d.Auth.Authenticate, d.Auth.CSRF, d.Auth.RequireDBAccess(domain.AccessViewEdit))
 }

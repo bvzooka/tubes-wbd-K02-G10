@@ -21,6 +21,7 @@ import (
 	"dbplatform/internal/contract"
 	"dbplatform/internal/explain"
 	"dbplatform/internal/httpx"
+	"dbplatform/internal/middleware"
 	"dbplatform/internal/migration"
 	"dbplatform/internal/schemadiff"
 	"dbplatform/internal/viewer"
@@ -218,10 +219,10 @@ func (a *app) mountSystemRoutes() error {
 
 // bungkus semua route dengan middleware global: ID request, tangkap panic, log, lalu header keamanan
 func (a *app) buildChain() http.Handler {
-	return httpx.Chain(
-		httpx.WithRequestID,
-		httpx.Recover(a.logger, a.d.HandleErr),
-		httpx.Logging(a.logger),
-		httpx.SecurityHeaders,
+	return middleware.Chain(
+		middleware.WithRequestID,
+		middleware.Recover(a.logger, a.d.HandleErr),
+		middleware.Logging(a.logger),
+		middleware.SecurityHeaders,
 	)(a.mux)
 }
