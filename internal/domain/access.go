@@ -1,5 +1,7 @@
+// Package domain berisi tipe data inti yang dipakai semua modul, tanpa urusan database atau HTTP
 package domain
 
+// AccessLevel adalah tingkat akses user ke sebuah database
 type AccessLevel string
 
 const (
@@ -20,6 +22,7 @@ func (l AccessLevel) Rank() int {
 	}
 }
 
+// Valid false untuk AccessNone dan nilai yang tidak dikenal
 func (l AccessLevel) Valid() bool { return l.Rank() > 0 }
 
 // AtLeast selalu false untuk AccessNone, apa pun nilai min.

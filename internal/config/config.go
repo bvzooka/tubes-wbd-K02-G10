@@ -90,7 +90,7 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 		cfg.UseStubs = b
 	}
-	
+
 	// APP_STUBS mematikan login dan otorisasi, jadi dilarang di production
 	if cfg.UseStubs && cfg.Env == EnvProduction {
 		errs = append(errs, errors.New("APP_STUBS: tidak boleh true saat APP_ENV=production"))

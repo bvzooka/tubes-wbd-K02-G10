@@ -1,3 +1,4 @@
+// Package appdb membuka koneksi ke database platform dan menjalankan migrasi skemanya saat start
 package appdb
 
 import (
@@ -11,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// file sql ikut tertanam di binary jadi tidak perlu dibawa terpisah
+//
 //go:embed sql/*.sql
 var sqlFS embed.FS
 
@@ -35,6 +38,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	return migrateFS(ctx, pool, sqlFS, "sql")
 }
 
+// migrateFS menjalankan file .sql yang belum pernah dijalankan, berurutan menurut nama file
 func migrateFS(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, dir string) error {
 	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
@@ -46,6 +50,7 @@ func migrateFS(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, dir string) 
 			names = append(names, e.Name())
 		}
 	}
+	// nama file berawalan tanggal jadi urutan abjad sama dengan urutan eksekusi
 	sort.Strings(names)
 
 	// Satu koneksi khusus agar advisory lock (level session) dipegang sampai selesai
@@ -68,6 +73,7 @@ func migrateFS(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, dir string) 
 		return fmt.Errorf("appdb: buat app_schema_versions: %w", err)
 	}
 
+	// versi yang sudah tercatat dilewati supaya migrasi tidak berjalan dua kali
 	applied := map[string]bool{}
 	rows, err := conn.Query(ctx, `SELECT version FROM app_schema_versions`)
 	if err != nil {
