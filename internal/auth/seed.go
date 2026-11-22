@@ -12,6 +12,7 @@ import (
 	"dbplatform/internal/contract"
 )
 
+// aturan username yang sama dengan constraint di tabel users
 var usernamePattern = regexp.MustCompile(`^[a-z0-9_.-]{3,32}$`)
 
 // TxBeginner adalah bagian *pgxpool.Pool yang dipakai SeedAdmin.

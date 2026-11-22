@@ -42,12 +42,15 @@ type SessionStore interface {
 	DeleteExpired(ctx context.Context, now time.Time) (int64, error)
 }
 
+// Repo menyimpan session di tabel sessions
 type Repo struct {
 	db DB
 }
 
+// NewRepo dibuat dengan koneksi database platform
 func NewRepo(db DB) *Repo { return &Repo{db: db} }
 
+// Create menyimpan session baru dan mengembalikan id-nya
 func (r *Repo) Create(ctx context.Context, s NewSession) (int64, error) {
 	var id int64
 	err := r.db.QueryRow(ctx, `
@@ -62,6 +65,7 @@ func (r *Repo) Create(ctx context.Context, s NewSession) (int64, error) {
 	return id, nil
 }
 
+// FindByTokenHash mengutamakan token yang sekarang, token lama dipakai hanya kalau masih dalam masa grace
 func (r *Repo) FindByTokenHash(ctx context.Context, hash []byte, now time.Time) (Session, error) {
 	var s Session
 	err := r.db.QueryRow(ctx, `
@@ -87,6 +91,7 @@ func (r *Repo) FindByTokenHash(ctx context.Context, hash []byte, now time.Time) 
 	return s, nil
 }
 
+// Touch memperbarui waktu terakhir dilihat, tidak mundur dan tidak menyentuh session yang sudah dicabut
 func (r *Repo) Touch(ctx context.Context, id int64, now time.Time) error {
 	_, err := r.db.Exec(ctx,
 		`UPDATE sessions SET last_seen_at = $2 WHERE id = $1 AND revoked_at IS NULL AND last_seen_at < $2`,
@@ -97,6 +102,7 @@ func (r *Repo) Touch(ctx context.Context, id int64, now time.Time) error {
 	return nil
 }
 
+// Rotate mengganti token, token lama disimpan sebagai prev supaya request yang masih membawanya tidak langsung gagal
 func (r *Repo) Rotate(ctx context.Context, id int64, oldHash, newHash []byte, now, prevValidUntil time.Time) (bool, error) {
 	tag, err := r.db.Exec(ctx, `
 		UPDATE sessions
@@ -114,6 +120,7 @@ func (r *Repo) Rotate(ctx context.Context, id int64, oldHash, newHash []byte, no
 	return tag.RowsAffected() == 1, nil
 }
 
+// Revoke mencabut satu session, session yang sudah dicabut tidak diubah lagi
 func (r *Repo) Revoke(ctx context.Context, id int64, now time.Time, reason string) error {
 	_, err := r.db.Exec(ctx,
 		`UPDATE sessions SET revoked_at = $2, revoked_reason = $3 WHERE id = $1 AND revoked_at IS NULL`,
@@ -124,6 +131,7 @@ func (r *Repo) Revoke(ctx context.Context, id int64, now time.Time, reason strin
 	return nil
 }
 
+// RevokeAllForUser mencabut semua session aktif milik satu user
 func (r *Repo) RevokeAllForUser(ctx context.Context, userID int64, now time.Time, reason string) error {
 	_, err := r.db.Exec(ctx,
 		`UPDATE sessions SET revoked_at = $2, revoked_reason = $3 WHERE user_id = $1 AND revoked_at IS NULL`,
@@ -134,6 +142,7 @@ func (r *Repo) RevokeAllForUser(ctx context.Context, userID int64, now time.Time
 	return nil
 }
 
+// MarkRotationNeeded memaksa session user dirotasi pada request berikutnya, dipakai saat hak aksesnya berubah
 func (r *Repo) MarkRotationNeeded(ctx context.Context, userIDs []int64) error {
 	if len(userIDs) == 0 {
 		return nil
@@ -150,6 +159,7 @@ func (r *Repo) MarkRotationNeeded(ctx context.Context, userIDs []int64) error {
 // revokedRetention adalah lama session yang dicabut disimpan sebelum dihapus.
 const revokedRetention = 7 * 24 * time.Hour
 
+// DeleteExpired menghapus session yang lewat batas mutlak atau yang sudah lama dicabut
 func (r *Repo) DeleteExpired(ctx context.Context, now time.Time) (int64, error) {
 	tag, err := r.db.Exec(ctx,
 		`DELETE FROM sessions WHERE absolute_expires_at < $1 OR revoked_at < $2`,

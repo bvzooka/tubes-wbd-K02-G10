@@ -23,10 +23,12 @@ type Authorizer struct {
 	db Querier
 }
 
+// New dibuat dengan koneksi database platform
 func New(db Querier) *Authorizer { return &Authorizer{db: db} }
 
 var _ contract.Authorizer = (*Authorizer)(nil)
 
+// EffectiveLevel adalah level tertinggi dari semua group user yang punya akses ke database ini, koneksi atau user nonaktif tidak dihitung
 func (a *Authorizer) EffectiveLevel(ctx context.Context, userID, connectionID int64) (domain.AccessLevel, error) {
 	rows, err := a.db.Query(ctx, `
 		SELECT gda.access_level
@@ -46,6 +48,7 @@ func (a *Authorizer) EffectiveLevel(ctx context.Context, userID, connectionID in
 	return MaxLevel(levels...), nil
 }
 
+// Can true kalau level efektif user minimal min
 func (a *Authorizer) Can(ctx context.Context, userID, connectionID int64, min domain.AccessLevel) (bool, error) {
 	level, err := a.EffectiveLevel(ctx, userID, connectionID)
 	if err != nil {
@@ -54,6 +57,7 @@ func (a *Authorizer) Can(ctx context.Context, userID, connectionID int64, min do
 	return level.AtLeast(min), nil
 }
 
+// ListAccessible mengembalikan database yang boleh dibuka user, satu baris per database dengan level tertingginya
 func (a *Authorizer) ListAccessible(ctx context.Context, userID int64) ([]domain.AccessibleDatabase, error) {
 	rows, err := a.db.Query(ctx, `
 		SELECT c.id, c.name, c.dbms, gda.access_level
@@ -70,6 +74,7 @@ func (a *Authorizer) ListAccessible(ctx context.Context, userID int64) ([]domain
 	defer rows.Close()
 
 	var out []domain.AccessibleDatabase
+	// satu database bisa muncul dari beberapa group, simpan yang levelnya tertinggi
 	index := map[int64]int{}
 	for rows.Next() {
 		var db domain.AccessibleDatabase

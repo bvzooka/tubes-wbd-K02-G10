@@ -30,6 +30,7 @@ func ClassifyError(err error) error {
 		return err
 	}
 
+	// error dari server PostgreSQL punya kode SQLSTATE, dipetakan ke pesan yang aman ditampilkan
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch {
@@ -48,6 +49,7 @@ func ClassifyError(err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return &connError{"Koneksi ke database melewati batas waktu", err}
 	}
+	// error di luar server: timeout dan host tidak terjangkau
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		return &connError{"Koneksi ke database melewati batas waktu", err}

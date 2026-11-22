@@ -16,6 +16,7 @@ type loginLimiter struct {
 	entries map[string]*limiterEntry
 }
 
+// limiterEntry mencatat jumlah gagal sejak jendela waktu dimulai
 type limiterEntry struct {
 	failures    int
 	windowStart time.Time
@@ -24,10 +25,12 @@ type limiterEntry struct {
 // maxLimiterEntries mencegah map tumbuh tanpa batas jika diserang banyak kombinasi.
 const maxLimiterEntries = 10000
 
+// newLoginLimiter membatasi max kegagalan dalam satu window
 func newLoginLimiter(clk clock.Clock, max int, window time.Duration) *loginLimiter {
 	return &loginLimiter{clock: clk, max: max, window: window, entries: map[string]*limiterEntry{}}
 }
 
+// kunci gabungan username dan IP, supaya satu orang yang salah tidak memblokir orang lain
 func limiterKey(username, ip string) string { return username + "\x00" + ip }
 
 // Blocked true jika kombinasi ini sudah mencapai batas kegagalan dalam jendela waktu.
@@ -45,6 +48,7 @@ func (l *loginLimiter) Blocked(username, ip string) bool {
 	return e.failures >= l.max
 }
 
+// Fail mencatat satu kegagalan, atau memulai jendela baru kalau yang lama sudah lewat
 func (l *loginLimiter) Fail(username, ip string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -61,12 +65,14 @@ func (l *loginLimiter) Fail(username, ip string) {
 	e.failures++
 }
 
+// Reset menghapus catatan gagal setelah login berhasil
 func (l *loginLimiter) Reset(username, ip string) {
 	l.mu.Lock()
 	delete(l.entries, limiterKey(username, ip))
 	l.mu.Unlock()
 }
 
+// pruneLocked membuang jendela yang sudah kedaluwarsa, dipanggil saat mu sudah dipegang
 func (l *loginLimiter) pruneLocked(now time.Time) {
 	for k, e := range l.entries {
 		if now.Sub(e.windowStart) >= l.window {

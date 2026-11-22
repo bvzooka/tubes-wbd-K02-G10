@@ -1,3 +1,4 @@
+// Package mysql adalah implementasi dbdriver.Driver untuk MySQL dan MariaDB
 package mysql
 
 import (
@@ -15,12 +16,14 @@ import (
 	"unicode/utf8"
 )
 
+// batas koneksi per database target, waktu tunggu konek, dan batas waktu default satu transaction
 const (
 	maxConns       = 5
 	connectTimeout = 5 * time.Second
 	defaultTxLimit = 30 * time.Second
 )
 
+// Driver memakai dua pool: ro untuk baca, dan rw yang baru dibuka saat ada yang menulis karena butuh MultiStatements
 type Driver struct {
 	dbms   domain.DBMS
 	dbName string
@@ -34,6 +37,7 @@ type Driver struct {
 
 var _ dbdriver.Driver = (*Driver)(nil)
 
+// New membangun driver untuk satu koneksi, signature-nya cocok dengan connmgr.DriverFactory
 func New(ctx context.Context, c domain.Connection, password string) (dbdriver.Driver, error) {
 	if c.DBMS != domain.DBMSMySQL && c.DBMS != domain.DBMSMariaDB {
 		return nil, fmt.Errorf("driver mysql tidak mendukung dbms %q: %w", c.DBMS, domain.ErrUnsupported)
@@ -49,6 +53,7 @@ func New(ctx context.Context, c domain.Connection, password string) (dbdriver.Dr
 	return d, nil
 }
 
+// NewFromConfig membuat driver dari konfigurasi dan melakukan Ping awal
 func NewFromConfig(ctx context.Context, dbms domain.DBMS, cfg *gomysql.Config) (*Driver, error) {
 	ro, err := openPool(cfg)
 	if err != nil {
@@ -62,6 +67,7 @@ func NewFromConfig(ctx context.Context, dbms domain.DBMS, cfg *gomysql.Config) (
 	return d, nil
 }
 
+// openPool membuka pool koneksi dengan batas jumlah dan umur koneksi
 func openPool(cfg *gomysql.Config) (*sql.DB, error) {
 	conn, err := gomysql.NewConnector(cfg)
 	if err != nil {
@@ -74,12 +80,15 @@ func openPool(cfg *gomysql.Config) (*sql.DB, error) {
 	return db, nil
 }
 
+// Dialect mengembalikan mysql atau mariadb
 func (d *Driver) Dialect() domain.DBMS { return d.dbms }
 
+// Capabilities memberi tahu bahwa DDL di MySQL tidak ikut transaction, jadi tidak bisa di-rollback
 func (d *Driver) Capabilities() dbdriver.Capabilities {
 	return dbdriver.Capabilities{TransactionalDDL: false}
 }
 
+// Ping mengecek server masih terjangkau, dengan batas waktu supaya tidak menggantung
 func (d *Driver) Ping(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
@@ -89,6 +98,7 @@ func (d *Driver) Ping(ctx context.Context) error {
 	return nil
 }
 
+// Close menutup kedua pool dan menandai driver tidak bisa dipakai lagi
 func (d *Driver) Close() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -100,6 +110,7 @@ func (d *Driver) Close() {
 	}
 }
 
+// writePool membuka pool tulis saat pertama kali dibutuhkan, MultiStatements diaktifkan agar satu string boleh berisi banyak statement
 func (d *Driver) writePool() (*sql.DB, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -119,12 +130,14 @@ func (d *Driver) writePool() (*sql.DB, error) {
 	return rw, nil
 }
 
+// txSpec adalah pengaturan transaction untuk runTx: hanya baca, level isolasi, dan batas waktu
 type txSpec struct {
 	readOnly bool
 	iso      sql.IsolationLevel
 	timeout  time.Duration
 }
 
+// runTx menjalankan fn dalam satu transaction pada satu koneksi, ErrForceRollback berarti rollback tanpa error
 func (d *Driver) runTx(ctx context.Context, db *sql.DB, spec txSpec, fn func(context.Context, *sql.Tx) error) error {
 	timeout := spec.timeout
 	if timeout <= 0 {
@@ -162,6 +175,7 @@ func (d *Driver) runTx(ctx context.Context, db *sql.DB, spec txSpec, fn func(con
 	return nil
 }
 
+// limitStatementTime memasang batas waktu per statement di sesi, MySQL dan MariaDB memakai variabel yang berbeda
 func (d *Driver) limitStatementTime(ctx context.Context, conn *sql.Conn, timeout time.Duration) func() {
 	var set, unset string
 	if d.dbms == domain.DBMSMariaDB {
@@ -181,6 +195,7 @@ func (d *Driver) limitStatementTime(ctx context.Context, conn *sql.Conn, timeout
 	}
 }
 
+// WithTx membaca lewat pool ro, dan menulis lewat pool rw
 func (d *Driver) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(tx dbdriver.Tx) error) error {
 	db := d.ro
 	if !opts.ReadOnly {
@@ -195,11 +210,13 @@ func (d *Driver) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(tx
 	})
 }
 
+// myTx membungkus sql.Tx supaya memenuhi dbdriver.Tx
 type myTx struct {
 	tx  *sql.Tx
 	ctx context.Context
 }
 
+// bind membatalkan operasi kalau context transaction-nya selesai lebih dulu
 func (t myTx) bind(ctx context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(t.ctx, cancel)
@@ -214,6 +231,7 @@ func (t myTx) Exec(ctx context.Context, sqlText string) (int64, error) {
 		return 0, err
 	}
 
+	// RowsAffected hanya mengembalikan hasil statement terakhir, jadi untuk banyak statement dipakai ROW_COUNT()
 	if strings.Contains(sqlText, ";") {
 		var n int64
 		if err := t.tx.QueryRowContext(ctx, "SELECT ROW_COUNT()").Scan(&n); err != nil {
@@ -251,6 +269,7 @@ func (t myTx) Query(ctx context.Context, sqlText string) (*domain.ResultSet, err
 	return rs, nil
 }
 
+// hasMultipleStatements memindai SQL dengan melewati string dan komentar, true kalau ada isi setelah titik koma
 func hasMultipleStatements(s string) bool {
 	seenSep := false
 	for i := 0; i < len(s); i++ {
@@ -295,6 +314,7 @@ func hasMultipleStatements(s string) bool {
 	return false
 }
 
+// collect membaca hasil sebagai teks, limit negatif berarti semua baris, more true kalau masih ada baris di luar limit
 func collect(rows *sql.Rows, limit int) (rs *domain.ResultSet, more bool, err error) {
 	cols, err := rows.Columns()
 	if err != nil {
@@ -335,6 +355,7 @@ func collect(rows *sql.Rows, limit int) (rs *domain.ResultSet, more bool, err er
 	return rs, more, nil
 }
 
+// isBinaryType menandai tipe yang isinya tidak layak ditampilkan sebagai teks
 func isBinaryType(name string) bool {
 	switch name {
 	case "BLOB", "BINARY", "VARBINARY", "BIT", "GEOMETRY":
@@ -343,6 +364,7 @@ func isBinaryType(name string) bool {
 	return false
 }
 
+// toCell menampilkan data biner atau yang bukan UTF-8 dalam bentuk hex
 func toCell(v sql.RawBytes, binary bool) domain.Cell {
 	if v == nil {
 		return domain.Cell{Null: true}

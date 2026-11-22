@@ -1,3 +1,4 @@
+// Package dbdriver mendefinisikan antarmuka driver database target, tiap DBMS punya implementasinya sendiri
 package dbdriver
 
 import (
@@ -16,6 +17,7 @@ type Capabilities struct {
 	TransactionalDDL bool
 }
 
+// TxOptions mengatur satu transaction: hanya baca atau tidak, dan batas waktunya
 type TxOptions struct {
 	ReadOnly bool
 	Timeout  time.Duration // 0 berarti default driver (30 detik)
@@ -27,6 +29,7 @@ type Tx interface {
 	Query(ctx context.Context, sql string) (*domain.ResultSet, error)
 }
 
+// Driver adalah semua yang dibutuhkan platform dari sebuah database target, di luar itu platform tidak peduli DBMS-nya
 type Driver interface {
 	Dialect() domain.DBMS
 	Capabilities() Capabilities

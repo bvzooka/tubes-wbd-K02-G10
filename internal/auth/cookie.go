@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// nama cookie session dan cookie token CSRF untuk form login
 const (
 	SessionCookieName   = "wbd_session"
 	LoginCSRFCookieName = "wbd_login_csrf"
@@ -13,6 +14,7 @@ const (
 	loginCSRFMaxAge = time.Hour
 )
 
+// HttpOnly supaya tidak terbaca JavaScript, SameSite Lax supaya tidak ikut terkirim dari situs lain
 func sessionCookie(value string, expires time.Time, secure bool) *http.Cookie {
 	return &http.Cookie{
 		Name:     SessionCookieName,
@@ -25,6 +27,7 @@ func sessionCookie(value string, expires time.Time, secure bool) *http.Cookie {
 	}
 }
 
+// MaxAge -1 menyuruh browser menghapus cookie
 func clearSessionCookie(secure bool) *http.Cookie {
 	return &http.Cookie{
 		Name:     SessionCookieName,
@@ -37,6 +40,7 @@ func clearSessionCookie(secure bool) *http.Cookie {
 	}
 }
 
+// cookie ini hanya dikirim ke path /login karena hanya form login yang memakainya
 func loginCSRFCookie(value string, secure bool) *http.Cookie {
 	return &http.Cookie{
 		Name:     LoginCSRFCookieName,

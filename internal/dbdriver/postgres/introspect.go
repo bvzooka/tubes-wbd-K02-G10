@@ -13,6 +13,7 @@ const userRel = `c.relkind IN ('r', 'p', 'v', 'm')
 	AND n.nspname NOT LIKE 'pg\_temp\_%'
 	AND n.nspname NOT LIKE 'pg\_toast\_temp\_%'`
 
+// empat query berikut membaca katalog sistem PostgreSQL: tabel, kolom, constraint, dan index
 const tablesSQL = `
 SELECT n.nspname, c.relname, c.relkind::text, c.reltuples::bigint
 FROM pg_class c
@@ -65,14 +66,17 @@ JOIN pg_am am ON am.oid = ic.relam
 WHERE ` + userRel + `
 ORDER BY n.nspname, c.relname, ic.relname`
 
+// relKey menunjuk satu tabel lewat schema dan nama, dipakai untuk menempelkan kolom dan constraint ke tabelnya
 type relKey struct{ schema, name string }
 
 // baca schema database dan tabel/view, kolom, constraint, dan index
 // hasil deterministik tabel menurut (schema, nama), kolom menurut posisi
 func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 	out := &domain.Schema{}
+	// RepeatableRead supaya keempat query melihat kondisi database yang sama walau ada perubahan di tengah
 	spec := txSpec{readOnly: true, iso: pgx.RepeatableRead, timeout: 20 * time.Second}
 	err := d.runTx(ctx, spec, func(tx pgx.Tx) error {
+		// pos mencatat urutan tiap tabel di out.Tables, query berikutnya memakainya untuk menempelkan hasil
 		pos := map[relKey]int{}
 		rows, err := tx.Query(ctx, tablesSQL)
 		if err != nil {
@@ -100,6 +104,7 @@ func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 			return err
 		}
 
+		// kolom tiap tabel
 		rows, err = tx.Query(ctx, columnsSQL)
 		if err != nil {
 			return err
@@ -120,6 +125,7 @@ func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 			return err
 		}
 
+		// constraint tiap tabel, kolom rujukan hanya diisi untuk foreign key
 		rows, err = tx.Query(ctx, constraintsSQL)
 		if err != nil {
 			return err
@@ -155,6 +161,7 @@ func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 			return err
 		}
 
+		// index tiap tabel
 		rows, err = tx.Query(ctx, indexesSQL)
 		if err != nil {
 			return err

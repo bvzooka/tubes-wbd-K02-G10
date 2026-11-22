@@ -33,6 +33,7 @@ func ParseKey(b64 string) ([]byte, error) {
 	return key, nil
 }
 
+// newGCM menyiapkan AES-GCM, mode yang sekaligus memastikan data tidak diubah orang lain
 func newGCM(key []byte) (cipher.AEAD, error) {
 	if len(key) != keySize {
 		return nil, ErrInvalidKey
@@ -58,6 +59,7 @@ func Encrypt(key, plaintext []byte) ([]byte, error) {
 	return gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
+// Decrypt membuka hasil Encrypt, data yang rusak atau kunci yang salah sama-sama jadi ErrDecrypt
 func Decrypt(key, data []byte) ([]byte, error) {
 	gcm, err := newGCM(key)
 	if err != nil {

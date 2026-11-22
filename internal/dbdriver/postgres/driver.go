@@ -14,6 +14,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// batas koneksi per database target, waktu tunggu konek, dan batas waktu default satu transaction
 const (
 	maxConns       = 5
 	connectTimeout = 5 * time.Second
@@ -65,12 +66,14 @@ func NewFromURL(ctx context.Context, connURL string) (*Driver, error) {
 // NewFromPool membungkus pool yang sudah ada (dipakai test). Pool ditutup oleh Close.
 func NewFromPool(pool *pgxpool.Pool) *Driver { return &Driver{pool: pool} }
 
+// Dialect dan Capabilities memberi tahu platform bahwa ini PostgreSQL dan DDL-nya ikut transaction
 func (d *Driver) Dialect() domain.DBMS { return domain.DBMSPostgres }
 
 func (d *Driver) Capabilities() dbdriver.Capabilities {
 	return dbdriver.Capabilities{TransactionalDDL: true}
 }
 
+// Ping mengecek server masih terjangkau, dengan batas waktu supaya tidak menggantung
 func (d *Driver) Ping(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
@@ -80,8 +83,10 @@ func (d *Driver) Ping(ctx context.Context) error {
 	return nil
 }
 
+// Close menutup semua koneksi di pool
 func (d *Driver) Close() { d.pool.Close() }
 
+// txSpec adalah pengaturan transaction untuk runTx: hanya baca, level isolasi, dan batas waktu
 type txSpec struct {
 	readOnly bool
 	iso      pgx.TxIsoLevel
@@ -124,12 +129,14 @@ func (d *Driver) runTx(ctx context.Context, spec txSpec, fn func(pgx.Tx) error) 
 	return nil
 }
 
+// WithTx menjalankan fn dalam satu transaction, ini yang dipakai modul lain lewat dbdriver.Driver
 func (d *Driver) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(tx dbdriver.Tx) error) error {
 	return d.runTx(ctx, txSpec{readOnly: opts.ReadOnly, timeout: opts.Timeout}, func(tx pgx.Tx) error {
 		return fn(pgTx{tx})
 	})
 }
 
+// pgTx membungkus transaction pgx supaya memenuhi dbdriver.Tx
 type pgTx struct{ tx pgx.Tx }
 
 // Exec memakai simple protocol (tanpa argumen) sehingga banyak statement boleh

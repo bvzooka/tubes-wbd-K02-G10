@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 )
 
+// nilai ssl_mode yang dikenal PostgreSQL dan dipakai juga untuk MySQL
 var validSSLModes = map[string]bool{
 	"disable":     true,
 	"allow":       true,

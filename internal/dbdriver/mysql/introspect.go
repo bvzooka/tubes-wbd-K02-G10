@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// query berikut membaca information_schema MySQL: tabel, kolom, constraint, key, aturan foreign key, check, dan index
 const tablesSQL = `
 SELECT TABLE_NAME, TABLE_TYPE, TABLE_ROWS
 FROM information_schema.TABLES
@@ -55,14 +56,17 @@ SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME, SUB_PART, 
 FROM information_schema.STATISTICS
 WHERE TABLE_SCHEMA = ?`
 
+// serverInfo mencatat jenis server dan fitur yang tersedia, karena MySQL dan MariaDB berbeda versi dan kolom
 type serverInfo struct {
 	mariadb       bool
 	hasChecks     bool
 	hasExpression bool
 }
 
+// conKey menunjuk satu constraint lewat nama tabel dan nama constraint-nya
 type conKey struct{ table, name string }
 
+// Introspect membaca schema database: tabel dan view, lalu kolom, constraint, dan index tiap tabel, hasilnya diurutkan deterministik
 func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 	out := &domain.Schema{}
 	spec := txSpec{readOnly: true, iso: sql.LevelRepeatableRead, timeout: 20 * time.Second}
@@ -73,6 +77,7 @@ func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 		}
 		schema := d.dbName
 
+		// pos mencatat urutan tiap tabel di out.Tables, bacaan berikutnya memakainya untuk menempelkan hasil
 		pos := map[string]int{}
 		rows, err := tx.QueryContext(ctx, tablesSQL, schema)
 		if err != nil {
@@ -113,6 +118,7 @@ func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 	return out, nil
 }
 
+// closeRows menutup rows dan mengembalikan error dari iterasi kalau ada, kalau tidak error dari penutupan
 func closeRows(rows *sql.Rows) error {
 	cerr := rows.Close()
 	if err := rows.Err(); err != nil {
@@ -121,6 +127,7 @@ func closeRows(rows *sql.Rows) error {
 	return cerr
 }
 
+// detectServer mengecek jenis server dan apakah tabel CHECK_CONSTRAINTS dan kolom EXPRESSION ada, tidak semua versi punya
 func detectServer(ctx context.Context, tx *sql.Tx) (serverInfo, error) {
 	var info serverInfo
 	var version string
@@ -150,6 +157,7 @@ func isMariaDB(version string) bool {
 	return strings.Contains(strings.ToLower(version), "mariadb")
 }
 
+// readColumns menempelkan kolom ke tabelnya
 func readColumns(ctx context.Context, tx *sql.Tx, schema string, info serverInfo, out *domain.Schema, pos map[string]int) error {
 	rows, err := tx.QueryContext(ctx, columnsSQL, schema)
 	if err != nil {
@@ -172,6 +180,7 @@ func readColumns(ctx context.Context, tx *sql.Tx, schema string, info serverInfo
 	return closeRows(rows)
 }
 
+// columnDefault menyamakan format default kolom: MariaDB sudah memberi tanda kutip sendiri, MySQL harus ditambahkan
 func columnDefault(def sql.NullString, dataType, extra string, mariadb bool) *string {
 	lextra := strings.ToLower(extra)
 	if !def.Valid {
@@ -194,6 +203,7 @@ func columnDefault(def sql.NullString, dataType, extra string, mariadb bool) *st
 	return &v
 }
 
+// isNowDefault true untuk default CURRENT_TIMESTAMP yang tidak boleh diberi kutip
 func isNowDefault(v, dataType string) bool {
 	switch strings.ToLower(dataType) {
 	case "timestamp", "datetime":
@@ -202,6 +212,7 @@ func isNowDefault(v, dataType string) bool {
 	return false
 }
 
+// isQuotedType true untuk tipe yang nilai defaultnya ditulis dengan kutip
 func isQuotedType(dataType string) bool {
 	switch strings.ToLower(dataType) {
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext",
@@ -212,6 +223,7 @@ func isQuotedType(dataType string) bool {
 	return false
 }
 
+// keyUsage adalah kolom yang dipakai satu constraint, dan tabel rujukannya untuk foreign key
 type keyUsage struct {
 	cols      []string
 	refSchema string
@@ -219,6 +231,7 @@ type keyUsage struct {
 	refCols   []string
 }
 
+// readConstraints menggabungkan beberapa sumber karena MySQL memecahnya: daftar constraint, kolomnya, aturan foreign key, dan ekspresi check
 func readConstraints(ctx context.Context, tx *sql.Tx, schema string, info serverInfo, out *domain.Schema, pos map[string]int) error {
 	extra := ""
 	if info.hasChecks {
@@ -245,6 +258,7 @@ func readConstraints(ctx context.Context, tx *sql.Tx, schema string, info server
 		return err
 	}
 
+	// kolom tiap constraint, diurutkan menurut posisinya di key
 	usage := map[conKey]*keyUsage{}
 	type part struct {
 		ord             int
@@ -283,6 +297,7 @@ func readConstraints(ctx context.Context, tx *sql.Tx, schema string, info server
 		usage[k] = u
 	}
 
+	// aturan ON UPDATE dan ON DELETE khusus foreign key
 	type rule struct{ upd, del string }
 	rules := map[conKey]rule{}
 	rows, err = tx.QueryContext(ctx, referentialSQL, schema)
@@ -302,6 +317,7 @@ func readConstraints(ctx context.Context, tx *sql.Tx, schema string, info server
 		return err
 	}
 
+	// ekspresi check hanya ada di server yang mendukungnya
 	checks := map[conKey]string{}
 	if info.hasChecks {
 		q := checksMySQLSQL
@@ -326,6 +342,7 @@ func readConstraints(ctx context.Context, tx *sql.Tx, schema string, info server
 		}
 	}
 
+	// terakhir, gabungkan semuanya jadi domain.Constraint per tabel
 	for _, dc := range decls {
 		i, ok := pos[dc.key.table]
 		if !ok {
@@ -376,12 +393,14 @@ func checkExpr(clause string) string {
 	return "CHECK " + clause
 }
 
+// indexPart adalah satu kolom atau ekspresi dalam sebuah index, seq menunjukkan urutannya
 type indexPart struct {
 	seq    int
 	text   string
 	quoted string
 }
 
+// readIndexes menggabungkan baris per kolom dari STATISTICS menjadi satu index utuh
 func readIndexes(ctx context.Context, tx *sql.Tx, schema string, info serverInfo, out *domain.Schema, pos map[string]int) error {
 	expr := "NULL"
 	if info.hasExpression {
@@ -442,6 +461,7 @@ func readIndexes(ctx context.Context, tx *sql.Tx, schema string, info serverInfo
 	return nil
 }
 
+// newIndexPart menyusun satu bagian index: nama kolom atau ekspresi, panjang prefix, dan arah urutnya
 func newIndexPart(seq int, col sql.NullString, sub sql.NullInt64, collation, expression sql.NullString) indexPart {
 	p := indexPart{seq: seq}
 	switch {
@@ -463,6 +483,7 @@ func newIndexPart(seq int, col sql.NullString, sub sql.NullInt64, collation, exp
 	return p
 }
 
+// indexDefinition menyusun pernyataan pembuat index, primary key diwakili ALTER TABLE karena tidak bisa lewat CREATE INDEX
 func indexDefinition(schema, table string, ix domain.Index, quotedParts []string) string {
 	target := quoteIdent(schema) + "." + quoteIdent(table)
 	cols := strings.Join(quotedParts, ", ")
@@ -485,6 +506,7 @@ func indexDefinition(schema, table string, ix domain.Index, quotedParts []string
 	return def
 }
 
+// sortSchema mengurutkan hasil karena map di Go tidak berurutan, jadi output sama persis di tiap pembacaan
 func sortSchema(s *domain.Schema) {
 	sort.SliceStable(s.Tables, func(i, j int) bool {
 		if s.Tables[i].Schema != s.Tables[j].Schema {

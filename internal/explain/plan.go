@@ -42,6 +42,7 @@ type Plan struct {
 	PrettyJSON      string
 }
 
+// rawExplain dan rawNode mencerminkan JSON EXPLAIN PostgreSQL, tag json harus sama dengan kuncinya
 type rawExplain struct {
 	Plan          rawNode  `json:"Plan"`
 	PlanningTime  *float64 `json:"Planning Time"`
@@ -100,6 +101,7 @@ func ParsePostgresPlan(raw string) (*Plan, error) {
 	return p, nil
 }
 
+// flatten meratakan pohon plan jadi daftar berurutan dengan kedalaman, supaya mudah ditampilkan di tabel
 func flatten(out *[]PlanNode, n rawNode, depth int) {
 	node := PlanNode{
 		Depth:        depth,
@@ -136,6 +138,7 @@ func flatten(out *[]PlanNode, n rawNode, depth int) {
 	}
 }
 
+// prefix membuat garis cabang teks yang menunjukkan kedalaman node
 func prefix(depth int) string {
 	if depth == 0 {
 		return ""
@@ -143,6 +146,7 @@ func prefix(depth int) string {
 	return strings.Repeat("   ", depth-1) + "└─ "
 }
 
+// firstNonEmpty mengambil kondisi pertama yang terisi karena nama kondisinya beda tiap jenis node
 func firstNonEmpty(vals ...string) string {
 	for _, v := range vals {
 		if v != "" {
@@ -156,6 +160,7 @@ func (p *Plan) PlanningTimeText() string { return msText(p.PlanningTimeMs) }
 
 func (p *Plan) ExecutionTimeText() string { return msText(p.ExecutionTimeMs) }
 
+// msText memformat milidetik dengan 3 desimal, kosong kalau tidak ada (bukan ANALYZE)
 func msText(f *float64) string {
 	if f == nil {
 		return ""
@@ -163,6 +168,7 @@ func msText(f *float64) string {
 	return strconv.FormatFloat(*f, 'f', 3, 64)
 }
 
+// deref mengubah pointer jadi nilainya, nil jadi 0
 func deref(f *float64) float64 {
 	if f == nil {
 		return 0

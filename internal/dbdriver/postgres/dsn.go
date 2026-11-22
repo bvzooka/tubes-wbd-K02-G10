@@ -14,6 +14,7 @@ func BuildURL(c domain.Connection, password string) string {
 	q.Set("application_name", "dbplatform")
 	q.Set("connect_timeout", "5")
 
+	// url.URL meng-escape username dan password otomatis, jadi karakter khusus di password tidak merusak URL
 	u := url.URL{
 		Scheme:   "postgres",
 		User:     url.UserPassword(c.Username, password),

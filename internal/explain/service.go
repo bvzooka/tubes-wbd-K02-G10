@@ -12,15 +12,18 @@ import (
 	"time"
 )
 
+// batas ukuran SQL dan waktu tunggu satu EXPLAIN
 const (
 	maxSQLBytes    = 256 << 10
 	explainTimeout = 15 * time.Second
 )
 
+// hanya statement DML yang boleh di-EXPLAIN, DDL ditolak
 var allowedKeywords = map[string]bool{
 	"select": true, "insert": true, "update": true, "delete": true, "with": true, "values": true,
 }
 
+// InputError adalah kesalahan dari input user yang aman ditampilkan apa adanya, Kind menentukan jenisnya
 type InputError struct {
 	Kind    error
 	Message string
@@ -38,11 +41,13 @@ type Result struct {
 	RawText string
 }
 
+// Service menjalankan EXPLAIN setelah memeriksa akses dan SQL-nya
 type Service struct {
 	authz   contract.Authorizer
 	drivers contract.DriverProvider
 }
 
+// NewService dibuat dengan authorizer dan penyedia driver database target
 func NewService(authz contract.Authorizer, drivers contract.DriverProvider) *Service {
 	return &Service{authz: authz, drivers: drivers}
 }
@@ -78,6 +83,7 @@ func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql s
 		if qerr != nil {
 			return qerr
 		}
+		// selalu di-rollback supaya ANALYZE tidak meninggalkan perubahan data
 		return dbdriver.ErrForceRollback
 	})
 	if err != nil {
@@ -89,6 +95,7 @@ func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql s
 	}
 
 	text := resultText(rs)
+	// Postgres menghasilkan JSON yang diparse jadi tabel plan, dialek lain ditampilkan sebagai teks mentah
 	if drv.Dialect() == domain.DBMSPostgres {
 		if plan, perr := ParsePostgresPlan(text); perr == nil {
 			res.Plan = plan
@@ -99,6 +106,7 @@ func (s *Service) Run(ctx context.Context, p domain.Principal, dbID int64, sql s
 	return res, nil
 }
 
+// validateSQL memastikan SQL tidak kosong, tidak terlalu panjang, hanya satu statement, dan hanya DML
 func validateSQL(sql string) (string, error) {
 	if strings.TrimSpace(sql) == "" {
 		return "", &InputError{Kind: domain.ErrValidation, Message: "SQL tidak boleh kosong."}
@@ -119,6 +127,7 @@ func validateSQL(sql string) (string, error) {
 	return shape.Body, nil
 }
 
+// explainStatement menyusun perintah EXPLAIN sesuai dialek karena sintaks tiap DBMS berbeda
 func explainStatement(dialect domain.DBMS, body string, analyze bool) string {
 	switch dialect {
 	case domain.DBMSMySQL:
@@ -157,8 +166,10 @@ func resultText(rs *domain.ResultSet) string {
 	return strings.Join(lines, "\n")
 }
 
+// batas panjang pesan error dari database yang ditampilkan ke user
 const maxErrorChars = 1000
 
+// truncate memotong berdasarkan jumlah karakter, bukan byte, supaya tidak memutus karakter di tengah
 func truncate(s string, max int) string {
 	r := []rune(s)
 	if len(r) <= max {

@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// connError membawa pesan aman untuk ditampilkan, penyebab aslinya disimpan di cause dan tidak ikut tampil
 type connError struct {
 	msg   string
 	cause error
@@ -22,6 +23,7 @@ func (e *connError) Cause() error         { return e.cause }
 func (e *connError) Unwrap() error        { return e.cause }
 func (e *connError) Is(target error) bool { return target == domain.ErrConnectionFailed }
 
+// kode error server MySQL yang dikenali
 const (
 	erAccessDenied     = 1045
 	erDBAccessDenied   = 1044
@@ -33,6 +35,7 @@ const (
 	erNoSuchTable      = 1146
 )
 
+// ClassifyError mengubah error koneksi MySQL jadi pesan yang aman ditampilkan, error lain dibiarkan apa adanya
 func ClassifyError(err error) error {
 	if err == nil {
 		return nil

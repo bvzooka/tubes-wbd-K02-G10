@@ -20,6 +20,7 @@ type Store interface {
 // membangun driver untuk satu koneksi.
 type DriverFactory func(ctx context.Context, conn domain.Connection, password string) (dbdriver.Driver, error)
 
+// cacheEntry menyimpan driver bersama updated_at koneksinya untuk mendeteksi perubahan
 type cacheEntry struct {
 	drv       dbdriver.Driver
 	updatedAt time.Time
@@ -34,11 +35,12 @@ type Provider struct {
 	cache map[int64]cacheEntry
 }
 
+// NewProvider dibuat dengan sumber data koneksi dan pembuat driver
 func NewProvider(store Store, factory DriverFactory) *Provider {
 	return &Provider{store: store, factory: factory, cache: map[int64]cacheEntry{}}
 }
 
-// mengembalikan driver untuk koneksi id, driver di-cache dan dibangun ulang
+// mengembalikan driver untuk koneksi id, driver di-cache dan dibangun ulang kalau koneksinya berubah
 func (p *Provider) Get(ctx context.Context, id int64) (dbdriver.Driver, error) {
 	updatedAt, active, err := p.store.Stamp(ctx, id)
 	if err != nil {
@@ -79,6 +81,7 @@ func (p *Provider) Close() {
 	}
 }
 
+// evict menutup dan membuang driver dari cache, evictLocked dipakai kalau mu sudah dipegang
 func (p *Provider) evict(id int64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
