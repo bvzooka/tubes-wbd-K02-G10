@@ -10,12 +10,16 @@ import (
 	"time"
 )
 
+// membatasi waktu pembacaan satu halaman data
+const tableDataTimeout = 10 * time.Second
+
 // cek tabel ada, di MySQL schema sama dengan nama database
 const tableExistsSQL = `
 SELECT TABLE_NAME
 FROM information_schema.TABLES
 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND TABLE_TYPE IN ('BASE TABLE', 'VIEW', 'SYSTEM VERSIONED')`
 
+// primaryKeySQL mengambil kolom primary key berurutan sesuai posisinya di key
 const primaryKeySQL = `
 SELECT COLUMN_NAME
 FROM information_schema.STATISTICS
@@ -30,7 +34,7 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 		return nil, domain.ErrNotFound
 	}
 
-	spec := txSpec{readOnly: true, timeout: 10 * time.Second}
+	spec := txSpec{readOnly: true, timeout: tableDataTimeout}
 	err := d.runTx(ctx, d.ro, spec, func(ctx context.Context, tx *sql.Tx) error {
 		var canonical string
 		err := tx.QueryRowContext(ctx, tableExistsSQL, ref.Schema, ref.Table).Scan(&canonical)

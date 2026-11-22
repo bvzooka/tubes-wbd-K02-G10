@@ -139,6 +139,8 @@ func (d *Driver) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(tx
 // pgTx membungkus transaction pgx supaya memenuhi dbdriver.Tx
 type pgTx struct{ tx pgx.Tx }
 
+var _ dbdriver.Tx = pgTx{}
+
 // Exec memakai simple protocol (tanpa argumen) sehingga banyak statement boleh
 // dalam satu string. Mengembalikan baris terdampak dari perintah terakhir.
 func (t pgTx) Exec(ctx context.Context, sql string) (int64, error) {

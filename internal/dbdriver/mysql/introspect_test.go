@@ -113,7 +113,7 @@ func TestIsMariaDB(t *testing.T) {
 	}
 }
 
-func TestSortSchemaIsDeterministic(t *testing.T) {
+func TestSortSchema_Deterministic(t *testing.T) {
 	mk := func(order []int) *domain.Schema {
 		tables := []domain.Table{
 			{Schema: "s", Name: "Zebra"}, {Schema: "s", Name: "apple"}, {Schema: "s", Name: "Apple"}, {Schema: "a", Name: "z"},

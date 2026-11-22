@@ -73,6 +73,7 @@ func quoteIdent(s string) string {
 	return "`" + strings.ReplaceAll(s, "`", "``") + "`"
 }
 
+// memberi quote pada tiap nama lalu menggabungkannya dengan koma
 func quoteIdents(ss []string) string {
 	out := make([]string, len(ss))
 	for i, s := range ss {

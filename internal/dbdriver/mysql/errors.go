@@ -5,11 +5,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql/driver"
-	"dbplatform/internal/domain"
 	"errors"
-	gomysql "github.com/go-sql-driver/mysql"
 	"net"
 	"strings"
+
+	gomysql "github.com/go-sql-driver/mysql"
+
+	"dbplatform/internal/domain"
 )
 
 // connError membawa pesan aman untuk ditampilkan, penyebab aslinya disimpan di cause dan tidak ikut tampil

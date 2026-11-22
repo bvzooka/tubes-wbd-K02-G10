@@ -1,9 +1,17 @@
 package connmgr
 
 import (
-	"dbplatform/internal/domain"
 	"strings"
 	"unicode/utf8"
+
+	"dbplatform/internal/domain"
+)
+
+// batas panjang nama koneksi dan rentang nomor port yang sah
+const (
+	maxNameLen = 64
+	minPort    = 1
+	maxPort    = 65535
 )
 
 // nilai ssl_mode yang dikenal PostgreSQL dan dipakai juga untuk MySQL

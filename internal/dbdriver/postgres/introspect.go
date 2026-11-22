@@ -2,18 +2,22 @@ package postgres
 
 import (
 	"context"
-	"dbplatform/internal/domain"
-	"github.com/jackc/pgx/v5"
+	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"dbplatform/internal/domain"
 )
 
-// membatasi pg_class dan pg_namespace ke objek pengguna
+// userRel membatasi pg_class dan pg_namespace ke objek pengguna, tanpa schema sistem dan temporary
 const userRel = `c.relkind IN ('r', 'p', 'v', 'm')
 	AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
 	AND n.nspname NOT LIKE 'pg\_temp\_%'
 	AND n.nspname NOT LIKE 'pg\_toast\_temp\_%'`
 
-// empat query berikut membaca katalog sistem PostgreSQL: tabel, kolom, constraint, dan index
+// empat query berikut membaca katalog sistem PostgreSQL: tabel, kolom, constraint, dan index.
+// Semuanya diurutkan di SQL supaya hasil Introspect deterministik.
 const tablesSQL = `
 SELECT n.nspname, c.relname, c.relkind::text, c.reltuples::bigint
 FROM pg_class c
@@ -66,120 +70,44 @@ JOIN pg_am am ON am.oid = ic.relam
 WHERE ` + userRel + `
 ORDER BY n.nspname, c.relname, ic.relname`
 
+// kode relkind di pg_class dan contype di pg_constraint yang dikenali
+const (
+	relkindView       = "v"
+	relkindMatView    = "m"
+	contypePrimaryKey = "p"
+	contypeForeignKey = "f"
+	contypeUnique     = "u"
+	contypeCheck      = "c"
+)
+
+// introspectTimeout membatasi waktu seluruh pembacaan katalog
+const introspectTimeout = 20 * time.Second
+
 // relKey menunjuk satu tabel lewat schema dan nama, dipakai untuk menempelkan kolom dan constraint ke tabelnya
 type relKey struct{ schema, name string }
 
-// baca schema database dan tabel/view, kolom, constraint, dan index
-// hasil deterministik tabel menurut (schema, nama), kolom menurut posisi
+// Introspect membaca schema database: tabel dan view, lalu kolom, constraint, dan index tiap tabel.
+// Hasilnya deterministik: tabel menurut (schema, nama), kolom menurut posisi.
 func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 	out := &domain.Schema{}
 	// RepeatableRead supaya keempat query melihat kondisi database yang sama walau ada perubahan di tengah
-	spec := txSpec{readOnly: true, iso: pgx.RepeatableRead, timeout: 20 * time.Second}
+	spec := txSpec{readOnly: true, iso: pgx.RepeatableRead, timeout: introspectTimeout}
 	err := d.runTx(ctx, spec, func(tx pgx.Tx) error {
-		// pos mencatat urutan tiap tabel di out.Tables, query berikutnya memakainya untuk menempelkan hasil
-		pos := map[relKey]int{}
-		rows, err := tx.Query(ctx, tablesSQL)
+		// pos mencatat urutan tiap tabel di out.Tables, bacaan berikutnya memakainya untuk menempelkan hasil
+		pos, err := readTables(ctx, tx, out)
 		if err != nil {
-			return err
+			return fmt.Errorf("read tables: %w", err)
 		}
-		for rows.Next() {
-			var t domain.Table
-			var kind string
-			if err := rows.Scan(&t.Schema, &t.Name, &kind, &t.EstimatedRows); err != nil {
-				rows.Close()
-				return err
-			}
-			t.Kind = domain.TableKindTable
-			if kind == "v" || kind == "m" {
-				t.Kind = domain.TableKindView
-			}
-			if kind == "v" || t.EstimatedRows < 0 {
-				t.EstimatedRows = -1 // ga diketahui
-			}
-			pos[relKey{t.Schema, t.Name}] = len(out.Tables)
-			out.Tables = append(out.Tables, t)
+		if err := readColumns(ctx, tx, out, pos); err != nil {
+			return fmt.Errorf("read columns: %w", err)
 		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
+		if err := readConstraints(ctx, tx, out, pos); err != nil {
+			return fmt.Errorf("read constraints: %w", err)
 		}
-
-		// kolom tiap tabel
-		rows, err = tx.Query(ctx, columnsSQL)
-		if err != nil {
-			return err
+		if err := readIndexes(ctx, tx, out, pos); err != nil {
+			return fmt.Errorf("read indexes: %w", err)
 		}
-		for rows.Next() {
-			var s, tn string
-			var c domain.Column
-			if err := rows.Scan(&s, &tn, &c.Name, &c.Position, &c.DataType, &c.Nullable, &c.Default); err != nil {
-				rows.Close()
-				return err
-			}
-			if i, ok := pos[relKey{s, tn}]; ok {
-				out.Tables[i].Columns = append(out.Tables[i].Columns, c)
-			}
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
-		}
-
-		// constraint tiap tabel, kolom rujukan hanya diisi untuk foreign key
-		rows, err = tx.Query(ctx, constraintsSQL)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var s, tn, ctype, upd, del string
-			var c domain.Constraint
-			if err := rows.Scan(&s, &tn, &c.Name, &ctype, &c.Columns,
-				&c.RefSchema, &c.RefTable, &c.RefColumns, &upd, &del, &c.CheckExpr); err != nil {
-				rows.Close()
-				return err
-			}
-			switch ctype {
-			case "p":
-				c.Type = domain.ConstraintPrimaryKey
-			case "f":
-				c.Type = domain.ConstraintForeignKey
-				c.OnUpdate, c.OnDelete = fkAction(upd), fkAction(del)
-			case "u":
-				c.Type = domain.ConstraintUnique
-			case "c":
-				c.Type = domain.ConstraintCheck
-			}
-			if c.Type != domain.ConstraintForeignKey {
-				c.RefSchema, c.RefTable, c.RefColumns = "", "", nil
-			}
-			if i, ok := pos[relKey{s, tn}]; ok {
-				out.Tables[i].Constraints = append(out.Tables[i].Constraints, c)
-			}
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
-		}
-
-		// index tiap tabel
-		rows, err = tx.Query(ctx, indexesSQL)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var s, tn string
-			var ix domain.Index
-			if err := rows.Scan(&s, &tn, &ix.Name, &ix.Unique, &ix.Primary, &ix.Method,
-				&ix.Definition, &ix.Columns); err != nil {
-				rows.Close()
-				return err
-			}
-			if i, ok := pos[relKey{s, tn}]; ok {
-				out.Tables[i].Indexes = append(out.Tables[i].Indexes, ix)
-			}
-		}
-		rows.Close()
-		return rows.Err()
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -187,7 +115,113 @@ func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 	return out, nil
 }
 
-// mengubah kode aksi FK pg_constraint jd teks SQL
+// readTables mengisi out.Tables dan mengembalikan peta posisi tiap tabel di dalamnya
+func readTables(ctx context.Context, tx pgx.Tx, out *domain.Schema) (map[relKey]int, error) {
+	pos := map[relKey]int{}
+	rows, err := tx.Query(ctx, tablesSQL)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var t domain.Table
+		var kind string
+		if err := rows.Scan(&t.Schema, &t.Name, &kind, &t.EstimatedRows); err != nil {
+			return nil, err
+		}
+		t.Kind = domain.TableKindTable
+		if kind == relkindView || kind == relkindMatView {
+			t.Kind = domain.TableKindView
+		}
+		if kind == relkindView || t.EstimatedRows < 0 {
+			t.EstimatedRows = -1 // tidak diketahui
+		}
+		pos[relKey{t.Schema, t.Name}] = len(out.Tables)
+		out.Tables = append(out.Tables, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return pos, nil
+}
+
+// readColumns menempelkan kolom ke tabelnya
+func readColumns(ctx context.Context, tx pgx.Tx, out *domain.Schema, pos map[relKey]int) error {
+	rows, err := tx.Query(ctx, columnsSQL)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s, tn string
+		var c domain.Column
+		if err := rows.Scan(&s, &tn, &c.Name, &c.Position, &c.DataType, &c.Nullable, &c.Default); err != nil {
+			return err
+		}
+		if i, ok := pos[relKey{s, tn}]; ok {
+			out.Tables[i].Columns = append(out.Tables[i].Columns, c)
+		}
+	}
+	return rows.Err()
+}
+
+// readConstraints menempelkan constraint ke tabelnya, kolom rujukan hanya diisi untuk foreign key
+func readConstraints(ctx context.Context, tx pgx.Tx, out *domain.Schema, pos map[relKey]int) error {
+	rows, err := tx.Query(ctx, constraintsSQL)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s, tn, ctype, upd, del string
+		var c domain.Constraint
+		if err := rows.Scan(&s, &tn, &c.Name, &ctype, &c.Columns,
+			&c.RefSchema, &c.RefTable, &c.RefColumns, &upd, &del, &c.CheckExpr); err != nil {
+			return err
+		}
+		switch ctype {
+		case contypePrimaryKey:
+			c.Type = domain.ConstraintPrimaryKey
+		case contypeForeignKey:
+			c.Type = domain.ConstraintForeignKey
+			c.OnUpdate, c.OnDelete = fkAction(upd), fkAction(del)
+		case contypeUnique:
+			c.Type = domain.ConstraintUnique
+		case contypeCheck:
+			c.Type = domain.ConstraintCheck
+		}
+		if c.Type != domain.ConstraintForeignKey {
+			c.RefSchema, c.RefTable, c.RefColumns = "", "", nil
+		}
+		if i, ok := pos[relKey{s, tn}]; ok {
+			out.Tables[i].Constraints = append(out.Tables[i].Constraints, c)
+		}
+	}
+	return rows.Err()
+}
+
+// readIndexes menempelkan index ke tabelnya
+func readIndexes(ctx context.Context, tx pgx.Tx, out *domain.Schema, pos map[relKey]int) error {
+	rows, err := tx.Query(ctx, indexesSQL)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s, tn string
+		var ix domain.Index
+		if err := rows.Scan(&s, &tn, &ix.Name, &ix.Unique, &ix.Primary, &ix.Method,
+			&ix.Definition, &ix.Columns); err != nil {
+			return err
+		}
+		if i, ok := pos[relKey{s, tn}]; ok {
+			out.Tables[i].Indexes = append(out.Tables[i].Indexes, ix)
+		}
+	}
+	return rows.Err()
+}
+
+// fkAction mengubah kode aksi foreign key di pg_constraint menjadi teks SQL
 func fkAction(code string) string {
 	switch code {
 	case "a":
