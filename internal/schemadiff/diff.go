@@ -189,133 +189,166 @@ type pendingConstraint struct {
 	c     domain.Constraint
 }
 
+// diffBuilder mengumpulkan perubahan dalam daftar terpisah per jenis, supaya urutan akhirnya bisa diatur di ordered
+type diffBuilder struct {
+	cur, des map[tableKey]domain.Table
+
+	createSchemas, createTables, addColumns, alterColumns                                                      []Change
+	dropForeignKeys, dropOtherConstraints, addConstraints, dropIndexes, createIndexes, dropColumns, dropTables []Change
+	pendingAdds                                                                                                []pendingConstraint
+}
+
 // current = tujuan, desired = sumber
 func Diff(current, desired *domain.Schema) []Change {
-	cur, des := tablesOf(current), tablesOf(desired)
-	curSchemas := relationSchemas(current)
-	curKeys, desKeys := sortedKeys(cur), sortedKeys(des)
+	b := &diffBuilder{cur: tablesOf(current), des: tablesOf(desired)}
+	desKeys := sortedKeys(b.des)
 
-	// tiap jenis perubahan dikumpulkan di daftar sendiri lalu digabung berurutan di akhir
-	var createSchemas, createTables, addColumns, alterColumns []Change
-	var dropForeignKeys, dropOtherConstraints, addConstraints, dropIndexes, createIndexes, dropColumns, dropTables []Change
-	var pendingAdds []pendingConstraint
-
-	// schema baru dibuat sekali walau dipakai banyak tabel
-	seenSchemas := map[string]bool{}
+	b.collectNewSchemas(relationSchemas(current), desKeys)
 	for _, k := range desKeys {
-		if k.schema != defaultSchema && !curSchemas[k.schema] && !seenSchemas[k.schema] {
-			seenSchemas[k.schema] = true
-			createSchemas = append(createSchemas, Change{Kind: KindCreateSchema, Object: k.schema, SQL: createSchemaSQL(k.schema)})
+		if ct, exists := b.cur[k]; exists {
+			b.diffExistingTable(k, ct, b.des[k])
+		} else {
+			b.addNewTable(k, b.des[k])
 		}
 	}
+	b.collectDroppedTables(sortedKeys(b.cur))
+	b.collectConstraintAdds()
+	return b.ordered()
+}
 
+// collectNewSchemas membuat schema yang dipakai sumber tapi belum ada di tujuan, sekali saja walau dipakai banyak tabel
+func (b *diffBuilder) collectNewSchemas(curSchemas map[string]bool, desKeys []tableKey) {
+	seen := map[string]bool{}
 	for _, k := range desKeys {
-		dt := des[k]
-		ct, exists := cur[k]
-		object := k.schema + "." + k.name
+		if k.schema != defaultSchema && !curSchemas[k.schema] && !seen[k.schema] {
+			seen[k.schema] = true
+			b.createSchemas = append(b.createSchemas, Change{Kind: KindCreateSchema, Object: k.schema, SQL: createSchemaSQL(k.schema)})
+		}
+	}
+}
 
-		// tabel belum ada di tujuan: buat beserta constraint dan index-nya
-		if !exists {
-			createTables = append(createTables, Change{Kind: KindCreateTable, Object: object, SQL: createTableSQL(dt)})
-			for _, c := range sortedConstraints(dt) {
-				pendingAdds = append(pendingAdds, pendingConstraint{dt, c})
-			}
-			idx := standaloneIndexes(dt)
-			for _, ix := range sortedIndexes(dt) {
-				if _, ok := idx[ix.Name]; ok {
-					createIndexes = append(createIndexes, Change{Kind: KindCreateIndex, Object: object + "." + ix.Name, SQL: createIndexSQL(ix)})
-				}
-			}
+// addNewTable membuat tabel yang belum ada di tujuan, constraint ditahan dulu dan index langsung dibuat
+func (b *diffBuilder) addNewTable(k tableKey, dt domain.Table) {
+	object := k.schema + "." + k.name
+	b.createTables = append(b.createTables, Change{Kind: KindCreateTable, Object: object, SQL: createTableSQL(dt)})
+	for _, c := range sortedConstraints(dt) {
+		b.pendingAdds = append(b.pendingAdds, pendingConstraint{dt, c})
+	}
+	idx := standaloneIndexes(dt)
+	for _, ix := range sortedIndexes(dt) {
+		if _, ok := idx[ix.Name]; ok {
+			b.createIndexes = append(b.createIndexes, Change{Kind: KindCreateIndex, Object: object + "." + ix.Name, SQL: createIndexSQL(ix)})
+		}
+	}
+}
+
+// diffExistingTable membandingkan tabel yang ada di keduanya: kolom, constraint, lalu index
+func (b *diffBuilder) diffExistingTable(k tableKey, ct, dt domain.Table) {
+	object := k.schema + "." + k.name
+	b.diffColumns(object, ct, dt)
+	b.diffConstraints(object, ct, dt)
+	b.diffIndexes(object, ct, dt)
+}
+
+// diffColumns menambah kolom baru, mengubah tipe, null, dan default yang berbeda, dan menghapus kolom yang tidak ada di sumber
+func (b *diffBuilder) diffColumns(object string, ct, dt domain.Table) {
+	curCols := columnIndex(ct)
+	desCols := columnIndex(dt)
+	for _, dc := range sortedColumns(dt) {
+		cc, ok := curCols[dc.Name]
+		colObject := object + "." + dc.Name
+		if !ok {
+			b.addColumns = append(b.addColumns, Change{Kind: KindAddColumn, Object: colObject, SQL: addColumnSQL(dt, dc)})
 			continue
 		}
+		if cc.DataType != dc.DataType {
+			b.alterColumns = append(b.alterColumns, Change{Kind: KindAlterColumnType, Object: colObject, SQL: alterTypeSQL(dt, dc)})
+		}
+		if cc.Nullable != dc.Nullable {
+			b.alterColumns = append(b.alterColumns, Change{Kind: KindAlterColumnNull, Object: colObject, SQL: alterNullSQL(dt, dc)})
+		}
+		if !sameDefault(cc.Default, dc.Default) {
+			b.alterColumns = append(b.alterColumns, Change{Kind: KindAlterColumnDefault, Object: colObject, SQL: alterDefaultSQL(dt, dc)})
+		}
+	}
+	for _, cc := range sortedColumns(ct) {
+		if _, ok := desCols[cc.Name]; !ok {
+			// Desctructive: true --> ngapus kolom atau tabel bisa ngilangin data
+			b.dropColumns = append(b.dropColumns, Change{Kind: KindDropColumn, Object: object + "." + cc.Name, SQL: dropColumnSQL(ct, cc), Destructive: true})
+		}
+	}
+}
 
-		// tabel sudah ada di keduanya: bandingkan kolom satu per satu
-		curCols := columnIndex(ct)
-		desCols := columnIndex(dt)
-		for _, dc := range sortedColumns(dt) {
-			cc, ok := curCols[dc.Name]
-			colObject := object + "." + dc.Name
-			if !ok {
-				addColumns = append(addColumns, Change{Kind: KindAddColumn, Object: colObject, SQL: addColumnSQL(dt, dc)})
-				continue
-			}
-			if cc.DataType != dc.DataType {
-				alterColumns = append(alterColumns, Change{Kind: KindAlterColumnType, Object: colObject, SQL: alterTypeSQL(dt, dc)})
-			}
-			if cc.Nullable != dc.Nullable {
-				alterColumns = append(alterColumns, Change{Kind: KindAlterColumnNull, Object: colObject, SQL: alterNullSQL(dt, dc)})
-			}
-			if !sameDefault(cc.Default, dc.Default) {
-				alterColumns = append(alterColumns, Change{Kind: KindAlterColumnDefault, Object: colObject, SQL: alterDefaultSQL(dt, dc)})
-			}
-		}
-		for _, cc := range sortedColumns(ct) {
-			if _, ok := desCols[cc.Name]; !ok {
-				// Desctructive: true --> ngapus kolom atau tabel bisa ngilangin data
-				dropColumns = append(dropColumns, Change{Kind: KindDropColumn, Object: object + "." + cc.Name, SQL: dropColumnSQL(ct, cc), Destructive: true})
-			}
-		}
-
-		// constraint yang beda dihapus dulu lalu ditambah lagi, foreign key dipisah karena harus lepas lebih awal
-		curCons, desCons := constraintIndex(ct), constraintIndex(dt)
-		for _, c := range sortedConstraints(ct) {
-			if d, ok := desCons[c.Name]; !ok || !sameConstraint(c, d) {
-				drop := Change{Kind: KindDropConstraint, Object: object + "." + c.Name, SQL: dropConstraintSQL(ct, c)}
-				if c.Type == domain.ConstraintForeignKey {
-					dropForeignKeys = append(dropForeignKeys, drop)
-				} else {
-					dropOtherConstraints = append(dropOtherConstraints, drop)
-				}
-			}
-		}
-		for _, c := range sortedConstraints(dt) {
-			if cc, ok := curCons[c.Name]; !ok || !sameConstraint(cc, c) {
-				pendingAdds = append(pendingAdds, pendingConstraint{dt, c})
-			}
-		}
-
-		// index yang berubah definisinya dihapus lalu dibuat ulang
-		curIdx, desIdx := standaloneIndexes(ct), standaloneIndexes(dt)
-		for _, ix := range sortedIndexes(ct) {
-			if _, tracked := curIdx[ix.Name]; !tracked {
-				continue
-			}
-			if d, ok := desIdx[ix.Name]; !ok || strings.TrimSpace(d.Definition) != strings.TrimSpace(ix.Definition) {
-				dropIndexes = append(dropIndexes, Change{Kind: KindDropIndex, Object: object + "." + ix.Name, SQL: dropIndexSQL(ct, ix)})
-			}
-		}
-		for _, ix := range sortedIndexes(dt) {
-			if _, tracked := desIdx[ix.Name]; !tracked {
-				continue
-			}
-			if c, ok := curIdx[ix.Name]; !ok || strings.TrimSpace(c.Definition) != strings.TrimSpace(ix.Definition) {
-				createIndexes = append(createIndexes, Change{Kind: KindCreateIndex, Object: object + "." + ix.Name, SQL: createIndexSQL(ix)})
+// diffConstraints menghapus constraint yang berbeda lalu menahannya untuk ditambah lagi, foreign key dipisah karena harus lepas lebih awal
+func (b *diffBuilder) diffConstraints(object string, ct, dt domain.Table) {
+	curCons, desCons := constraintIndex(ct), constraintIndex(dt)
+	for _, c := range sortedConstraints(ct) {
+		if d, ok := desCons[c.Name]; !ok || !sameConstraint(c, d) {
+			drop := Change{Kind: KindDropConstraint, Object: object + "." + c.Name, SQL: dropConstraintSQL(ct, c)}
+			if c.Type == domain.ConstraintForeignKey {
+				b.dropForeignKeys = append(b.dropForeignKeys, drop)
+			} else {
+				b.dropOtherConstraints = append(b.dropOtherConstraints, drop)
 			}
 		}
 	}
+	for _, c := range sortedConstraints(dt) {
+		if cc, ok := curCons[c.Name]; !ok || !sameConstraint(cc, c) {
+			b.pendingAdds = append(b.pendingAdds, pendingConstraint{dt, c})
+		}
+	}
+}
 
-	// tabel yang hanya ada di tujuan akan dihapus
+// diffIndexes menghapus index yang berubah definisinya lalu membuatnya ulang, index dari primary key atau constraint dilewati
+func (b *diffBuilder) diffIndexes(object string, ct, dt domain.Table) {
+	curIdx, desIdx := standaloneIndexes(ct), standaloneIndexes(dt)
+	for _, ix := range sortedIndexes(ct) {
+		if _, tracked := curIdx[ix.Name]; !tracked {
+			continue
+		}
+		if d, ok := desIdx[ix.Name]; !ok || strings.TrimSpace(d.Definition) != strings.TrimSpace(ix.Definition) {
+			b.dropIndexes = append(b.dropIndexes, Change{Kind: KindDropIndex, Object: object + "." + ix.Name, SQL: dropIndexSQL(ct, ix)})
+		}
+	}
+	for _, ix := range sortedIndexes(dt) {
+		if _, tracked := desIdx[ix.Name]; !tracked {
+			continue
+		}
+		if c, ok := curIdx[ix.Name]; !ok || strings.TrimSpace(c.Definition) != strings.TrimSpace(ix.Definition) {
+			b.createIndexes = append(b.createIndexes, Change{Kind: KindCreateIndex, Object: object + "." + ix.Name, SQL: createIndexSQL(ix)})
+		}
+	}
+}
+
+// collectDroppedTables menghapus tabel yang hanya ada di tujuan, ditandai destruktif karena datanya hilang
+func (b *diffBuilder) collectDroppedTables(curKeys []tableKey) {
 	for _, k := range curKeys {
-		if _, ok := des[k]; !ok {
-			dropTables = append(dropTables, Change{Kind: KindDropTable, Object: k.schema + "." + k.name, SQL: dropTableSQL(cur[k]), Destructive: true})
+		if _, ok := b.des[k]; !ok {
+			b.dropTables = append(b.dropTables, Change{Kind: KindDropTable, Object: k.schema + "." + k.name, SQL: dropTableSQL(b.cur[k]), Destructive: true})
 		}
 	}
+}
 
+// collectConstraintAdds mengurutkan constraint yang ditahan lalu menjadikannya perubahan
+func (b *diffBuilder) collectConstraintAdds() {
 	// primary key dan unique ditambah lebih dulu supaya foreign key punya yang dirujuk
-	sort.SliceStable(pendingAdds, func(i, j int) bool {
-		return constraintRank(pendingAdds[i].c.Type) < constraintRank(pendingAdds[j].c.Type)
+	sort.SliceStable(b.pendingAdds, func(i, j int) bool {
+		return constraintRank(b.pendingAdds[i].c.Type) < constraintRank(b.pendingAdds[j].c.Type)
 	})
-	for _, p := range pendingAdds {
-		addConstraints = append(addConstraints, Change{
+	for _, p := range b.pendingAdds {
+		b.addConstraints = append(b.addConstraints, Change{
 			Kind: KindAddConstraint, Object: p.table.Schema + "." + p.table.Name + "." + p.c.Name, SQL: addConstraintSQL(p.table, p.c),
 		})
 	}
+}
 
+// ordered menggabungkan semua daftar dengan urutan yang aman dijalankan lalu memberi ID tiap perubahan
+func (b *diffBuilder) ordered() []Change {
 	var all []Change
 	// Urutan gabungan: buat, ubah, lepas FK lama, tambah baru, hapus
 	for _, group := range [][]Change{
-		createSchemas, createTables, addColumns, alterColumns, dropForeignKeys, dropOtherConstraints, addConstraints,
-		dropIndexes, createIndexes, dropColumns, dropTables,
+		b.createSchemas, b.createTables, b.addColumns, b.alterColumns, b.dropForeignKeys, b.dropOtherConstraints, b.addConstraints,
+		b.dropIndexes, b.createIndexes, b.dropColumns, b.dropTables,
 	} {
 		all = append(all, group...)
 	}
