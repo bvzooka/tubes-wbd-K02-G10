@@ -180,34 +180,59 @@ func (r *GroupRepo) GrantAccess(ctx context.Context, groupID, connID int64, leve
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 
+	if err := requireActiveConnection(ctx, tx, connID); err != nil {
+		return domain.AccessNone, err
+	}
+	previous, err := lockCurrentLevel(ctx, tx, groupID, connID)
+	if err != nil {
+		return domain.AccessNone, err
+	}
+	if err := upsertAccess(ctx, tx, groupID, connID, level, grantedBy); err != nil {
+		return domain.AccessNone, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.AccessNone, fmt.Errorf("commit grant: %w", err)
+	}
+	return previous, nil
+}
+
+// requireActiveConnection memastikan koneksi ada dan masih aktif, karena akses tidak boleh diberikan ke koneksi yang dinonaktifkan
+func requireActiveConnection(ctx context.Context, tx pgx.Tx, connID int64) error {
 	var active bool
-	err = tx.QueryRow(ctx, `SELECT is_active FROM connections WHERE id = $1`, connID).Scan(&active)
+	err := tx.QueryRow(ctx, `SELECT is_active FROM connections WHERE id = $1`, connID).Scan(&active)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.AccessNone, domain.ErrNotFound
+		return domain.ErrNotFound
 	}
 	if err != nil {
-		return domain.AccessNone, fmt.Errorf("check connection: %w", err)
+		return fmt.Errorf("check connection: %w", err)
 	}
 	if !active {
-		return domain.AccessNone, domain.ErrConnectionInactive
+		return domain.ErrConnectionInactive
 	}
+	return nil
+}
 
-	var previous domain.AccessLevel
+// lockCurrentLevel mengunci baris akses yang sudah ada lalu mengembalikan levelnya, AccessNone kalau group belum punya akses
+func lockCurrentLevel(ctx context.Context, tx pgx.Tx, groupID, connID int64) (domain.AccessLevel, error) {
 	var current string
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 		SELECT access_level
 		FROM group_database_access
 		WHERE group_id = $1 AND connection_id = $2
 		FOR UPDATE`, groupID, connID).Scan(&current)
 	switch {
 	case err == nil:
-		previous = domain.AccessLevel(current)
+		return domain.AccessLevel(current), nil
 	case errors.Is(err, pgx.ErrNoRows):
+		return domain.AccessNone, nil
 	default:
 		return domain.AccessNone, fmt.Errorf("read current access: %w", err)
 	}
+}
 
-	_, err = tx.Exec(ctx, `
+// upsertAccess menyimpan level baru, atau mengubah level kalau group sudah punya akses ke koneksi itu
+func upsertAccess(ctx context.Context, tx pgx.Tx, groupID, connID int64, level domain.AccessLevel, grantedBy int64) error {
+	_, err := tx.Exec(ctx, `
 		INSERT INTO group_database_access (group_id, connection_id, access_level, granted_by)
 		VALUES ($1, $2, $3, NULLIF($4::bigint, 0))
 		ON CONFLICT (group_id, connection_id) DO UPDATE
@@ -216,15 +241,12 @@ func (r *GroupRepo) GrantAccess(ctx context.Context, groupID, connID int64, leve
 		    granted_at   = now()`,
 		groupID, connID, string(level), grantedBy)
 	if isForeignKeyViolation(err) {
-		return domain.AccessNone, domain.ErrNotFound
+		return domain.ErrNotFound
 	}
 	if err != nil {
-		return domain.AccessNone, fmt.Errorf("grant access: %w", err)
+		return fmt.Errorf("grant access: %w", err)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return domain.AccessNone, fmt.Errorf("commit grant: %w", err)
-	}
-	return previous, nil
+	return nil
 }
 
 // RevokeAccess mencabut akses group ke satu database
