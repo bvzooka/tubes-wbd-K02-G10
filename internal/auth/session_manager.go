@@ -86,16 +86,7 @@ func (m *Manager) Resolve(ctx context.Context, raw string) (*Resolved, error) {
 	// Evaluate memutuskan session ini valid, perlu dicabut, atau perlu dirotasi, tanpa menyentuh database
 	d := Evaluate(now, s, m.policy)
 	if !d.Valid {
-		switch {
-		case d.RevokeAllForUser:
-			if err := m.store.RevokeAllForUser(ctx, s.UserID, now, d.RevokeReason); err != nil {
-				m.logger.ErrorContext(ctx, "revoke user sessions failed", "user_id", s.UserID, "err", err)
-			}
-		case d.Revoke:
-			if err := m.store.Revoke(ctx, s.ID, now, d.RevokeReason); err != nil {
-				m.logger.ErrorContext(ctx, "revoke session failed", "session_id", s.ID, "err", err)
-			}
-		}
+		m.revokeInvalid(ctx, s, d, now)
 		return nil, domain.ErrUnauthenticated
 	}
 
@@ -105,15 +96,37 @@ func (m *Manager) Resolve(ctx context.Context, raw string) (*Resolved, error) {
 		CSRFToken: s.CSRFToken,
 		ExpiresAt: s.AbsoluteExpiresAt,
 	}
+	if err := m.refresh(ctx, s, d, hash, now, res); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// revokeInvalid mencabut session yang tidak valid sesuai keputusan Evaluate, kegagalan mencabut hanya dicatat karena request tetap ditolak
+func (m *Manager) revokeInvalid(ctx context.Context, s Session, d Decision, now time.Time) {
+	switch {
+	case d.RevokeAllForUser:
+		if err := m.store.RevokeAllForUser(ctx, s.UserID, now, d.RevokeReason); err != nil {
+			m.logger.ErrorContext(ctx, "revoke user sessions failed", "user_id", s.UserID, "err", err)
+		}
+	case d.Revoke:
+		if err := m.store.Revoke(ctx, s.ID, now, d.RevokeReason); err != nil {
+			m.logger.ErrorContext(ctx, "revoke session failed", "session_id", s.ID, "err", err)
+		}
+	}
+}
+
+// refresh memperbarui session yang valid: merotasi token kalau sudah waktunya, atau memperpanjang waktu aktifnya
+func (m *Manager) refresh(ctx context.Context, s Session, d Decision, hash []byte, now time.Time, res *Resolved) error {
 	switch {
 	case d.Rotate:
 		newRaw, err := NewToken()
 		if err != nil {
-			return nil, fmt.Errorf("new session token: %w", err)
+			return fmt.Errorf("new session token: %w", err)
 		}
 		ok, err := m.store.Rotate(ctx, s.ID, hash, HashToken(newRaw), now, now.Add(m.policy.GracePeriod))
 		if err != nil {
-			return nil, fmt.Errorf("rotate session: %w", err)
+			return fmt.Errorf("rotate session: %w", err)
 		}
 		// ok false: request paralel sudah merotasi lebih dulu; token ini masih berlaku dalam grace.
 		if ok {
@@ -124,7 +137,7 @@ func (m *Manager) Resolve(ctx context.Context, raw string) (*Resolved, error) {
 			m.logger.WarnContext(ctx, "touch session failed", "session_id", s.ID, "err", err)
 		}
 	}
-	return res, nil
+	return nil
 }
 
 // End mencabut session milik nilai cookie (logout). Token yang tidak dikenal diabaikan.
