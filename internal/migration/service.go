@@ -1,3 +1,4 @@
+// Package migration mengelola migration database target: buat draft, validasi, dan jalankan berurutan dalam satu transaction
 package migration
 
 import (
@@ -10,6 +11,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// store adalah penyimpanan migration yang dibutuhkan service, implementasinya Repo
 type store interface {
 	Create(ctx context.Context, connID int64, name, sql, checksum string, createdBy int64) (domain.Migration, error)
 	Get(ctx context.Context, connID int64, version int) (domain.Migration, error)
@@ -21,6 +23,7 @@ type store interface {
 	FailStuck(ctx context.Context, startedBefore time.Time, message string, finishedAt time.Time) (int, error)
 }
 
+// Service berisi aturan migration: cek akses, validasi, dan menjalankan lewat driver database target
 type Service struct {
 	store   store
 	authz   contract.Authorizer
@@ -28,6 +31,7 @@ type Service struct {
 	clock   clock.Clock
 }
 
+// NewService dibuat dengan penyimpanan, authorizer, penyedia driver, dan clock
 func NewService(store store, authz contract.Authorizer, drivers contract.DriverProvider, clk clock.Clock) *Service {
 	return &Service{store: store, authz: authz, drivers: drivers, clock: clk}
 }
@@ -44,6 +48,7 @@ func (s *Service) require(ctx context.Context, actor domain.Principal, connID in
 	return nil
 }
 
+// List mengembalikan ringkasan migration, cukup akses View Only
 func (s *Service) List(ctx context.Context, actor domain.Principal, connID int64) ([]domain.Migration, error) {
 	if err := s.require(ctx, actor, connID, domain.AccessViewOnly); err != nil {
 		return nil, err
@@ -51,6 +56,7 @@ func (s *Service) List(ctx context.Context, actor domain.Principal, connID int64
 	return s.store.List(ctx, connID)
 }
 
+// Get mengembalikan satu migration lengkap dengan SQL-nya, cukup akses View Only
 func (s *Service) Get(ctx context.Context, actor domain.Principal, connID int64, version int) (domain.Migration, error) {
 	if err := s.require(ctx, actor, connID, domain.AccessViewOnly); err != nil {
 		return domain.Migration{}, err
@@ -58,6 +64,7 @@ func (s *Service) Get(ctx context.Context, actor domain.Principal, connID int64,
 	return s.store.Get(ctx, connID, version)
 }
 
+// Create membuat draft baru, butuh akses View + Edit
 func (s *Service) Create(ctx context.Context, actor domain.Principal, connID int64, in Input) (domain.Migration, error) {
 	if err := s.require(ctx, actor, connID, domain.AccessViewEdit); err != nil {
 		return domain.Migration{}, err
@@ -69,6 +76,7 @@ func (s *Service) Create(ctx context.Context, actor domain.Principal, connID int
 	return s.store.Create(ctx, connID, clean.Name, clean.SQL, Checksum(clean.SQL), actor.UserID)
 }
 
+// Update mengubah draft, migration yang sudah jalan tidak bisa diubah
 func (s *Service) Update(ctx context.Context, actor domain.Principal, connID int64, version int, in Input) (domain.Migration, error) {
 	if err := s.require(ctx, actor, connID, domain.AccessViewEdit); err != nil {
 		return domain.Migration{}, err
@@ -80,6 +88,7 @@ func (s *Service) Update(ctx context.Context, actor domain.Principal, connID int
 	return s.store.UpdateDraft(ctx, connID, version, clean.Name, clean.SQL, Checksum(clean.SQL))
 }
 
+// Cancel membatalkan draft supaya tidak ikut menahan versi berikutnya
 func (s *Service) Cancel(ctx context.Context, actor domain.Principal, connID int64, version int) error {
 	if err := s.require(ctx, actor, connID, domain.AccessViewEdit); err != nil {
 		return err

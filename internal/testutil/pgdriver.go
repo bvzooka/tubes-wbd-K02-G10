@@ -20,6 +20,7 @@ type PgDriver struct {
 
 var _ dbdriver.Driver = (*PgDriver)(nil)
 
+// NewPgDriver membungkus pool jadi dbdriver.Driver
 func NewPgDriver(pool *pgxpool.Pool) dbdriver.Driver { return &PgDriver{Pool: pool} }
 
 func (d *PgDriver) Dialect() domain.DBMS { return domain.DBMSPostgres }
@@ -29,6 +30,7 @@ func (d *PgDriver) Capabilities() dbdriver.Capabilities {
 func (d *PgDriver) Ping(ctx context.Context) error { return d.Pool.Ping(ctx) }
 func (d *PgDriver) Close()                         {}
 
+// TableData tidak dipakai test yang memakai driver ini, jadi hanya mengembalikan ErrUnsupported
 func (d *PgDriver) TableData(context.Context, domain.TableRef, domain.PageRequest) (*domain.TableData, error) {
 	return nil, domain.ErrUnsupported
 }
@@ -69,6 +71,7 @@ func (d *PgDriver) Introspect(ctx context.Context) (*domain.Schema, error) {
 	return s, rows.Err()
 }
 
+// WithTx menjalankan fn dalam satu transaction dengan aturan yang sama seperti driver asli: ErrForceRollback berarti rollback tanpa error
 func (d *PgDriver) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(dbdriver.Tx) error) (err error) {
 	mode := pgx.ReadWrite
 	if opts.ReadOnly {
@@ -109,6 +112,7 @@ func (d *PgDriver) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(
 	return tx.Commit(ctx)
 }
 
+// pgTx membungkus transaction pgx supaya memenuhi dbdriver.Tx
 type pgTx struct{ tx pgx.Tx }
 
 // Exec tanpa argumen memakai simple protocol sehingga banyak statement diperbolehkan

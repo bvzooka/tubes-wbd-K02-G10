@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 )
 
+// batas panjang dan pesan error form, pesannya satu tempat supaya konsisten di semua halaman
 const (
 	minPasswordBytes = 10
 	maxPasswordBytes = 72
@@ -25,12 +26,15 @@ const (
 	msgUserMissing        = "Pilih user yang valid."
 )
 
+// aturan username yang sama dengan constraint di tabel users
 var usernamePattern = regexp.MustCompile(`^[a-z0-9_.-]{3,32}$`)
 
+// NormalizeUsername membuang spasi dan menyamakan huruf kecil, supaya Budi dan budi dianggap satu username
 func NormalizeUsername(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
 
+// validateUsername mengembalikan username yang sudah dirapikan dan pesan error, kosong kalau valid
 func validateUsername(raw string) (string, string) {
 	u := NormalizeUsername(raw)
 	if !usernamePattern.MatchString(u) {
@@ -39,6 +43,7 @@ func validateUsername(raw string) (string, string) {
 	return u, ""
 }
 
+// validatePassword memakai satuan byte karena bcrypt membatasi 72 byte
 func validatePassword(p string) string {
 	if len(p) < minPasswordBytes || len(p) > maxPasswordBytes {
 		return msgPasswordLength
@@ -46,6 +51,7 @@ func validatePassword(p string) string {
 	return ""
 }
 
+// validateGroupName dan validateDescription menghitung karakter, bukan byte, supaya huruf non-ASCII tidak dianggap lebih panjang
 func validateGroupName(raw string) (string, string) {
 	name := strings.TrimSpace(raw)
 	if n := utf8.RuneCountInString(name); n < 1 || n > maxGroupNameChars {

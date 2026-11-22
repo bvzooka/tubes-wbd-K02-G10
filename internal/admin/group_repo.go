@@ -1,3 +1,4 @@
+// Package admin mengelola user dan group: buat, ubah, nonaktifkan, anggota, dan akses database
 package admin
 
 import (
@@ -12,6 +13,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// GroupRow adalah satu baris daftar group beserta jumlah anggota dan akses
 type GroupRow struct {
 	ID          int64
 	Name        string
@@ -21,15 +23,19 @@ type GroupRow struct {
 	CreatedAt   time.Time
 }
 
+// GroupRepo menyimpan group, anggota, dan akses database di tabelnya
 type GroupRepo struct{ db DB }
 
+// NewGroupRepo dibuat dengan koneksi database platform
 func NewGroupRepo(db DB) *GroupRepo { return &GroupRepo{db: db} }
 
+// isUniqueViolation true kalau error karena nama sudah dipakai, kode 23505 dari PostgreSQL
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == uniqueViolation
 }
 
+// Create menyimpan group baru, nama kembar jadi ErrConflict
 func (r *GroupRepo) Create(ctx context.Context, name, description string) (domain.Group, error) {
 	g := domain.Group{Name: name, Description: description}
 	err := r.db.QueryRow(ctx, `
@@ -71,6 +77,7 @@ func (r *GroupRepo) List(ctx context.Context) ([]GroupRow, error) {
 	return groups, rows.Err()
 }
 
+// Get mengembalikan satu group, ErrNotFound kalau tidak ada
 func (r *GroupRepo) Get(ctx context.Context, id int64) (domain.Group, error) {
 	g := domain.Group{ID: id}
 	err := r.db.QueryRow(ctx, `
@@ -87,6 +94,7 @@ func (r *GroupRepo) Get(ctx context.Context, id int64) (domain.Group, error) {
 	return g, nil
 }
 
+// Update mengubah nama dan deskripsi group
 func (r *GroupRepo) Update(ctx context.Context, id int64, name, description string) (domain.Group, error) {
 	g := domain.Group{ID: id}
 	err := r.db.QueryRow(ctx, `
@@ -108,6 +116,7 @@ func (r *GroupRepo) Update(ctx context.Context, id int64, name, description stri
 	return g, nil
 }
 
+// Delete menghapus group hanya kalau sudah tidak punya anggota dan akses
 func (r *GroupRepo) Delete(ctx context.Context, id int64) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

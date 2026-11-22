@@ -11,8 +11,10 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// kode error PostgreSQL saat user atau koneksi yang dirujuk tidak ada
 const foreignKeyViolation = "23503"
 
+// GroupMember, GroupAccess, UserOption, dan ConnOption adalah bentuk data untuk halaman group
 type GroupMember struct {
 	UserID   int64
 	Username string
@@ -35,11 +37,13 @@ type ConnOption struct {
 	Name string
 }
 
+// isForeignKeyViolation true kalau user atau koneksi yang dirujuk tidak ada
 func isForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation
 }
 
+// ListMembers mengembalikan anggota group menurut username
 func (r *GroupRepo) ListMembers(ctx context.Context, groupID int64) ([]GroupMember, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT u.id, u.username, u.is_active
@@ -63,6 +67,7 @@ func (r *GroupRepo) ListMembers(ctx context.Context, groupID int64) ([]GroupMemb
 	return members, rows.Err()
 }
 
+// MemberIDs hanya mengembalikan id anggota, dipakai untuk memaksa rotasi session mereka
 func (r *GroupRepo) MemberIDs(ctx context.Context, groupID int64) ([]int64, error) {
 	rows, err := r.db.Query(ctx, `SELECT user_id FROM group_members WHERE group_id = $1 ORDER BY user_id`, groupID)
 	if err != nil {
@@ -81,6 +86,7 @@ func (r *GroupRepo) MemberIDs(ctx context.Context, groupID int64) ([]int64, erro
 	return ids, rows.Err()
 }
 
+// AddMember mengembalikan true kalau benar-benar anggota baru, anggota yang sudah ada diabaikan
 func (r *GroupRepo) AddMember(ctx context.Context, groupID, userID int64) (bool, error) {
 	tag, err := r.db.Exec(ctx, `
 		INSERT INTO group_members (group_id, user_id)
@@ -95,6 +101,7 @@ func (r *GroupRepo) AddMember(ctx context.Context, groupID, userID int64) (bool,
 	return tag.RowsAffected() > 0, nil
 }
 
+// RemoveMember mengeluarkan anggota, ErrNotFound kalau memang bukan anggota
 func (r *GroupRepo) RemoveMember(ctx context.Context, groupID, userID int64) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM group_members WHERE group_id = $1 AND user_id = $2`, groupID, userID)
 	if err != nil {
@@ -106,6 +113,7 @@ func (r *GroupRepo) RemoveMember(ctx context.Context, groupID, userID int64) err
 	return nil
 }
 
+// ListAccess mengembalikan database yang boleh diakses group beserta levelnya
 func (r *GroupRepo) ListAccess(ctx context.Context, groupID int64) ([]GroupAccess, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT a.connection_id, c.name, a.access_level
@@ -131,6 +139,7 @@ func (r *GroupRepo) ListAccess(ctx context.Context, groupID int64) ([]GroupAcces
 	return list, rows.Err()
 }
 
+// GrantAccess memberi atau mengubah akses, mengembalikan level sebelumnya supaya service tahu apakah level naik
 func (r *GroupRepo) GrantAccess(ctx context.Context, groupID, connID int64, level domain.AccessLevel, grantedBy int64) (domain.AccessLevel, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -185,6 +194,7 @@ func (r *GroupRepo) GrantAccess(ctx context.Context, groupID, connID int64, leve
 	return previous, nil
 }
 
+// RevokeAccess mencabut akses group ke satu database
 func (r *GroupRepo) RevokeAccess(ctx context.Context, groupID, connID int64) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM group_database_access WHERE group_id = $1 AND connection_id = $2`, groupID, connID)
 	if err != nil {
@@ -220,6 +230,7 @@ func (r *GroupRepo) AvailableUsers(ctx context.Context, groupID int64) ([]UserOp
 	return list, rows.Err()
 }
 
+// AvailableConnections adalah dropdown koneksi aktif untuk diberi akses
 func (r *GroupRepo) AvailableConnections(ctx context.Context) ([]ConnOption, error) {
 	rows, err := r.db.Query(ctx, `SELECT id, name FROM connections WHERE is_active ORDER BY lower(name), id`)
 	if err != nil {

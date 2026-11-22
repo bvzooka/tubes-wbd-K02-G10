@@ -6,6 +6,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// OutOfOrderError memberi tahu versi mana yang harus dijalankan lebih dulu
 type OutOfOrderError struct {
 	Blocking int
 }

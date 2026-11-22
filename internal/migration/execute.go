@@ -10,6 +10,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// batas waktu eksekusi, tambahan waktu untuk koneksi, dan lama running sebelum dianggap nyangkut
 const (
 	execTimeout   = 60 * time.Second
 	execGrace     = 10 * time.Second
@@ -22,6 +23,7 @@ const (
 	msgTargetUnavailable = "Tidak dapat menyiapkan koneksi ke database target."
 )
 
+// Execute menjalankan satu migration: klaim, jalankan di target, lalu catat hasilnya
 func (s *Service) Execute(ctx context.Context, actor domain.Principal, connID int64, version int) (domain.Migration, error) {
 	if err := s.require(ctx, actor, connID, domain.AccessViewEdit); err != nil {
 		return domain.Migration{}, err
@@ -73,11 +75,13 @@ func (s *Service) run(ctx context.Context, connID int64, sql string) (domain.Mig
 	return domain.MigrationSuccess, "", warning
 }
 
+// RecoverStuck menandai gagal migration yang nyangkut running karena server mati, dipanggil saat start
 func (s *Service) RecoverStuck(ctx context.Context) (int, error) {
 	now := s.clock.Now()
 	return s.store.FailStuck(ctx, now.Add(-stuckAfter), msgInterrupted, now)
 }
 
+// targetMessage memilih pesan aman untuk error koneksi ke target, error yang tidak dikenal tidak dibocorkan
 func targetMessage(err error) string {
 	switch {
 	case errors.Is(err, domain.ErrConnectionInactive):
@@ -89,6 +93,7 @@ func targetMessage(err error) string {
 	}
 }
 
+// truncate memotong berdasarkan karakter, bukan byte, supaya tidak memutus karakter di tengah
 func truncate(s string, max int) string {
 	runes := []rune(s)
 	if len(runes) <= max {

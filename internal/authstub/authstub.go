@@ -1,3 +1,4 @@
+// Package authstub berisi pengganti auth untuk development (APP_STUBS=true): semua orang dianggap admin dan semua akses diizinkan
 package authstub
 
 import (
@@ -11,6 +12,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// Bundle mengumpulkan semua pengganti yang dibutuhkan wire.go sebagai ganti modul auth dan access
 type Bundle struct {
 	Middleware   contract.AuthMiddleware
 	Authorizer   contract.Authorizer
@@ -18,6 +20,7 @@ type Bundle struct {
 	SessionAdmin contract.SessionAdmin
 }
 
+// New menyiapkan pengganti auth dengan admin palsu, tidak boleh dipakai di production
 func New(ctx context.Context, pool *pgxpool.Pool) (*Bundle, error) {
 	p, err := ensureAdmin(ctx, pool)
 	if err != nil {
@@ -31,6 +34,7 @@ func New(ctx context.Context, pool *pgxpool.Pool) (*Bundle, error) {
 	}, nil
 }
 
+// ensureAdmin memakai user pertama yang ada, atau membuat stubadmin kalau tabel users masih kosong
 func ensureAdmin(ctx context.Context, pool *pgxpool.Pool) (domain.Principal, error) {
 	var p domain.Principal
 	err := pool.QueryRow(ctx, `
@@ -50,6 +54,7 @@ func ensureAdmin(ctx context.Context, pool *pgxpool.Pool) (domain.Principal, err
 	return p, nil
 }
 
+// Middleware melewatkan semua request dan selalu memakai Principal yang sama
 type Middleware struct{ Principal domain.Principal }
 
 var _ contract.AuthMiddleware = (*Middleware)(nil)
@@ -70,6 +75,7 @@ func (m *Middleware) RequireDBAccess(domain.AccessLevel) func(http.Handler) http
 
 func (m *Middleware) CSRF(next http.Handler) http.Handler { return next }
 
+// Authorizer mengizinkan semua akses View + Edit ke semua koneksi aktif
 type Authorizer struct{ Pool *pgxpool.Pool }
 
 var _ contract.Authorizer = (*Authorizer)(nil)
@@ -102,6 +108,7 @@ func (a *Authorizer) ListAccessible(ctx context.Context, _ int64) ([]domain.Acce
 	return out, rows.Err()
 }
 
+// Hasher tidak benar-benar menghash, hanya menambah awalan stub: supaya password tidak pernah tersimpan sungguhan
 type Hasher struct{}
 
 var _ contract.PasswordHasher = Hasher{}
@@ -109,6 +116,7 @@ var _ contract.PasswordHasher = Hasher{}
 func (Hasher) Hash(plain string) (string, error) { return "stub:" + plain, nil }
 func (Hasher) Verify(hash, plain string) bool    { return hash == "stub:"+plain }
 
+// SessionAdmin tidak melakukan apa-apa karena tidak ada session
 type SessionAdmin struct{}
 
 var _ contract.SessionAdmin = SessionAdmin{}

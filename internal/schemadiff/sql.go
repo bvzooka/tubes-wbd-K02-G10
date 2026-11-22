@@ -1,3 +1,4 @@
+// Package schemadiff membandingkan schema dua database PostgreSQL dan menyusun SQL untuk menyamakan tujuan dengan sumber
 package schemadiff
 
 import (
@@ -11,10 +12,12 @@ func quote(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
+// qualified menulis nama lengkap schema.tabel dengan kutip
 func qualified(schema, name string) string {
 	return quote(schema) + "." + quote(name)
 }
 
+// quoteList mengutip tiap nama lalu menggabungkannya dengan koma
 func quoteList(names []string) string {
 	quoted := make([]string, len(names))
 	for i, n := range names {
@@ -23,6 +26,7 @@ func quoteList(names []string) string {
 	return strings.Join(quoted, ", ")
 }
 
+// usableDefault membuang default dari sequence (nextval) karena sequence di database lain tidak ikut tersalin
 func usableDefault(def *string) *string {
 	if def == nil || strings.HasPrefix(strings.TrimSpace(*def), "nextval(") {
 		return nil
@@ -30,6 +34,7 @@ func usableDefault(def *string) *string {
 	return def
 }
 
+// columnDefinition menulis definisi satu kolom: nama, tipe, NOT NULL, dan default
 func columnDefinition(c domain.Column) string {
 	var b strings.Builder
 	b.WriteString(quote(c.Name))
@@ -45,6 +50,7 @@ func columnDefinition(c domain.Column) string {
 	return b.String()
 }
 
+// createTableSQL membuat tabel dengan semua kolomnya, constraint ditambahkan terpisah belakangan
 func createTableSQL(t domain.Table) string {
 	lines := make([]string, len(t.Columns))
 	for i, c := range t.Columns {
@@ -53,6 +59,7 @@ func createTableSQL(t domain.Table) string {
 	return "CREATE TABLE " + qualified(t.Schema, t.Name) + " (\n" + strings.Join(lines, ",\n") + "\n);"
 }
 
+// createSchemaSQL memakai IF NOT EXISTS supaya aman dijalankan ulang
 func createSchemaSQL(schema string) string {
 	return "CREATE SCHEMA IF NOT EXISTS " + quote(schema) + ";"
 }
@@ -67,6 +74,7 @@ func alterTypeSQL(t domain.Table, c domain.Column) string {
 		" TYPE " + c.DataType + " USING " + quote(c.Name) + "::" + c.DataType + ";"
 }
 
+// alterNullSQL mengikuti keadaan sumber: kolom nullable berarti DROP NOT NULL, sebaliknya SET NOT NULL
 func alterNullSQL(t domain.Table, c domain.Column) string {
 	action := "SET NOT NULL"
 	if c.Nullable {
@@ -75,6 +83,7 @@ func alterNullSQL(t domain.Table, c domain.Column) string {
 	return "ALTER TABLE " + qualified(t.Schema, t.Name) + " ALTER COLUMN " + quote(c.Name) + " " + action + ";"
 }
 
+// alterDefaultSQL mengikuti default sumber, tanpa default berarti DROP DEFAULT
 func alterDefaultSQL(t domain.Table, c domain.Column) string {
 	action := "DROP DEFAULT"
 	if def := usableDefault(c.Default); def != nil {
@@ -87,6 +96,7 @@ func dropColumnSQL(t domain.Table, c domain.Column) string {
 	return "ALTER TABLE " + qualified(t.Schema, t.Name) + " DROP COLUMN " + quote(c.Name) + ";"
 }
 
+// dropTableSQL memakai CASCADE supaya objek yang bergantung ikut terhapus, makanya perubahan ini destruktif
 func dropTableSQL(t domain.Table) string {
 	return "DROP TABLE " + qualified(t.Schema, t.Name) + " CASCADE;"
 }
@@ -95,6 +105,7 @@ func dropConstraintSQL(t domain.Table, c domain.Constraint) string {
 	return "ALTER TABLE " + qualified(t.Schema, t.Name) + " DROP CONSTRAINT " + quote(c.Name) + ";"
 }
 
+// constraintBody menulis isi constraint sesuai jenisnya, foreign key lengkap dengan aturan ON UPDATE dan ON DELETE
 func constraintBody(c domain.Constraint) string {
 	switch c.Type {
 	case domain.ConstraintPrimaryKey:
@@ -129,6 +140,7 @@ func dropIndexSQL(t domain.Table, ix domain.Index) string {
 	return "DROP INDEX " + qualified(t.Schema, ix.Name) + ";"
 }
 
+// createIndexSQL memakai definisi index apa adanya dari database sumber
 func createIndexSQL(ix domain.Index) string {
 	return strings.TrimRight(strings.TrimSpace(ix.Definition), ";") + ";"
 }

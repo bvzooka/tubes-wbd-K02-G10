@@ -9,6 +9,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// jenis perubahan, urutannya mengikuti urutan SQL yang aman dijalankan
 const (
 	KindCreateSchema       = "create_schema"
 	KindCreateTable        = "create_table"
@@ -24,8 +25,10 @@ const (
 	KindDropTable          = "drop_table"
 )
 
+// schema public selalu ada di PostgreSQL jadi tidak perlu dibuat
 const defaultSchema = "public"
 
+// Change adalah satu perubahan yang bisa dipilih user, ID dihitung dari isinya supaya stabil antar perhitungan
 type Change struct {
 	ID          string
 	Kind        string
@@ -34,6 +37,7 @@ type Change struct {
 	Destructive bool
 }
 
+// tableKey menunjuk satu tabel lewat schema dan nama
 type tableKey struct{ schema, name string }
 
 // View diabaikan, cuma tabel yang dibandingin
@@ -51,6 +55,7 @@ func tablesOf(s *domain.Schema) map[tableKey]domain.Table {
 	return out
 }
 
+// relationSchemas mengumpulkan nama schema yang sudah dipakai
 func relationSchemas(s *domain.Schema) map[string]bool {
 	out := map[string]bool{}
 	if s == nil {
@@ -62,6 +67,7 @@ func relationSchemas(s *domain.Schema) map[string]bool {
 	return out
 }
 
+// sortedKeys, sortedColumns, sortedConstraints, dan sortedIndexes mengurutkan hasil supaya SQL yang dibuat selalu sama
 func sortedKeys(m map[tableKey]domain.Table) []tableKey {
 	keys := make([]tableKey, 0, len(m))
 	for k := range m {
@@ -82,6 +88,7 @@ func sortedColumns(t domain.Table) []domain.Column {
 	return cols
 }
 
+// columnIndex dan constraintIndex membuat peta nama ke objek supaya pencarian cepat
 func columnIndex(t domain.Table) map[string]domain.Column {
 	out := make(map[string]domain.Column, len(t.Columns))
 	for _, c := range t.Columns {
@@ -110,6 +117,7 @@ func sortedIndexes(t domain.Table) []domain.Index {
 	return list
 }
 
+// sameStrings membandingkan dua daftar nama dengan urutan yang sama
 func sameStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -122,6 +130,7 @@ func sameStrings(a, b []string) bool {
 	return true
 }
 
+// sameConstraint membandingkan jenis, kolom, dan detail sesuai jenisnya (rujukan untuk foreign key, ekspresi untuk check)
 func sameConstraint(a, b domain.Constraint) bool {
 	if a.Type != b.Type || !sameStrings(a.Columns, b.Columns) {
 		return false
@@ -152,6 +161,7 @@ func standaloneIndexes(t domain.Table) map[string]domain.Index {
 	return out
 }
 
+// sameDefault membandingkan default tanpa memedulikan spasi dan mengabaikan default sequence
 func sameDefault(a, b *string) bool {
 	a, b = usableDefault(a), usableDefault(b)
 	if a == nil || b == nil {
@@ -173,6 +183,7 @@ func constraintRank(t domain.ConstraintType) int {
 	return 3
 }
 
+// pendingConstraint menahan constraint yang akan ditambah sampai semua tabel dan kolom ada, lalu diurutkan
 type pendingConstraint struct {
 	table domain.Table
 	c     domain.Constraint
@@ -184,10 +195,12 @@ func Diff(current, desired *domain.Schema) []Change {
 	curSchemas := relationSchemas(current)
 	curKeys, desKeys := sortedKeys(cur), sortedKeys(des)
 
+	// tiap jenis perubahan dikumpulkan di daftar sendiri lalu digabung berurutan di akhir
 	var createSchemas, createTables, addColumns, alterColumns []Change
 	var dropForeignKeys, dropOtherConstraints, addConstraints, dropIndexes, createIndexes, dropColumns, dropTables []Change
 	var pendingAdds []pendingConstraint
 
+	// schema baru dibuat sekali walau dipakai banyak tabel
 	seenSchemas := map[string]bool{}
 	for _, k := range desKeys {
 		if k.schema != defaultSchema && !curSchemas[k.schema] && !seenSchemas[k.schema] {
@@ -201,6 +214,7 @@ func Diff(current, desired *domain.Schema) []Change {
 		ct, exists := cur[k]
 		object := k.schema + "." + k.name
 
+		// tabel belum ada di tujuan: buat beserta constraint dan index-nya
 		if !exists {
 			createTables = append(createTables, Change{Kind: KindCreateTable, Object: object, SQL: createTableSQL(dt)})
 			for _, c := range sortedConstraints(dt) {
@@ -215,6 +229,7 @@ func Diff(current, desired *domain.Schema) []Change {
 			continue
 		}
 
+		// tabel sudah ada di keduanya: bandingkan kolom satu per satu
 		curCols := columnIndex(ct)
 		desCols := columnIndex(dt)
 		for _, dc := range sortedColumns(dt) {
@@ -241,6 +256,7 @@ func Diff(current, desired *domain.Schema) []Change {
 			}
 		}
 
+		// constraint yang beda dihapus dulu lalu ditambah lagi, foreign key dipisah karena harus lepas lebih awal
 		curCons, desCons := constraintIndex(ct), constraintIndex(dt)
 		for _, c := range sortedConstraints(ct) {
 			if d, ok := desCons[c.Name]; !ok || !sameConstraint(c, d) {
@@ -258,6 +274,7 @@ func Diff(current, desired *domain.Schema) []Change {
 			}
 		}
 
+		// index yang berubah definisinya dihapus lalu dibuat ulang
 		curIdx, desIdx := standaloneIndexes(ct), standaloneIndexes(dt)
 		for _, ix := range sortedIndexes(ct) {
 			if _, tracked := curIdx[ix.Name]; !tracked {
@@ -277,12 +294,14 @@ func Diff(current, desired *domain.Schema) []Change {
 		}
 	}
 
+	// tabel yang hanya ada di tujuan akan dihapus
 	for _, k := range curKeys {
 		if _, ok := des[k]; !ok {
 			dropTables = append(dropTables, Change{Kind: KindDropTable, Object: k.schema + "." + k.name, SQL: dropTableSQL(cur[k]), Destructive: true})
 		}
 	}
 
+	// primary key dan unique ditambah lebih dulu supaya foreign key punya yang dirujuk
 	sort.SliceStable(pendingAdds, func(i, j int) bool {
 		return constraintRank(pendingAdds[i].c.Type) < constraintRank(pendingAdds[j].c.Type)
 	})
@@ -306,11 +325,13 @@ func Diff(current, desired *domain.Schema) []Change {
 	return all
 }
 
+// changeID membuat ID pendek dari isi perubahan, jadi perubahan yang sama selalu punya ID yang sama
 func changeID(c Change) string {
 	sum := sha256.Sum256([]byte(c.Kind + "\x00" + c.Object + "\x00" + c.SQL))
 	return hex.EncodeToString(sum[:])[:12]
 }
 
+// SQL menggabungkan SQL semua perubahan jadi satu skrip migration
 func SQL(changes []Change) string {
 	parts := make([]string, len(changes))
 	for i, c := range changes {
@@ -319,6 +340,7 @@ func SQL(changes []Change) string {
 	return strings.Join(parts, "\n")
 }
 
+// Select memilih perubahan yang ID-nya ada di ids, urutan aslinya dipertahankan
 func Select(changes []Change, ids map[string]bool) []Change {
 	var out []Change
 	for _, c := range changes {

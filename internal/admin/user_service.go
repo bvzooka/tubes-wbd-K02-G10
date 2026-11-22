@@ -9,6 +9,7 @@ import (
 	"dbplatform/internal/domain"
 )
 
+// userStore adalah penyimpanan user yang dibutuhkan service, implementasinya UserRepo
 type userStore interface {
 	Create(ctx context.Context, username, passwordHash string, isAdmin bool) (domain.User, error)
 	List(ctx context.Context) ([]domain.User, error)
@@ -17,27 +18,32 @@ type userStore interface {
 	SetActive(ctx context.Context, id int64, active bool) (domain.User, error)
 }
 
+// UserInput adalah isi form buat user baru
 type UserInput struct {
 	Username        string
 	Password        string
 	IsPlatformAdmin bool
 }
 
+// UserUpdate adalah isi form ubah user, password kosong berarti tidak diganti
 type UserUpdate struct {
 	Password        string
 	IsPlatformAdmin bool
 }
 
+// Service berisi aturan pengelolaan user, hasher dan sessions untuk menyentuh password dan session
 type Service struct {
 	users    userStore
 	hasher   contract.PasswordHasher
 	sessions contract.SessionAdmin
 }
 
+// NewService dibuat dengan penyimpanan user, hasher password, dan pengelola session
 func NewService(users userStore, hasher contract.PasswordHasher, sessions contract.SessionAdmin) *Service {
 	return &Service{users: users, hasher: hasher, sessions: sessions}
 }
 
+// requireAdmin dicek di service dan bukan hanya di middleware, supaya aturannya berlaku dari pemanggil mana pun
 func requireAdmin(actor domain.Principal) error {
 	if !actor.IsPlatformAdmin {
 		return domain.ErrForbidden
@@ -45,6 +51,7 @@ func requireAdmin(actor domain.Principal) error {
 	return nil
 }
 
+// CreateUser memvalidasi semua field sekaligus supaya form bisa menampilkan semua kesalahan dalam satu kali
 func (s *Service) CreateUser(ctx context.Context, actor domain.Principal, in UserInput) (domain.User, error) {
 	if err := requireAdmin(actor); err != nil {
 		return domain.User{}, err
@@ -76,6 +83,7 @@ func (s *Service) CreateUser(ctx context.Context, actor domain.Principal, in Use
 	return u, nil
 }
 
+// ListUsers, GetUser, dan ActivateUser hanya meneruskan ke repo setelah cek admin
 func (s *Service) ListUsers(ctx context.Context, actor domain.Principal) ([]domain.User, error) {
 	if err := requireAdmin(actor); err != nil {
 		return nil, err
@@ -90,6 +98,7 @@ func (s *Service) GetUser(ctx context.Context, actor domain.Principal, id int64)
 	return s.users.Get(ctx, id)
 }
 
+// UpdateUser mengubah password dan peran admin, dengan efek ke session user itu
 func (s *Service) UpdateUser(ctx context.Context, actor domain.Principal, id int64, in UserUpdate) (domain.User, error) {
 	if err := requireAdmin(actor); err != nil {
 		return domain.User{}, err
@@ -135,6 +144,7 @@ func (s *Service) UpdateUser(ctx context.Context, actor domain.Principal, id int
 	return u, nil
 }
 
+// DeactivateUser menonaktifkan user lalu mencabut semua session-nya supaya langsung keluar
 func (s *Service) DeactivateUser(ctx context.Context, actor domain.Principal, id int64) (domain.User, error) {
 	if err := requireAdmin(actor); err != nil {
 		return domain.User{}, err
