@@ -33,88 +33,115 @@ func (t *tokenTracker) note(word string) {
 	}
 }
 
+// splitter menyimpan keadaan saat memindai SQL: hasil sementara, token statement yang sedang dibaca, dan awal statement itu
+type splitter struct {
+	sql    string
+	stmts  []Statement
+	tokens tokenTracker
+	start  int
+}
+
 // Split memecah SQL jadi statement dengan membaca karakter satu per satu, supaya titik koma di dalam string, komentar, atau dollar-quote tidak ikut memecah
 func Split(sql string) ([]Statement, error) {
-	var stmts []Statement
-	var tokens tokenTracker
-	start, i, n := 0, 0, len(sql)
-
-	// flush menutup statement yang sedang dibaca dan mulai pencatatan baru
-	flush := func(end int) {
-		if tokens.count > 0 {
-			stmts = append(stmts, Statement{
-				Text:    strings.TrimSpace(sql[start:end]),
-				Keyword: tokens.first,
-				Second:  tokens.second,
-			})
+	sp := &splitter{sql: sql}
+	for i := 0; i < len(sql); {
+		next, err := sp.step(i)
+		if err != nil {
+			return nil, err
 		}
-		tokens = tokenTracker{}
+		i = next
 	}
+	sp.flush(len(sql))
+	return sp.stmts, nil
+}
 
-	for i < n {
-		c := sql[i]
-		switch {
-		case c == ';': // Titik koma di luar string dan komentar = akhir perintah
-			flush(i)
-			i++
-			start = i
-		case c == '-' && i+1 < n && sql[i+1] == '-':
-			i = skipLineComment(sql, i)
-		case c == '/' && i+1 < n && sql[i+1] == '*': // Komentar block boleh nested
-			end, ok := skipBlockComment(sql, i)
-			if !ok {
-				return nil, ErrUnterminated
-			}
-			i = end
-		case c == '\'': // Treat backslash secara khusus
-			backslash := i > 0 && (sql[i-1] == 'e' || sql[i-1] == 'E') && (i < 2 || !isIdentChar(sql[i-2]))
-			end, ok := skipQuoted(sql, i, '\'', backslash)
-			if !ok {
-				return nil, ErrUnterminated
-			}
-			tokens.note("")
-			i = end
-		case c == '"':
-			end, ok := skipQuoted(sql, i, '"', false)
-			if !ok {
-				return nil, ErrUnterminated
-			}
-			tokens.note("")
-			i = end
-		case c == '$': // Bisa ada titik koma di dollar-quote
-			delim, ok := dollarDelimiter(sql, i)
-			if !ok {
-				tokens.note("")
-				i++
-				continue
-			}
-			end, ok := skipDollarQuoted(sql, i, delim)
-			if !ok {
-				return nil, ErrUnterminated
-			}
-			tokens.note("")
-			i = end
-		case isSpace(c):
-			i++
-		case isIdentChar(c):
-			j := i
-			for j < n && isIdentChar(sql[j]) {
-				j++
-			}
-			// Token awal angka bukan kata kunci
-			if c >= '0' && c <= '9' {
-				tokens.note("")
-			} else {
-				tokens.note(strings.ToUpper(sql[i:j]))
-			}
-			i = j
-		default:
-			tokens.note("")
-			i++
-		}
+// flush menutup statement yang sedang dibaca dan mulai pencatatan baru
+func (sp *splitter) flush(end int) {
+	if sp.tokens.count > 0 {
+		sp.stmts = append(sp.stmts, Statement{
+			Text:    strings.TrimSpace(sp.sql[sp.start:end]),
+			Keyword: sp.tokens.first,
+			Second:  sp.tokens.second,
+		})
 	}
-	flush(n)
-	return stmts, nil
+	sp.tokens = tokenTracker{}
+}
+
+// step membaca satu token mulai dari posisi i dan mengembalikan posisi berikutnya
+func (sp *splitter) step(i int) (int, error) {
+	sql, n := sp.sql, len(sp.sql)
+	c := sql[i]
+	switch {
+	case c == ';': // Titik koma di luar string dan komentar = akhir perintah
+		sp.flush(i)
+		sp.start = i + 1
+		return i + 1, nil
+	case c == '-' && i+1 < n && sql[i+1] == '-':
+		return skipLineComment(sql, i), nil
+	case c == '/' && i+1 < n && sql[i+1] == '*': // Komentar block boleh nested
+		return closed(skipBlockComment(sql, i))
+	case c == '\'': // Treat backslash secara khusus
+		return sp.noted(skipQuoted(sql, i, '\'', isEscapeString(sql, i)))
+	case c == '"':
+		return sp.noted(skipQuoted(sql, i, '"', false))
+	case c == '$': // Bisa ada titik koma di dollar-quote
+		return sp.dollar(i)
+	case isSpace(c):
+		return i + 1, nil
+	case isIdentChar(c):
+		return sp.word(i), nil
+	default:
+		sp.tokens.note("")
+		return i + 1, nil
+	}
+}
+
+// closed mengubah hasil skip menjadi posisi berikutnya, atau ErrUnterminated kalau penutupnya tidak ketemu
+func closed(end int, ok bool) (int, error) {
+	if !ok {
+		return 0, ErrUnterminated
+	}
+	return end, nil
+}
+
+// noted sama dengan closed, ditambah mencatat bahwa ada satu token (string atau identifier) di statement ini
+func (sp *splitter) noted(end int, ok bool) (int, error) {
+	end, err := closed(end, ok)
+	if err != nil {
+		return 0, err
+	}
+	sp.tokens.note("")
+	return end, nil
+}
+
+// isEscapeString true untuk string gaya E'..' yang mengenal backslash
+func isEscapeString(sql string, i int) bool {
+	return i > 0 && (sql[i-1] == 'e' || sql[i-1] == 'E') && (i < 2 || !isIdentChar(sql[i-2]))
+}
+
+// dollar menangani $: bisa pembuka dollar-quote ($$ atau $tag$), bisa juga hanya simbol biasa
+func (sp *splitter) dollar(i int) (int, error) {
+	delim, ok := dollarDelimiter(sp.sql, i)
+	if !ok {
+		sp.tokens.note("")
+		return i + 1, nil
+	}
+	return sp.noted(skipDollarQuoted(sp.sql, i, delim))
+}
+
+// word membaca satu kata atau angka dan mencatatnya, hanya kata yang bisa jadi kata kunci
+func (sp *splitter) word(i int) int {
+	j := i
+	for j < len(sp.sql) && isIdentChar(sp.sql[j]) {
+		j++
+	}
+	// Token awal angka bukan kata kunci
+	if c := sp.sql[i]; c >= '0' && c <= '9' {
+		sp.tokens.note("")
+	} else {
+		sp.tokens.note(strings.ToUpper(sp.sql[i:j]))
+	}
+	return j
 }
 
 // isSpace true untuk karakter spasi, tab, dan baris baru
