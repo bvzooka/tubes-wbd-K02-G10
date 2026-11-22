@@ -6,13 +6,15 @@ import (
 	"dbplatform/internal/approval"
 	"dbplatform/internal/auth"
 	"dbplatform/internal/connmgr"
+	"dbplatform/internal/viewer"
 )
 
 type apiHandlers struct {
-	auth *auth.APIHandler
-	admin *admin.APIHandler
-	approvals *approval.APIHandler
+	auth        *auth.APIHandler
+	admin       *admin.APIHandler
+	approvals   *approval.APIHandler
 	connections *connmgr.APIHandler
+	viewer      *viewer.APIHandler
 }
 
 // peta lengkap /api/v1. Nama method router adalah syarat
@@ -50,6 +52,11 @@ func registerAPIRoutes(api *apiv1.Router, h apiHandlers) {
 	api.Admin("PUT /admin/connections/{dbID}", h.connections.Update)
 	api.Admin("POST /admin/connections/{dbID}/activate", h.connections.Activate)
 	api.Admin("POST /admin/connections/{dbID}/deactivate", h.connections.Deactivate)
+
+	api.Authed("GET /databases", h.viewer.ListDatabases)
+	api.DBView("GET /databases/{dbID}/schema", h.viewer.Schema)
+	api.DBView("GET /databases/{dbID}/tables/{schema}/{table}", h.viewer.Table)
+	api.DBView("GET /databases/{dbID}/tables/{schema}/{table}/data", h.viewer.Data)
 
 	api.Authed("GET /approvals", h.approvals.Inbox)
 	api.Authed("POST /executions/{execID}/approvals/{groupID}/approve", h.approvals.Approve)

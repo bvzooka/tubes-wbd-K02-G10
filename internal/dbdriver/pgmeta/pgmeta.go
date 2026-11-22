@@ -10,16 +10,16 @@ import (
 	"dbplatform/internal/dbdriver"
 )
 
-//  nama schema meta di database target. Introspect dan viewer menyembunyikannya.
+// nama schema meta di database target. Introspect dan viewer menyembunyikannya.
 const Schema = "_dbplatform"
 
-//  kode error PostgreSQL saat primary key atau nilai unik sudah ada
+// kode error PostgreSQL saat primary key atau nilai unik sudah ada
 const sqlstateUniqueViolation = "23505"
 
 // arah batch: forward untuk migration biasa, revert untuk pembatalan batch (rollback)
 const (
 	Forward = "forward"
-	Revert = "revert"
+	Revert  = "revert"
 )
 
 // ErrDuplicateExecution dikembalikan RecordExecution bila execution_id itu sudah tercatat.
@@ -56,8 +56,8 @@ CREATE TABLE IF NOT EXISTS ` + Schema + `.batches (
 
 // bukti satu eksekusi yang ter-commit di database target
 type Execution struct {
-	ID int64
-	Kind string
+	ID       int64
+	Kind     string
 	Attempt  int
 	Checksum string
 }
@@ -65,10 +65,10 @@ type Execution struct {
 // checkpoint satu batch, LoKey eksklusif dan HiKey inklusif, sama dengan placeholder $1 dan $2.
 type Batch struct {
 	ExecutionID  int64
-	BatchNo int
-	Direction string
-	LoKey int64
-	HiKey int64
+	BatchNo      int
+	Direction    string
+	LoKey        int64
+	HiKey        int64
 	RowsAffected int64
 }
 
@@ -151,10 +151,10 @@ func ResumeCursor(ctx context.Context, tx dbdriver.ArgTx, chain []int64) (cursor
 	return cursor, found, nil
 }
 
-//  jumlah batch dan baris forward yang sudah ter-commit pada sebuah rantai eksekusi
+// jumlah batch dan baris forward yang sudah ter-commit pada sebuah rantai eksekusi
 type Progress struct {
 	Batches int64
-	Rows int64
+	Rows    int64
 }
 
 // menghitung progres dari checkpoint di target. sumber kebenaran progres, dipake rekonsiliasi kalau penulisan progres ke db platform gagal

@@ -34,15 +34,52 @@ func (s *Service) Databases(ctx context.Context, p domain.Principal) ([]Database
 	return out, nil
 }
 
-// Overview menampilkan tabel dan view per schema
-func (s *Service) Overview(ctx context.Context, p domain.Principal, dbID int64) (*Overview, error) {
+// Schema membaca semua tabel dan view database setelah memeriksa akses user.
+// Mengembalikan data mentah dari driver, Overview dan API JSON menyusunnya sendiri sesuai kebutuhan.
+func (s *Service) Schema(ctx context.Context, p domain.Principal, dbID int64) (DatabaseItem, *domain.Schema, error) {
 	item, drv, err := s.open(ctx, p, dbID)
 	if err != nil {
-		return nil, err
+		return DatabaseItem{}, nil, err
 	}
 	schema, err := drv.Introspect(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("introspect database %d: %w", dbID, err)
+		return DatabaseItem{}, nil, fmt.Errorf("introspect database %d: %w", dbID, err)
+	}
+	return item, schema, nil
+}
+
+// Describe mengembalikan satu tabel lengkap dengan kolom, constraint, dan index, ErrNotFound bila tidak ada
+func (s *Service) Describe(ctx context.Context, p domain.Principal, dbID int64, ref domain.TableRef) (DatabaseItem, domain.Table, error) {
+	item, schema, err := s.Schema(ctx, p, dbID)
+	if err != nil {
+		return DatabaseItem{}, domain.Table{}, err
+	}
+	for _, t := range schema.Tables {
+		if t.Schema == ref.Schema && t.Name == ref.Table {
+			return item, t, nil
+		}
+	}
+	return DatabaseItem{}, domain.Table{}, domain.ErrNotFound
+}
+
+// Rows membaca satu halaman isi tabel setelah memeriksa akses user
+func (s *Service) Rows(ctx context.Context, p domain.Principal, dbID int64, ref domain.TableRef, page domain.PageRequest) (DatabaseItem, *domain.TableData, error) {
+	item, drv, err := s.open(ctx, p, dbID)
+	if err != nil {
+		return DatabaseItem{}, nil, err
+	}
+	res, err := drv.TableData(ctx, ref, page)
+	if err != nil {
+		return DatabaseItem{}, nil, fmt.Errorf("read data of %s.%s: %w", ref.Schema, ref.Table, err)
+	}
+	return item, res, nil
+}
+
+// Overview menampilkan tabel dan view per schema
+func (s *Service) Overview(ctx context.Context, p domain.Principal, dbID int64) (*Overview, error) {
+	item, schema, err := s.Schema(ctx, p, dbID)
+	if err != nil {
+		return nil, err
 	}
 	ov := &Overview{Database: item}
 	// tabel dari Introspect sudah berurutan per schema, jadi grup baru dibuat tiap schema berganti
@@ -62,31 +99,18 @@ func (s *Service) Overview(ctx context.Context, p domain.Principal, dbID int64) 
 
 // menampilkan kolom, constraint, dan index satu tabel, ErrNotFound bila tabelnya tidak ada
 func (s *Service) Table(ctx context.Context, p domain.Principal, dbID int64, ref domain.TableRef) (*TableDetail, error) {
-	item, drv, err := s.open(ctx, p, dbID)
+	item, t, err := s.Describe(ctx, p, dbID, ref)
 	if err != nil {
 		return nil, err
 	}
-	schema, err := drv.Introspect(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("introspect database %d: %w", dbID, err)
-	}
-	for _, t := range schema.Tables {
-		if t.Schema == ref.Schema && t.Name == ref.Table {
-			return newTableDetail(dbID, item, t), nil
-		}
-	}
-	return nil, domain.ErrNotFound
+	return newTableDetail(dbID, item, t), nil
 }
 
 // menampilkan satu halaman isi tabel
 func (s *Service) Data(ctx context.Context, p domain.Principal, dbID int64, ref domain.TableRef, page domain.PageRequest) (*DataView, error) {
-	item, drv, err := s.open(ctx, p, dbID)
+	item, res, err := s.Rows(ctx, p, dbID, ref, page)
 	if err != nil {
 		return nil, err
-	}
-	res, err := drv.TableData(ctx, ref, page)
-	if err != nil {
-		return nil, fmt.Errorf("read data of %s.%s: %w", ref.Schema, ref.Table, err)
 	}
 	return &DataView{
 		Database: item, Schema: ref.Schema, Name: ref.Table, Result: res,

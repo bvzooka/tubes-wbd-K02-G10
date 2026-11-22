@@ -75,6 +75,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		approvals: approval.NewAPIHandler(approval.NewService(pool, clk, logger)),
 
 		connections: wireConnections(cfg, pool),
+		viewer:      wireViewer(&d),
 	})
 
 	if err := wireStatic(mux, d, cfg, pool); err != nil {
