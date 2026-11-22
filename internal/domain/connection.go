@@ -2,6 +2,7 @@ package domain
 
 import "time"
 
+// DBMS adalah jenis database target
 type DBMS string
 
 const (

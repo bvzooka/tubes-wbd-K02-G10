@@ -1,15 +1,15 @@
 package connmgr
 
 import (
+	"dbplatform/internal/domain"
+	"dbplatform/internal/httpx"
+	webassets "dbplatform/web"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
-	"dbplatform/internal/domain"
-	"dbplatform/internal/httpx"
-	webassets "dbplatform/web"
 )
 
 func validInputFor(dbms domain.DBMS) domain.ConnectionInput {

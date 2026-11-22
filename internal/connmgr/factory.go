@@ -2,11 +2,11 @@ package connmgr
 
 import (
 	"context"
-	"fmt"
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/dbdriver/mysql"
 	"dbplatform/internal/dbdriver/postgres"
 	"dbplatform/internal/domain"
+	"fmt"
 )
 
 func DefaultFactory(ctx context.Context, conn domain.Connection, password string) (dbdriver.Driver, error) {

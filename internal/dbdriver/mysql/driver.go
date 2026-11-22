@@ -1,17 +1,18 @@
 package mysql
+
 import (
 	"context"
 	"database/sql"
+	"dbplatform/internal/dbdriver"
+	"dbplatform/internal/domain"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	gomysql "github.com/go-sql-driver/mysql"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
-	gomysql "github.com/go-sql-driver/mysql"
-	"dbplatform/internal/dbdriver"
-	"dbplatform/internal/domain"
 )
 
 const (
@@ -21,13 +22,13 @@ const (
 )
 
 type Driver struct {
-	dbms domain.DBMS
+	dbms   domain.DBMS
 	dbName string
-	cfg *gomysql.Config
-	ro *sql.DB
+	cfg    *gomysql.Config
+	ro     *sql.DB
 
-	mu sync.Mutex
-	rw *sql.DB
+	mu     sync.Mutex
+	rw     *sql.DB
 	closed bool
 }
 
@@ -120,8 +121,8 @@ func (d *Driver) writePool() (*sql.DB, error) {
 
 type txSpec struct {
 	readOnly bool
-	iso sql.IsolationLevel
-	timeout time.Duration
+	iso      sql.IsolationLevel
+	timeout  time.Duration
 }
 
 func (d *Driver) runTx(ctx context.Context, db *sql.DB, spec txSpec, fn func(context.Context, *sql.Tx) error) error {
@@ -195,7 +196,7 @@ func (d *Driver) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(tx
 }
 
 type myTx struct {
-	tx *sql.Tx
+	tx  *sql.Tx
 	ctx context.Context
 }
 

@@ -18,9 +18,9 @@ import (
 
 	"dbplatform/internal/access"
 	"dbplatform/internal/auth"
-	"dbplatform/internal/auth/authtest"
 	"dbplatform/internal/clock"
 	"dbplatform/internal/domain"
+	"dbplatform/internal/testutil"
 )
 
 // pageRenderer menulis token CSRF login ke body agar bisa dibaca client test.
@@ -58,7 +58,7 @@ func newApp(t *testing.T) *app {
 	if testing.Short() {
 		t.Skip("integration")
 	}
-	pool := authtest.NewAppDB(t)
+	pool := testutil.NewAppDB(t)
 	// Mulai dari waktu nyata: cookie jar memakai jam sistem untuk atribut Expires.
 	clk := clock.NewFake(time.Now().UTC().Truncate(time.Second))
 	mod := auth.New(auth.Config{Policy: auth.DefaultPolicy(), BcryptCost: bcrypt.MinCost}, auth.Deps{
@@ -87,7 +87,7 @@ func (a *app) seedUser(t *testing.T, username, password string, admin bool) doma
 	if err != nil {
 		t.Fatal(err)
 	}
-	return authtest.SeedUser(t, a.pool, username, hash, admin)
+	return testutil.SeedUserWithHash(t, a.pool, username, hash, admin)
 }
 
 func newClient(t *testing.T) *http.Client {
@@ -358,7 +358,7 @@ func TestAuth_Integration_DeactivatedUserRejected(t *testing.T) {
 	u := a.seedUser(t, "alice", "password-alice", false)
 	c := newClient(t)
 	a.login(t, c, "alice", "password-alice")
-	authtest.SetUserActive(t, a.pool, u.ID, false)
+	testutil.SetUserActive(t, a.pool, u.ID, false)
 	if resp, _ := get(t, c, a.server.URL+"/databases"); resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("user nonaktif: %d", resp.StatusCode)
 	}
@@ -386,9 +386,9 @@ func TestAuth_Integration_RevokeAllForUser(t *testing.T) {
 func TestAuth_Integration_PostWithoutCSRFForbidden(t *testing.T) {
 	a := newApp(t)
 	u := a.seedUser(t, "alice", "password-alice", false)
-	conn := authtest.SeedConnection(t, a.pool, "sample", true)
-	g := authtest.SeedGroup(t, a.pool, "editors", u.ID)
-	authtest.Grant(t, a.pool, g, conn, domain.AccessViewEdit)
+	conn := testutil.SeedConnection(t, a.pool, "sample", true)
+	g := testutil.SeedGroup(t, a.pool, "editors", u.ID)
+	testutil.Grant(t, a.pool, g, conn, domain.AccessViewEdit)
 
 	c := newClient(t)
 	a.login(t, c, "alice", "password-alice")
@@ -409,9 +409,9 @@ func TestAuth_Integration_PostWithoutCSRFForbidden(t *testing.T) {
 func TestAuth_Integration_RequireDBAccessViewOnlyOnEditRoute(t *testing.T) {
 	a := newApp(t)
 	u := a.seedUser(t, "viewer", "password-viewer", false)
-	conn := authtest.SeedConnection(t, a.pool, "sample", true)
-	g := authtest.SeedGroup(t, a.pool, "viewers", u.ID)
-	authtest.Grant(t, a.pool, g, conn, domain.AccessViewOnly)
+	conn := testutil.SeedConnection(t, a.pool, "sample", true)
+	g := testutil.SeedGroup(t, a.pool, "viewers", u.ID)
+	testutil.Grant(t, a.pool, g, conn, domain.AccessViewOnly)
 
 	c := newClient(t)
 	a.login(t, c, "viewer", "password-viewer")

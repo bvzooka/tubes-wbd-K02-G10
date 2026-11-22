@@ -66,7 +66,6 @@ func (s *Service) Get(ctx context.Context, p domain.Principal, id int64) (domain
 	return s.repo.Get(ctx, id)
 }
 
-
 func (s *Service) TestConnection(ctx context.Context, p domain.Principal, id int64, in domain.ConnectionInput) error {
 	if err := requireAdmin(p); err != nil {
 		return err

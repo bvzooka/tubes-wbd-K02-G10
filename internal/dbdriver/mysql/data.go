@@ -3,11 +3,11 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"dbplatform/internal/domain"
 	"errors"
+	gomysql "github.com/go-sql-driver/mysql"
 	"strings"
 	"time"
-	gomysql "github.com/go-sql-driver/mysql"
-	"dbplatform/internal/domain"
 )
 
 const tableExistsSQL = `

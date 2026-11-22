@@ -29,34 +29,34 @@ type ListPage struct {
 }
 
 type FormValues struct {
-	Name string
-	DBMS string
-	Host string
-	Port string
+	Name         string
+	DBMS         string
+	Host         string
+	Port         string
 	DatabaseName string
-	Username string
-	SSLMode string
+	Username     string
+	SSLMode      string
 }
 
 type FormPage struct {
-	IsEdit bool
-	ID int64
-	Heading string
-	Action string
-	Values FormValues
-	Errors map[string]string
-	SSLModes []string
+	IsEdit      bool
+	ID          int64
+	Heading     string
+	Action      string
+	Values      FormValues
+	Errors      map[string]string
+	SSLModes    []string
 	DBMSOptions []DBMSOption
 	TestMessage string
-	TestOK bool
+	TestOK      bool
 }
 
 type Handler struct {
 	svc *Service
-	d httpx.Deps
+	d   httpx.Deps
 }
 
-func NewHandler(svc *Service, d httpx.Deps) *Handler { return &Handler{svc: svc, d: d} }
+func NewHandler(d httpx.Deps, svc *Service) *Handler { return &Handler{svc: svc, d: d} }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	admin := h.d.Admin()

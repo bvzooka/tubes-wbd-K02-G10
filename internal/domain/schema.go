@@ -1,5 +1,6 @@
 package domain
 
+// TableKind membedakan tabel biasa dan view
 type TableKind string
 
 const (
@@ -7,6 +8,7 @@ const (
 	TableKindView  TableKind = "view"
 )
 
+// ConstraintType adalah jenis aturan di sebuah tabel
 type ConstraintType string
 
 const (
@@ -62,11 +64,13 @@ type Index struct {
 	Definition string
 }
 
+// TableRef menunjuk satu tabel lewat nama schema dan nama tabelnya
 type TableRef struct {
 	Schema string
 	Table  string
 }
 
+// ukuran halaman default dan batas atasnya supaya satu request tidak menarik terlalu banyak baris
 const (
 	DefaultPageSize = 50
 	MaxPageSize     = 200
@@ -77,6 +81,7 @@ type PageRequest struct {
 	PageSize int
 }
 
+// Normalize memaksa nilai halaman ke rentang yang aman
 func (p PageRequest) Normalize() PageRequest {
 	if p.Page < 1 {
 		p.Page = 1
@@ -90,21 +95,25 @@ func (p PageRequest) Normalize() PageRequest {
 	return p
 }
 
+// Offset menghitung berapa baris dilewati untuk halaman ini
 func (p PageRequest) Offset() int {
 	n := p.Normalize()
 	return (n.Page - 1) * n.PageSize
 }
 
+// Cell adalah isi satu sel, Null dibedakan dari string kosong
 type Cell struct {
 	Value string
 	Null  bool
 }
 
+// ResultSet adalah hasil query: nama kolom dan baris-barisnya
 type ResultSet struct {
 	Columns []string
 	Rows    [][]Cell
 }
 
+// TableData adalah satu halaman isi tabel, HasNext menandakan masih ada halaman berikutnya
 type TableData struct {
 	ResultSet
 	Page     int

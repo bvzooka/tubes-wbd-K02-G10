@@ -1,17 +1,17 @@
 package mysql
 
 import (
-	"errors"
-	"testing"
-	gomysql "github.com/go-sql-driver/mysql"
 	"dbplatform/internal/domain"
+	"errors"
+	gomysql "github.com/go-sql-driver/mysql"
+	"testing"
 )
 
 func TestSelectSQL(t *testing.T) {
 	cases := []struct {
 		name string
-		ref domain.TableRef
-		pk []string
+		ref  domain.TableRef
+		pk   []string
 		want string
 	}{
 		{"tanpa pk", domain.TableRef{Schema: "shop", Table: "v_sales"}, nil,

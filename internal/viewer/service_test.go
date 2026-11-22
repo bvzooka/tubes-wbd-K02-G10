@@ -2,12 +2,12 @@ package viewer
 
 import (
 	"context"
-	"errors"
-	"reflect"
-	"testing"
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/domain"
 	"dbplatform/internal/testutil"
+	"errors"
+	"reflect"
+	"testing"
 )
 
 type fakeAuthz struct {
@@ -27,12 +27,12 @@ func (f fakeAuthz) ListAccessible(context.Context, int64) ([]domain.AccessibleDa
 
 type fakeDriver struct {
 	dbdriver.Driver
-	schema *domain.Schema
-	data *domain.TableData
-	gotRef domain.TableRef
-	gotPage domain.PageRequest
+	schema    *domain.Schema
+	data      *domain.TableData
+	gotRef    domain.TableRef
+	gotPage   domain.PageRequest
 	introCall int
-	err error
+	err       error
 }
 
 func (d *fakeDriver) Introspect(context.Context) (*domain.Schema, error) {

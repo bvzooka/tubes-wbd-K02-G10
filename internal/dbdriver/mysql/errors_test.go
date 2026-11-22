@@ -3,13 +3,13 @@ package mysql
 import (
 	"context"
 	"database/sql/driver"
+	"dbplatform/internal/domain"
 	"errors"
 	"fmt"
+	gomysql "github.com/go-sql-driver/mysql"
 	"net"
 	"strings"
 	"testing"
-	gomysql "github.com/go-sql-driver/mysql"
-	"dbplatform/internal/domain"
 )
 
 func TestClassifyError(t *testing.T) {

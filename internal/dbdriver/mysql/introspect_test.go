@@ -11,12 +11,12 @@ func ns(s string) sql.NullString { return sql.NullString{String: s, Valid: true}
 
 func TestColumnDefault(t *testing.T) {
 	cases := []struct {
-		name string
-		def sql.NullString
+		name     string
+		def      sql.NullString
 		dataType string
-		extra string
+		extra    string
 		mariadb  bool
-		want string
+		want     string
 	}{
 		{"tanpa default", sql.NullString{}, "int", "", false, "<nil>"},
 		{"auto increment", sql.NullString{}, "int", "auto_increment", false, "AUTO_INCREMENT"},
@@ -52,8 +52,8 @@ func TestColumnDefault(t *testing.T) {
 func TestCheckExpr(t *testing.T) {
 	cases := map[string]string{
 		"(`balance` >= 0)": "CHECK (`balance` >= 0)",
-		"`balance` >= 0": "CHECK (`balance` >= 0)",
-		"  (`a` > 1)  ": "CHECK (`a` > 1)",
+		"`balance` >= 0":   "CHECK (`balance` >= 0)",
+		"  (`a` > 1)  ":    "CHECK (`a` > 1)",
 	}
 	for in, want := range cases {
 		if got := checkExpr(in); got != want {
@@ -64,10 +64,10 @@ func TestCheckExpr(t *testing.T) {
 
 func TestIndexDefinition(t *testing.T) {
 	cases := []struct {
-		name string
-		ix domain.Index
+		name  string
+		ix    domain.Index
 		parts []string
-		want string
+		want  string
 	}{
 		{"primary", domain.Index{Name: "PRIMARY", Primary: true, Unique: true, Method: "btree"}, []string{"`id`"},
 			"ALTER TABLE `shop`.`orders` ADD PRIMARY KEY (`id`)"},
@@ -102,10 +102,10 @@ func TestNewIndexPart(t *testing.T) {
 
 func TestIsMariaDB(t *testing.T) {
 	for v, want := range map[string]bool{
-		"8.4.5": false,
+		"8.4.5":                   false,
 		"8.0.36-0ubuntu0.22.04.1": false,
 		"10.11.6-MariaDB-1:10.11": true,
-		"5.5.5-10.6.12-mariadb": true,
+		"5.5.5-10.6.12-mariadb":   true,
 	} {
 		if got := isMariaDB(v); got != want {
 			t.Errorf("isMariaDB(%q) = %v", v, got)

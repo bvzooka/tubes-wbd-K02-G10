@@ -11,17 +11,17 @@ import (
 	"dbplatform/internal/domain"
 )
 
-//  ErrConnectionFailed dgn pesan utk ditampilkan
+// ErrConnectionFailed dgn pesan utk ditampilkan
 type connError struct {
 	msg   string
 	cause error
 }
 
-func (e *connError) Error() string { return e.msg }
-func (e *connError) Cause() error { return e.cause }
+func (e *connError) Error() string        { return e.msg }
+func (e *connError) Cause() error         { return e.cause }
 func (e *connError) Is(target error) bool { return target == domain.ErrConnectionFailed }
 
-//  mengubah error koneksi/driver jadi domain.ErrConnectionFailed
+// mengubah error koneksi/driver jadi domain.ErrConnectionFailed
 func ClassifyError(err error) error {
 	if err == nil {
 		return nil

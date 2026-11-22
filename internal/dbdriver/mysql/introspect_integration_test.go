@@ -13,7 +13,7 @@ import (
 
 type fixture struct {
 	cust, ord, item, view string
-	caps serverInfo
+	caps                  serverInfo
 }
 
 func newFixture(t *testing.T, d *Driver) fixture {

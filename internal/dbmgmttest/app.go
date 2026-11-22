@@ -25,6 +25,7 @@ import (
 	"dbplatform/internal/dbdriver/postgres"
 	"dbplatform/internal/domain"
 	"dbplatform/internal/httpx"
+	"dbplatform/internal/middleware"
 	"dbplatform/internal/testutil"
 	"dbplatform/internal/viewer"
 	webassets "dbplatform/web"
@@ -33,14 +34,14 @@ import (
 const Password = "password-rahasia-123"
 
 type App struct {
-	Pool*pgxpool.Pool 
-	Target *pgxpool.Pool 
-	Server *httptest.Server
-	Hasher *auth.Hasher
+	Pool    *pgxpool.Pool
+	Target  *pgxpool.Pool
+	Server  *httptest.Server
+	Hasher  *auth.Hasher
 	Service *connmgr.Service
-	Repo*connmgr.Repo
+	Repo    *connmgr.Repo
 	Drivers *connmgr.Provider
-	ConnID int64
+	ConnID  int64
 }
 
 var csrfRe = regexp.MustCompile(`name="csrf_token" value="([^"]+)"`)
@@ -78,11 +79,11 @@ func New(t *testing.T) *App {
 	}
 	mux := http.NewServeMux()
 	mod.Handler.Register(mux)
-	connmgr.NewHandler(svc, d).Register(mux)
-	viewer.NewHandler(viewer.NewService(authz, provider), d).Register(mux)
+	connmgr.NewHandler(d, svc).Register(mux)
+	viewer.NewHandler(d, viewer.NewService(authz, provider)).Register(mux)
 
-	srv := httptest.NewServer(httpx.Chain(
-		httpx.WithRequestID, httpx.Recover(logger, handleErr), httpx.SecurityHeaders,
+	srv := httptest.NewServer(middleware.Chain(
+		middleware.WithRequestID, middleware.Recover(logger, handleErr), middleware.SecurityHeaders,
 	)(mux))
 	t.Cleanup(srv.Close)
 
@@ -139,7 +140,6 @@ func (a *App) Client() *http.Client {
 	return &http.Client{Jar: jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 }
 
-
 func (a *App) Login(t *testing.T, c *http.Client, username string) {
 	t.Helper()
 	_, body := a.Get(t, c, "/login")
@@ -161,7 +161,7 @@ func (a *App) Get(t *testing.T, c *http.Client, path string) (*http.Response, st
 	return resp, readBody(t, resp)
 }
 
-//  ngirim forms tanpa menambah token CSRF
+// ngirim forms tanpa menambah token CSRF
 func (a *App) PostRaw(t *testing.T, c *http.Client, path string, form url.Values) (*http.Response, string) {
 	t.Helper()
 	resp, err := c.PostForm(a.Server.URL+path, form)

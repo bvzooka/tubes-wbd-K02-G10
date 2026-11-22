@@ -3,11 +3,11 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"dbplatform/internal/dbdriver"
+	"dbplatform/internal/domain"
 	"errors"
 	"strings"
 	"testing"
-	"dbplatform/internal/dbdriver"
-	"dbplatform/internal/domain"
 )
 
 func TestNew_RejectsOtherDBMS(t *testing.T) {

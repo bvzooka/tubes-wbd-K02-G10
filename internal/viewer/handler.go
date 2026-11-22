@@ -1,10 +1,10 @@
 package viewer
 
 import (
-	"net/http"
-	"strconv"
 	"dbplatform/internal/domain"
 	"dbplatform/internal/httpx"
+	"net/http"
+	"strconv"
 )
 
 type DatabasesPage struct {
@@ -12,16 +12,16 @@ type DatabasesPage struct {
 }
 
 type DataPage struct {
-	View *DataView
+	View  *DataView
 	Pager httpx.Pager
 }
 
 type Handler struct {
 	svc *Service
-	d httpx.Deps
+	d   httpx.Deps
 }
 
-func NewHandler(svc *Service, d httpx.Deps) *Handler { return &Handler{svc: svc, d: d} }
+func NewHandler(d httpx.Deps, svc *Service) *Handler { return &Handler{svc: svc, d: d} }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	view := h.d.DBView()

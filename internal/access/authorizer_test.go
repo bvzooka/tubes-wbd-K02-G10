@@ -5,35 +5,35 @@ import (
 	"testing"
 
 	"dbplatform/internal/access"
-	"dbplatform/internal/auth/authtest"
 	"dbplatform/internal/domain"
+	"dbplatform/internal/testutil"
 )
 
 func TestAuthorizer_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration")
 	}
-	pool := authtest.NewAppDB(t)
+	pool := testutil.NewAppDB(t)
 	ctx := context.Background()
 	authz := access.New(pool)
 
-	multi := authtest.SeedUser(t, pool, "multi", "x", false)
-	viewer := authtest.SeedUser(t, pool, "viewer", "x", false)
-	loner := authtest.SeedUser(t, pool, "loner", "x", false)
-	admin := authtest.SeedUser(t, pool, "admin", "x", true)
-	inactive := authtest.SeedUser(t, pool, "inactive", "x", false)
+	multi := testutil.SeedUserWithHash(t, pool, "multi", "x", false)
+	viewer := testutil.SeedUserWithHash(t, pool, "viewer", "x", false)
+	loner := testutil.SeedUserWithHash(t, pool, "loner", "x", false)
+	admin := testutil.SeedUserWithHash(t, pool, "admin", "x", true)
+	inactive := testutil.SeedUserWithHash(t, pool, "inactive", "x", false)
 
-	sales := authtest.SeedConnection(t, pool, "Sales", true)
-	hr := authtest.SeedConnection(t, pool, "hr", true)
-	archived := authtest.SeedConnection(t, pool, "archived", false)
+	sales := testutil.SeedConnection(t, pool, "Sales", true)
+	hr := testutil.SeedConnection(t, pool, "hr", true)
+	archived := testutil.SeedConnection(t, pool, "archived", false)
 
-	readers := authtest.SeedGroup(t, pool, "readers", multi.ID, viewer.ID, inactive.ID)
-	editors := authtest.SeedGroup(t, pool, "editors", multi.ID)
-	authtest.Grant(t, pool, readers, sales, domain.AccessViewOnly)
-	authtest.Grant(t, pool, readers, hr, domain.AccessViewOnly)
-	authtest.Grant(t, pool, readers, archived, domain.AccessViewEdit)
-	authtest.Grant(t, pool, editors, sales, domain.AccessViewEdit)
-	authtest.SetUserActive(t, pool, inactive.ID, false)
+	readers := testutil.SeedGroup(t, pool, "readers", multi.ID, viewer.ID, inactive.ID)
+	editors := testutil.SeedGroup(t, pool, "editors", multi.ID)
+	testutil.Grant(t, pool, readers, sales, domain.AccessViewOnly)
+	testutil.Grant(t, pool, readers, hr, domain.AccessViewOnly)
+	testutil.Grant(t, pool, readers, archived, domain.AccessViewEdit)
+	testutil.Grant(t, pool, editors, sales, domain.AccessViewEdit)
+	testutil.SetUserActive(t, pool, inactive.ID, false)
 
 	tests := []struct {
 		name string
@@ -107,7 +107,7 @@ func TestAuthorizer_Integration(t *testing.T) {
 	})
 
 	t.Run("perubahan grant langsung berlaku", func(t *testing.T) {
-		authtest.Grant(t, pool, readers, sales, domain.AccessViewEdit)
+		testutil.Grant(t, pool, readers, sales, domain.AccessViewEdit)
 		got, _ := authz.EffectiveLevel(ctx, viewer.ID, sales)
 		if got != domain.AccessViewEdit {
 			t.Fatalf("got %q", got)

@@ -1,3 +1,4 @@
+// Package contract berisi interface antar modul supaya modul tidak saling mengimpor langsung
 package contract
 
 import (
@@ -18,6 +19,7 @@ type Authorizer interface {
 	ListAccessible(ctx context.Context, userID int64) ([]domain.AccessibleDatabase, error)
 }
 
+// PasswordHasher mengubah password jadi hash dan memeriksanya, dipakai login dan admin
 type PasswordHasher interface {
 	Hash(plain string) (string, error)
 	Verify(hash, plain string) bool
@@ -29,6 +31,7 @@ type SessionAdmin interface {
 	MarkRotationNeeded(ctx context.Context, userIDs ...int64) error
 }
 
+// AuthMiddleware berisi pengaman route: login, khusus admin, akses database, dan CSRF
 type AuthMiddleware interface {
 	Authenticate(next http.Handler) http.Handler
 	RequireAdmin(next http.Handler) http.Handler

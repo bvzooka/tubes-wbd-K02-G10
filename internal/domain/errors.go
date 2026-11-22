@@ -22,4 +22,6 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string { return "validation failed" }
+
+// Unwrap membuat ValidationError cocok dengan errors.Is(err, ErrValidation)
 func (e *ValidationError) Unwrap() error { return ErrValidation }

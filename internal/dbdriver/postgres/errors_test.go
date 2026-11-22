@@ -13,15 +13,15 @@ import (
 
 type timeoutErr struct{}
 
-func (timeoutErr) Error() string { return "i/o timeout" }
-func (timeoutErr) Timeout() bool { return true }
+func (timeoutErr) Error() string   { return "i/o timeout" }
+func (timeoutErr) Timeout() bool   { return true }
 func (timeoutErr) Temporary() bool { return true }
 
 func TestClassifyError(t *testing.T) {
 	tests := []struct {
-		name string
-		err error
-		wantMsg string 
+		name    string
+		err     error
+		wantMsg string
 	}{
 		{"password salah", &pgconn.PgError{Code: "28P01", Message: "password authentication failed"}, "Autentikasi database gagal"},
 		{"auth invalid", &pgconn.PgError{Code: "28000"}, "Autentikasi database gagal"},

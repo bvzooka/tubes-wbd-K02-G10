@@ -2,9 +2,9 @@ package mysql
 
 import (
 	"crypto/tls"
-	"testing"
-	gomysql "github.com/go-sql-driver/mysql"
 	"dbplatform/internal/domain"
+	gomysql "github.com/go-sql-driver/mysql"
+	"testing"
 )
 
 func TestBuildConfig_SpecialCharactersSurviveFormatAndParse(t *testing.T) {

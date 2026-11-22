@@ -8,13 +8,13 @@ import (
 )
 
 type DatabaseItem struct {
-	ID int64
-	Name string
-	DBMS string
+	ID         int64
+	Name       string
+	DBMS       string
 	DBMSLabel  string
-	Level domain.AccessLevel
+	Level      domain.AccessLevel
 	LevelLabel string
-	CanEdit bool
+	CanEdit    bool
 }
 
 func newDatabaseItem(a domain.AccessibleDatabase) DatabaseItem {
@@ -47,68 +47,68 @@ func LevelLabel(l domain.AccessLevel) string {
 }
 
 type TableItem struct {
-	Schema string
-	Name string
+	Schema    string
+	Name      string
 	KindLabel string
-	RowsText string
-	Href string
-	DataHref string
+	RowsText  string
+	Href      string
+	DataHref  string
 }
 
 type SchemaGroup struct {
-	Name string
+	Name   string
 	Tables []TableItem
 }
 
 type Overview struct {
 	Database DatabaseItem
-	Schemas []SchemaGroup
+	Schemas  []SchemaGroup
 }
 
 type ColumnRow struct {
-	Position int
-	Name string
-	DataType string
-	Nullable bool
-	Default string
+	Position   int
+	Name       string
+	DataType   string
+	Nullable   bool
+	Default    string
 	HasDefault bool
 }
 
 type ConstraintRow struct {
-	Name string
+	Name      string
 	TypeLabel string
-	Columns string
-	Detail string
+	Columns   string
+	Detail    string
 }
 
 type IndexRow struct {
-	Name string
-	Method string
-	Columns string
-	Unique bool
-	Primary bool
+	Name       string
+	Method     string
+	Columns    string
+	Unique     bool
+	Primary    bool
 	Definition string
 }
 
 type TableDetail struct {
-	Database DatabaseItem
-	Schema string
-	Name string
-	KindLabel string
-	RowsText string
-	Columns []ColumnRow
+	Database    DatabaseItem
+	Schema      string
+	Name        string
+	KindLabel   string
+	RowsText    string
+	Columns     []ColumnRow
 	Constraints []ConstraintRow
-	Indexes []IndexRow
-	DataHref string
-	BackHref string
+	Indexes     []IndexRow
+	DataHref    string
+	BackHref    string
 }
 
 // data halaman isi tabel
 type DataView struct {
 	Database  DatabaseItem
-	Schema string
-	Name string
-	Result *domain.TableData
+	Schema    string
+	Name      string
+	Result    *domain.TableData
 	TableHref string
 }
 

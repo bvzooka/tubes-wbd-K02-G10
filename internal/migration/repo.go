@@ -74,7 +74,7 @@ func (r *Repo) Create(ctx context.Context, connID int64, name, sql, checksum str
 	}
 
 	var version int
-	err = tx.QueryRow(ctx, 
+	err = tx.QueryRow(ctx,
 		// Versi berikutnya diitung di dalem kunci biar ga kembar
 		`
 		SELECT COALESCE(MAX(version), 0) + 1
@@ -194,7 +194,7 @@ func (r *Repo) Claim(ctx context.Context, connID int64, version int, executedBy 
 	}
 
 	var blocking int
-	err = tx.QueryRow(ctx, 
+	err = tx.QueryRow(ctx,
 		// Berurutan, versi lebih kecil harus selesai duluan
 		`
 		SELECT version

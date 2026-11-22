@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"context"
+	"dbplatform/internal/domain"
 	"errors"
+	"github.com/jackc/pgx/v5"
 	"strings"
 	"time"
-	"github.com/jackc/pgx/v5"
-	"dbplatform/internal/domain"
 )
 
 const tableExistsSQL = `
@@ -25,7 +25,7 @@ JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
 WHERE n.nspname = $1 AND c.relname = $2 AND i.indisprimary
 ORDER BY k.ord`
 
-// baca satu halaman data tabel, nama tabel divalidasi 
+// baca satu halaman data tabel, nama tabel divalidasi
 func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain.PageRequest) (*domain.TableData, error) {
 	page = page.Normalize()
 	out := &domain.TableData{Page: page.Page, PageSize: page.PageSize}

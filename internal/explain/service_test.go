@@ -13,10 +13,10 @@ import (
 	"testing"
 
 	"dbplatform/internal/access"
-	"dbplatform/internal/auth/authtest"
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/domain"
 	"dbplatform/internal/explain"
+	"dbplatform/internal/testutil"
 )
 
 type staticProvider struct{ drv dbdriver.Driver }
@@ -43,15 +43,15 @@ INSERT INTO customers (name) SELECT 'c' || g FROM generate_series(1, 50) g;
 INSERT INTO orders (customer_id, total) SELECT (g % 50) + 1, g FROM generate_series(1, 200) g;
 ANALYZE;`
 
-func newTarget(t *testing.T) *authtest.PgDriver {
+func newTarget(t *testing.T) *testutil.PgDriver {
 	t.Helper()
 	if testing.Short() {
 		t.Skip("integration")
 	}
-	return &authtest.PgDriver{Pool: authtest.NewTargetDB(t, targetSQL)}
+	return &testutil.PgDriver{Pool: testutil.NewTargetDB(t, targetSQL)}
 }
 
-func countOrders(t *testing.T, d *authtest.PgDriver) int {
+func countOrders(t *testing.T, d *testutil.PgDriver) int {
 	t.Helper()
 	var n int
 	if err := d.Pool.QueryRow(context.Background(), `SELECT count(*) FROM orders`).Scan(&n); err != nil {
@@ -138,12 +138,12 @@ func TestExplain_Integration_Rejections(t *testing.T) {
 
 func TestExplain_Integration_WithRealAuthorizer(t *testing.T) {
 	drv := newTarget(t)
-	app := authtest.NewAppDB(t)
-	viewer := authtest.SeedUser(t, app, "viewer", "x", false)
-	editorUser := authtest.SeedUser(t, app, "editor", "x", false)
-	conn := authtest.SeedConnection(t, app, "sample", true)
-	authtest.Grant(t, app, authtest.SeedGroup(t, app, "viewers", viewer.ID), conn, domain.AccessViewOnly)
-	authtest.Grant(t, app, authtest.SeedGroup(t, app, "editors", editorUser.ID), conn, domain.AccessViewEdit)
+	app := testutil.NewAppDB(t)
+	viewer := testutil.SeedUserWithHash(t, app, "viewer", "x", false)
+	editorUser := testutil.SeedUserWithHash(t, app, "editor", "x", false)
+	conn := testutil.SeedConnection(t, app, "sample", true)
+	testutil.Grant(t, app, testutil.SeedGroup(t, app, "viewers", viewer.ID), conn, domain.AccessViewOnly)
+	testutil.Grant(t, app, testutil.SeedGroup(t, app, "editors", editorUser.ID), conn, domain.AccessViewEdit)
 
 	svc := explain.NewService(access.New(app), staticProvider{drv})
 	ctx := context.Background()
@@ -155,7 +155,7 @@ func TestExplain_Integration_WithRealAuthorizer(t *testing.T) {
 	}
 }
 
-// handler 
+// handler
 
 type recRenderer struct {
 	status int
@@ -270,7 +270,7 @@ func TestHandler_ExplainForm(t *testing.T) {
 	}
 }
 
-//  template 
+//  template
 
 const stubLayout = `{{define "base"}}{{template "content" .}}{{end}}{{define "csrf"}}<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">{{end}}`
 
