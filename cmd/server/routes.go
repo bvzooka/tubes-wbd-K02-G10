@@ -5,15 +5,17 @@ import (
 	"dbplatform/internal/apiv1"
 	"dbplatform/internal/approval"
 	"dbplatform/internal/auth"
+	"dbplatform/internal/connmgr"
 )
 
 type apiHandlers struct {
-	auth      *auth.APIHandler
-	admin     *admin.APIHandler
+	auth *auth.APIHandler
+	admin *admin.APIHandler
 	approvals *approval.APIHandler
+	connections *connmgr.APIHandler
 }
 
-// registerAPIRoutes adalah peta lengkap /api/v1. Nama method router adalah syarat
+// peta lengkap /api/v1. Nama method router adalah syarat
 // aksesnya: Public, Authed, Admin, DBView, DBEdit.
 func registerAPIRoutes(api *apiv1.Router, h apiHandlers) {
 	if h.auth != nil {
@@ -40,6 +42,14 @@ func registerAPIRoutes(api *apiv1.Router, h apiHandlers) {
 	api.Admin("PUT /admin/groups/{groupID}/leader", h.admin.SetLeader)
 	api.Admin("PUT /admin/groups/{groupID}/access/{dbID}", h.admin.GrantAccess)
 	api.Admin("DELETE /admin/groups/{groupID}/access/{dbID}", h.admin.RevokeAccess)
+
+	api.Admin("GET /admin/connections", h.connections.List)
+	api.Admin("POST /admin/connections", h.connections.Create)
+	api.Admin("POST /admin/connections/test", h.connections.Test)
+	api.Admin("GET /admin/connections/{dbID}", h.connections.Get)
+	api.Admin("PUT /admin/connections/{dbID}", h.connections.Update)
+	api.Admin("POST /admin/connections/{dbID}/activate", h.connections.Activate)
+	api.Admin("POST /admin/connections/{dbID}/deactivate", h.connections.Deactivate)
 
 	api.Authed("GET /approvals", h.approvals.Inbox)
 	api.Authed("POST /executions/{execID}/approvals/{groupID}/approve", h.approvals.Approve)
