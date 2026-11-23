@@ -1,29 +1,55 @@
-import { useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '../../api/client'
-import type { AccessLevel, GroupDetail } from '../../api/types'
+import { api, ApiError } from '../../api/client'
+import type { AccessLevel, Group, GroupDetail } from '../../api/types'
+import Badge from '../../components/Badge'
+import Breadcrumbs from '../../components/Breadcrumbs'
 import EmptyState from '../../components/EmptyState'
 import ErrorMessage from '../../components/ErrorMessage'
+import Field from '../../components/Field'
+import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
+import Panel from '../../components/Panel'
+import StatCard from '../../components/StatCard'
+import { accessLabel } from '../databases/paths'
 
-const levelLabel: Record<AccessLevel, string> = { view_only: 'View only', view_edit: 'View + Edit' }
+const otherLevel: Record<AccessLevel, AccessLevel> = { view_only: 'view_edit', view_edit: 'view_only' }
 
 export default function GroupDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [newMember, setNewMember] = useState('')
   const [newConn, setNewConn] = useState('')
   const [newLevel, setNewLevel] = useState<AccessLevel>('view_only')
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const key = ['admin', 'groups', id]
-  const group = useQuery({ queryKey: key, queryFn: () => api<GroupDetail>('GET', `/admin/groups/${id}`) })
+  const group = useQuery({
+    queryKey: ['admin', 'groups', id],
+    queryFn: () => api<GroupDetail>('GET', `/admin/groups/${id}`),
+  })
+  useEffect(() => {
+    if (group.data) {
+      setName(group.data.name)
+      setDescription(group.data.description)
+    }
+  }, [group.data])
 
-  // Semua aksi di halaman ini memuat ulang detail group setelah berhasil.
+  // Anggota, leader, dan akses memakai satu mutation: setelah berhasil, detail dimuat ulang.
+  // Daftar database ikut dibuang dari cache karena akses admin sendiri bisa berubah.
   const action = useMutation({
-    mutationFn: (run: () => Promise<void>) => run(),
+    mutationFn: (run: () => Promise<unknown>) => run(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'groups'] })
+      queryClient.invalidateQueries({ queryKey: ['databases'] })
+    },
+  })
+  const saveDetail = useMutation({
+    mutationFn: () => api<Group>('PUT', `/admin/groups/${id}`, { name, description }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'groups'] }),
   })
   const remove = useMutation({
@@ -37,130 +63,328 @@ export default function GroupDetailPage() {
   if (group.isLoading) return <Loading />
   if (!group.data) return <ErrorMessage error={group.error} />
   const g = group.data
+  const busy = action.isPending
+  const detailFields = saveDetail.error instanceof ApiError ? saveDetail.error.fields : {}
+  const detailError = saveDetail.error instanceof ApiError && saveDetail.error.status === 422 ? null : saveDetail.error
+
+  function run(fn: () => Promise<unknown>) {
+    action.mutate(fn)
+  }
+
+  function submitDetail(e: FormEvent) {
+    e.preventDefault()
+    saveDetail.mutate()
+  }
 
   return (
     <>
+      <Breadcrumbs items={[{ label: 'Group', to: '/admin/groups' }, { label: g.name }]} />
       <PageHeader
+        eyebrow={{ icon: 'grid', label: 'Group' }}
         title={g.name}
-        action={
-          g.can_delete && (
-            <button className="btn-danger" onClick={() => remove.mutate()}>
-              Hapus group
-            </button>
+        titleExtra={
+          g.leader_name ? (
+            <Badge tone="ink">Leader: {g.leader_name}</Badge>
+          ) : (
+            <Badge tone="amber" dot>
+              Belum ada leader
+            </Badge>
           )
         }
+        subtitle={g.description || undefined}
+        aside={
+          <>
+            <StatCard icon="users" label="Anggota" value={g.member_count} />
+            <StatCard icon="db" label="Akses database" value={g.access_count} />
+          </>
+        }
       />
-      {g.description && <p className="mb-4 text-sm text-slate-600">{g.description}</p>}
-      <div className="mb-4">
-        <ErrorMessage error={action.error ?? remove.error} />
-      </div>
 
-      <section className="card mb-4">
-        <h2 className="mb-3 font-medium">Anggota</h2>
+      <div className="space-y-4">
         {!g.leader_id && (
-          <p className="mb-3 rounded-md bg-amber-50 p-2 text-sm text-amber-700">
-            Group ini belum punya leader. Permintaan migration pada database yang diakses group ini akan ditolak.
+          <p className="alert alert-warning">
+            <span className="alert-mark" aria-hidden="true">
+              !
+            </span>
+            Group ini belum punya leader. Permintaan migration ke database yang diakses group ini akan tertahan sampai
+            leader ditetapkan.
           </p>
         )}
-        {g.members.length === 0 && <EmptyState message="Belum ada anggota." />}
-        <ul className="divide-y divide-slate-100">
-          {g.members.map((m) => (
-            <li key={m.user_id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-              <span>
-                {m.username}
-                {m.is_leader && <span className="ml-2 rounded bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">Leader</span>}
-                {!m.is_active && <span className="ml-2 text-xs text-slate-500">(nonaktif)</span>}
-              </span>
-              {!m.is_leader && (
-                <span className="flex gap-2">
-                  <button
-                    className="btn-secondary"
-                    onClick={() => action.mutate(() => api('PUT', `/admin/groups/${id}/leader`, { user_id: m.user_id }))}
+        {action.error && <ErrorMessage error={action.error} />}
+      </div>
+
+      <div className="mt-5">
+        <Panel
+          icon="users"
+          title="Anggota"
+          count={g.members.length}
+          footer={
+            g.available_users.length > 0 ? (
+              <form
+                className="flex flex-wrap items-end gap-2.5 max-sm:[&>label]:basis-full"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  run(async () => {
+                    await api('POST', `/admin/groups/${id}/members`, { user_id: Number(newMember) })
+                    setNewMember('')
+                  })
+                }}
+              >
+                <Field label="Tambah anggota">
+                  <select
+                    className="input sm:w-72"
+                    value={newMember}
+                    onChange={(e) => setNewMember(e.target.value)}
+                    required
                   >
-                    Jadikan leader
-                  </button>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => action.mutate(() => api('DELETE', `/admin/groups/${id}/members/${m.user_id}`))}
+                    <option value="">Pilih pengguna…</option>
+                    {g.available_users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <button type="submit" className="btn-primary" disabled={!newMember || busy}>
+                  <Icon name="plus" />
+                  Tambahkan
+                </button>
+              </form>
+            ) : (
+              <p className="m-0 text-sm text-muted">Semua pengguna aktif sudah menjadi anggota group ini.</p>
+            )
+          }
+        >
+          {g.members.length === 0 ? (
+            <EmptyState plain icon="users" message="Belum ada anggota. Tambahkan pengguna di bawah." />
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Status</th>
+                  <th>Peran di group</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {g.members.map((m) => (
+                  <tr key={m.user_id}>
+                    <td className="whitespace-nowrap font-bold">{m.username}</td>
+                    <td>
+                      <Badge tone={m.is_active ? 'green' : 'neutral'} dot>
+                        {m.is_active ? 'Aktif' : 'Nonaktif'}
+                      </Badge>
+                    </td>
+                    <td>{m.is_leader ? <Badge tone="ink">Leader</Badge> : <span className="text-muted">Anggota</span>}</td>
+                    <td>
+                      {m.is_leader ? (
+                        // Backend menolak mengeluarkan leader; leader harus diganti lebih dulu.
+                        <span className="text-[0.84rem] text-muted">Ganti leader dulu untuk mengeluarkan</span>
+                      ) : (
+                        <div className="flex items-center gap-4 whitespace-nowrap">
+                          {m.is_active && (
+                            <button
+                              type="button"
+                              className="btn-link"
+                              disabled={busy}
+                              onClick={() => run(() => api('PUT', `/admin/groups/${id}/leader`, { user_id: m.user_id }))}
+                            >
+                              <Icon name="shield" />
+                              Jadikan leader
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn-link destructive"
+                            disabled={busy}
+                            onClick={() => run(() => api('DELETE', `/admin/groups/${id}/members/${m.user_id}`))}
+                            aria-label={`Keluarkan ${m.username}`}
+                          >
+                            Keluarkan
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Panel>
+
+        <Panel
+          icon="db"
+          title="Akses database"
+          count={g.accesses.length}
+          footer={
+            g.available_connections.length > 0 ? (
+              <form
+                className="flex flex-wrap items-end gap-2.5 max-sm:[&>label]:basis-full"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  run(async () => {
+                    await api('PUT', `/admin/groups/${id}/access/${newConn}`, { access_level: newLevel })
+                    setNewConn('')
+                  })
+                }}
+              >
+                <Field label="Database">
+                  <select className="input sm:w-64" value={newConn} onChange={(e) => setNewConn(e.target.value)} required>
+                    <option value="">Pilih database…</option>
+                    {g.available_connections.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Level akses">
+                  <select
+                    className="input sm:w-44"
+                    value={newLevel}
+                    onChange={(e) => setNewLevel(e.target.value as AccessLevel)}
                   >
-                    Keluarkan
-                  </button>
+                    <option value="view_only">{accessLabel.view_only}</option>
+                    <option value="view_edit">{accessLabel.view_edit}</option>
+                  </select>
+                </Field>
+                <button type="submit" className="btn-primary" disabled={!newConn || busy}>
+                  <Icon name="check" />
+                  Simpan akses
+                </button>
+                <span className="hint basis-full">
+                  Memilih database yang sudah punya akses akan mengubah levelnya.
+                </span>
+              </form>
+            ) : (
+              <p className="m-0 text-sm text-muted">Belum ada koneksi database yang aktif.</p>
+            )
+          }
+        >
+          {g.accesses.length === 0 ? (
+            <EmptyState plain icon="db" message="Group ini belum punya akses ke database mana pun." />
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Database</th>
+                  <th>Level</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {g.accesses.map((a) => (
+                  <tr key={a.connection_id}>
+                    <td className="whitespace-nowrap font-bold">{a.connection_name}</td>
+                    <td>
+                      <Badge tone={a.access_level === 'view_edit' ? 'lime' : 'butter'}>
+                        {accessLabel[a.access_level]}
+                      </Badge>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-4 whitespace-nowrap">
+                        <button
+                          type="button"
+                          className="btn-link"
+                          disabled={busy}
+                          onClick={() =>
+                            run(() =>
+                              api('PUT', `/admin/groups/${id}/access/${a.connection_id}`, {
+                                access_level: otherLevel[a.access_level],
+                              }),
+                            )
+                          }
+                        >
+                          <Icon name="edit" />
+                          Ubah ke {accessLabel[otherLevel[a.access_level]]}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-link destructive"
+                          disabled={busy}
+                          onClick={() => run(() => api('DELETE', `/admin/groups/${id}/access/${a.connection_id}`))}
+                          aria-label={`Cabut akses ${a.connection_name}`}
+                        >
+                          Cabut
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Panel>
+
+        <Panel icon="edit" title="Detail group">
+          <form onSubmit={submitDetail} className="space-y-4 px-6 py-5 max-md:px-4" noValidate>
+            <ErrorMessage error={detailError} />
+            <Field label="Nama group" error={detailFields.name}>
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={64} required />
+            </Field>
+            <Field label="Deskripsi" error={detailFields.description}>
+              <textarea
+                className="input"
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={500}
+              />
+            </Field>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="submit" className="btn-primary" disabled={saveDetail.isPending}>
+                <Icon name="check" />
+                {saveDetail.isPending ? 'Menyimpan…' : 'Simpan perubahan'}
+              </button>
+              {saveDetail.isSuccess && (
+                <span role="status" className="text-sm font-semibold text-green">
+                  Tersimpan.
                 </span>
               )}
-            </li>
-          ))}
-        </ul>
-        {g.available_users.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <select className="input sm:w-64" value={newMember} onChange={(e) => setNewMember(e.target.value)}>
-              <option value="">Pilih user…</option>
-              {g.available_users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
-            <button
-              className="btn-primary"
-              disabled={!newMember}
-              onClick={() =>
-                action.mutate(async () => {
-                  await api('POST', `/admin/groups/${id}/members`, { user_id: Number(newMember) })
-                  setNewMember('')
-                })
-              }
-            >
-              Tambah anggota
-            </button>
-          </div>
-        )}
-      </section>
+            </div>
+          </form>
+        </Panel>
 
-      <section className="card">
-        <h2 className="mb-3 font-medium">Akses database</h2>
-        {g.accesses.length === 0 && <EmptyState message="Belum ada akses database." />}
-        <ul className="divide-y divide-slate-100">
-          {g.accesses.map((a) => (
-            <li key={a.connection_id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-              <span>
-                {a.connection_name} <span className="text-slate-500">· {levelLabel[a.access_level]}</span>
-              </span>
-              <button
-                className="btn-secondary"
-                onClick={() => action.mutate(() => api('DELETE', `/admin/groups/${id}/access/${a.connection_id}`))}
-              >
-                Cabut
-              </button>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <select className="input sm:w-64" value={newConn} onChange={(e) => setNewConn(e.target.value)}>
-            <option value="">Pilih koneksi…</option>
-            {g.available_connections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select className="input sm:w-40" value={newLevel} onChange={(e) => setNewLevel(e.target.value as AccessLevel)}>
-            <option value="view_only">{levelLabel.view_only}</option>
-            <option value="view_edit">{levelLabel.view_edit}</option>
-          </select>
-          <button
-            className="btn-primary"
-            disabled={!newConn}
-            onClick={() =>
-              action.mutate(async () => {
-                await api('PUT', `/admin/groups/${id}/access/${newConn}`, { access_level: newLevel })
-                setNewConn('')
-              })
-            }
-          >
-            Beri / ubah akses
-          </button>
-        </div>
-      </section>
+        <Panel icon="alert" title="Hapus group" danger>
+          <div className="px-6 py-5 max-md:px-4">
+            {g.can_delete ? (
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Dua langkah, tanpa dialog browser: klik pertama meminta konfirmasi. */}
+                {confirmDelete ? (
+                  <>
+                    <span className="text-sm font-semibold text-danger-ink">Hapus group “{g.name}” secara permanen?</span>
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate()}
+                    >
+                      Ya, hapus
+                    </button>
+                    <button type="button" className="btn-secondary" onClick={() => setConfirmDelete(false)}>
+                      Batal
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="btn-danger" onClick={() => setConfirmDelete(true)}>
+                    Hapus group
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className="m-0 text-sm text-muted">
+                Group yang masih punya anggota atau akses database tidak bisa dihapus. Kosongkan dulu.
+              </p>
+            )}
+            {remove.error && (
+              <div className="mt-3">
+                <ErrorMessage error={remove.error} />
+              </div>
+            )}
+          </div>
+        </Panel>
+      </div>
     </>
   )
 }

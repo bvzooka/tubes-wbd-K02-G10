@@ -46,7 +46,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <form onSubmit={submit} className="card w-full max-w-sm space-y-4">
-        <h1 className="text-xl font-semibold text-slate-900">Masuk</h1>
+        <h1 className="text-xl font-semibold text-ink">Masuk</h1>
         <ErrorMessage error={error} />
         <label className="block text-sm">
           Username

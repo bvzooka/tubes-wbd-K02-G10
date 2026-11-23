@@ -2,23 +2,426 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html {
+    min-height: 100%;
+    background: #e5efe1;
+  }
+  body {
+    @apply min-h-screen font-sans text-text antialiased;
+    background:
+      radial-gradient(900px 520px at 90% -8%, rgb(195 242 107 / 60%), transparent 62%),
+      radial-gradient(760px 520px at -6% 18%, rgb(120 200 140 / 32%), transparent 62%),
+      linear-gradient(180deg, #f1f7ee 0%, #e5efe1 100%);
+    background-repeat: no-repeat;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply text-ink;
+  }
+  a {
+    @apply text-green underline-offset-[3px];
+  }
+  a:hover {
+    @apply underline;
+  }
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible,
+  [tabindex]:focus-visible {
+    @apply shadow-focus outline-none;
+  }
+  code {
+    @apply rounded-[6px] bg-ink/[.06] px-[0.45em] py-[0.1em] font-mono text-[0.85em];
+  }
+  label {
+    @apply text-sm font-bold text-ink-2;
+  }
+}
+
 @layer components {
   .btn {
-    @apply inline-flex min-h-[44px] items-center justify-center rounded-md px-4 text-sm font-medium disabled:opacity-50;
+    @apply inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border-[1.5px] border-transparent bg-ink px-[1.4rem] text-[0.95rem] font-bold text-white no-underline;
+    transition:
+      transform 0.12s,
+      background-color 0.15s,
+      box-shadow 0.15s;
+  }
+  .btn:hover:not(:disabled) {
+    @apply bg-ink-2 no-underline shadow-press;
+    transform: translateY(-1px);
+  }
+  .btn:active {
+    @apply shadow-none;
+    transform: none;
+  }
+  .btn:disabled,
+  .btn[aria-disabled='true'] {
+    @apply cursor-not-allowed opacity-50 shadow-none;
+    transform: none;
+  }
+  .btn-dark {
+    @apply btn;
   }
   .btn-primary {
-    @apply btn bg-indigo-600 text-white hover:bg-indigo-700;
+    @apply btn bg-btn [&:hover:not(:disabled)]:bg-btn-hover;
+  }
+  .btn-lime {
+    @apply btn bg-lime text-ink [&:hover:not(:disabled)]:bg-lime-hover;
   }
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+    @apply btn border-line-strong bg-paper text-ink [&:hover:not(:disabled)]:bg-green-soft;
   }
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700;
+    @apply btn bg-danger [&:hover:not(:disabled)]:bg-danger-ink;
   }
+  .btn-sm {
+    @apply min-h-[36px] px-4 text-[0.86rem];
+  }
+  .btn-link {
+    @apply inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 font-bold text-green no-underline hover:text-green-hover hover:underline disabled:opacity-50;
+  }
+  .btn-link.destructive {
+    @apply text-danger;
+  }
+  .icon-btn {
+    @apply grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full border-[1.5px] border-line-strong bg-paper p-0 text-ink;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s,
+      color 0.15s;
+  }
+
   .input {
-    @apply block min-h-[44px] w-full rounded-md border border-slate-300 px-3 text-sm focus:border-indigo-500 focus:outline-none;
+    @apply block min-h-[46px] w-full rounded-md border-[1.5px] border-line-strong bg-paper px-[0.95rem] py-[0.6rem] text-[0.95rem] font-normal text-text;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
   }
+  .input:hover,
+  .input:focus {
+    @apply border-green;
+  }
+  .input:disabled,
+  .input:read-only:not(select) {
+    @apply cursor-not-allowed bg-paper-soft text-muted hover:border-line-strong;
+  }
+  textarea.input {
+    @apply min-h-[96px] resize-y leading-normal;
+  }
+  .check {
+    @apply flex min-h-[44px] cursor-pointer items-center gap-2.5 font-semibold text-ink-2;
+  }
+  .check input {
+    @apply m-0 h-[1.15rem] w-[1.15rem] accent-green;
+  }
+  .field-error {
+    @apply mt-[0.35rem] block text-[0.86rem] font-semibold text-danger;
+  }
+  .hint {
+    @apply mt-[0.35rem] block text-[0.84rem] font-normal text-muted;
+  }
+
   .card {
-    @apply rounded-lg border border-slate-200 bg-white p-4 shadow-sm;
+    @apply rounded-xl border border-white/80 bg-paper p-6 shadow-card;
+  }
+
+  .glass {
+    @apply border border-white/60 bg-white/45 backdrop-blur-xl backdrop-saturate-150;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 70%),
+      theme('boxShadow.card');
+  }
+  /* Scrollbar tipis berwarna garis, untuk area yang scroll sendiri (sidebar). */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.line.strong') transparent;
+  }
+  /* Permukaan kaca yang mengelompokkan kartu (misalnya satu schema). */
+  .surface {
+    @apply glass mb-7 rounded-2xl p-5 max-md:rounded-xl max-md:p-3.5;
+  }
+  .dark-card {
+    @apply relative mb-5 overflow-hidden rounded-xl bg-ink p-7 text-white shadow-lift max-md:p-5;
+  }
+
+  .table-wrap {
+    @apply relative overflow-x-auto rounded-xl border border-white/80 bg-paper shadow-card;
+  }
+  .table {
+    @apply w-full border-collapse text-left text-[0.92rem];
+  }
+  .table th {
+    @apply whitespace-nowrap border-b border-line bg-paper-soft px-[0.9rem] py-[0.85rem] text-[0.72rem] font-bold uppercase tracking-[0.08em] text-muted;
+  }
+  .table td {
+    @apply border-b border-line px-[0.9rem] py-[0.85rem] align-middle;
+  }
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .table tbody tr:hover td {
+    @apply bg-paper-soft;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-ink/[.07] px-3 py-[0.2rem] text-[0.78rem] font-bold text-ink-2;
+  }
+  .badge-outline {
+    @apply border-[1.5px] border-line-strong bg-transparent text-inherit;
+  }
+  .badge-lime {
+    @apply bg-lime text-ink;
+  }
+  .badge-butter {
+    @apply bg-butter text-butter-ink;
+  }
+  .badge-green {
+    @apply bg-green-soft text-green-hover;
+  }
+  .badge-red {
+    @apply bg-danger-soft text-danger;
+  }
+  .badge-amber {
+    @apply bg-[#fff3dd] text-[#8a3a06];
+  }
+  .badge-ink {
+    @apply bg-ink text-lime;
+  }
+  .badge-dot::before {
+    content: '';
+    @apply h-[7px] w-[7px] rounded-full bg-current;
+  }
+
+  /* Pesan dengan bulatan ikon di kiri. */
+  .alert {
+    @apply flex items-center gap-3 rounded-[22px] border border-line bg-paper py-2.5 pl-2.5 pr-[1.1rem] text-[0.93rem] font-medium leading-snug text-ink;
+  }
+  .alert-mark {
+    @apply grid h-[30px] w-[30px] flex-none place-items-center rounded-full bg-ink text-[0.95rem] font-extrabold text-lime;
+  }
+  .alert-error {
+    @apply border-[#f3cfca] bg-[#fdf3f1] text-danger-ink;
+  }
+  .alert-error .alert-mark {
+    @apply bg-danger text-white;
+  }
+  .alert-success {
+    @apply border-green-mid bg-green-soft text-ink-2;
+  }
+  .alert-warning {
+    @apply border-[#f1dca8] bg-warn-soft text-warn-ink;
+  }
+  .alert-warning .alert-mark {
+    @apply bg-warn text-white;
+  }
+
+  .empty {
+    @apply rounded-xl border-2 border-dashed border-line-strong bg-white/40 px-6 py-12 text-center text-muted backdrop-blur-xl;
+  }
+
+  /* Label kecil berbentuk pil di atas judul halaman. */
+  .eyebrow {
+    @apply mb-3.5 inline-flex items-center gap-[0.45rem] rounded-full border-[1.5px] border-line-strong bg-white/55 px-[0.85rem] py-[0.3rem] text-[0.8rem] font-bold text-ink-2;
+  }
+  .chip {
+    @apply glass inline-flex min-h-[36px] items-center gap-[0.45rem] rounded-full px-[0.95rem] text-[0.84rem] font-semibold text-muted;
+  }
+  .null-pill {
+    @apply inline-block rounded-full bg-butter px-2 font-mono text-[0.72rem] font-bold not-italic tracking-[0.05em] text-butter-ink;
+  }
+  /* Avatar lime dengan siluet orang, digambar dengan gradien seperti M1 (tanpa gambar). */
+  .avatar {
+    @apply h-[42px] w-[42px] flex-none rounded-full border-2 border-paper shadow-sm max-sm:h-[38px] max-sm:w-[38px];
+    background:
+      radial-gradient(circle at 50% 38%, theme('colors.ink.DEFAULT') 0 6px, transparent 6.5px),
+      radial-gradient(circle at 50% 100%, theme('colors.ink.DEFAULT') 0 11px, transparent 11.5px),
+      theme('colors.lime.DEFAULT');
+  }
+  /* Bulatan ikon lembut di kartu dan form. */
+  .icon-bubble {
+    @apply grid h-[46px] w-[46px] flex-none place-items-center rounded-full bg-green-soft text-green;
+  }
+}
+
+@layer components {
+  .tile {
+    @apply relative flex min-h-[190px] flex-col gap-4 rounded-xl border border-white/80 bg-paper p-[1.3rem] text-text shadow-card;
+    transition:
+      transform 0.18s,
+      background-color 0.18s,
+      color 0.18s,
+      box-shadow 0.18s;
+  }
+  .tile-link {
+    @apply text-inherit no-underline hover:no-underline;
+  }
+  .tile-link::after {
+    content: '';
+    @apply absolute inset-0 rounded-xl;
+  }
+  .tile-link:focus-visible {
+    @apply shadow-none;
+  }
+  .tile:hover,
+  .tile:focus-within,
+  .tile.is-dark {
+    @apply bg-ink text-white;
+  }
+  .tile:hover,
+  .tile:focus-within {
+    @apply shadow-lift;
+    transform: translateY(-4px);
+  }
+  /* Cincin fokus keyboard; harus setelah aturan shadow-lift di atas supaya tidak tertimpa. */
+  .tile:has(.tile-link:focus-visible) {
+    @apply shadow-[0_2px_4px_rgb(15_29_21/8%),0_22px_40px_-16px_rgb(15_29_21/35%),0_0_0_3px_#fff,0_0_0_5px_#167a42];
+  }
+  .tile.is-dark:hover {
+    @apply bg-ink-2;
+  }
+  .tile-icon {
+    @apply icon-bubble;
+    transition:
+      background-color 0.18s,
+      color 0.18s;
+  }
+  .tile:hover .tile-icon,
+  .tile:focus-within .tile-icon,
+  .tile.is-dark .tile-icon {
+    @apply bg-lime text-ink;
+  }
+  .tile:hover .badge-outline,
+  .tile:focus-within .badge-outline,
+  .tile.is-dark .badge-outline {
+    @apply border-white/40;
+  }
+  .tile-big {
+    @apply block whitespace-nowrap text-[2.1rem] font-light leading-[1.05] tracking-[-0.04em] text-ink tabular-nums;
+    transition: color 0.18s;
+  }
+  .tile:hover .tile-big,
+  .tile:focus-within .tile-big {
+    @apply text-lime;
+  }
+  .tile-cap {
+    @apply text-[0.78rem] font-semibold text-muted;
+  }
+  .tile:hover .tile-cap,
+  .tile:focus-within .tile-cap {
+    @apply text-white/75;
+  }
+  /* Tautan kecil di kaki kartu; z-index di atas ::after supaya tetap bisa diklik sendiri. */
+  .tile-sub {
+    @apply relative z-[2] inline-flex min-h-[44px] items-center gap-1.5 rounded-full border-[1.5px] border-current px-[0.85rem] text-[0.84rem] font-bold text-inherit no-underline opacity-85 hover:border-lime hover:bg-lime hover:text-ink hover:no-underline hover:opacity-100;
+  }
+  .tile-go {
+    @apply grid h-11 w-11 place-items-center rounded-full bg-ink text-white;
+    transition:
+      transform 0.18s,
+      background-color 0.18s;
+  }
+  .tile:hover .tile-go,
+  .tile:focus-within .tile-go,
+  .tile.is-dark .tile-go {
+    @apply bg-lime text-ink;
+    transform: rotate(-45deg);
+  }
+  /* Segmen hak akses (Lihat / Edit). Yang aktif terisi, yang tidak putus-putus. */
+  .access-seg {
+    @apply inline-flex items-center gap-1 rounded-full border-[1.5px] border-dashed border-line-strong px-[0.7rem] py-1 text-[0.78rem] font-bold text-muted;
+  }
+  .access-seg.on {
+    @apply border-solid border-transparent bg-green-soft text-green-hover;
+  }
+  /* Di atas latar gelap (kartu gelap atau saat hover/fokus) warna segmen ikut dibalik. */
+  .tile:hover .access-seg,
+  .tile:focus-within .access-seg,
+  .tile.is-dark .access-seg {
+    @apply border-white/30 text-white/70;
+  }
+  .tile:hover .access-seg.on,
+  .tile:focus-within .access-seg.on,
+  .tile.is-dark .access-seg.on {
+    @apply border-transparent bg-lime text-ink;
+  }
+
+  /* Pil nama kolom di kepala tabel: lime = NOT NULL, transparan = boleh NULL, titik = ada default. */
+  .col-pill {
+    @apply inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] border-transparent px-[0.95rem] font-mono text-[0.8rem] font-semibold;
+  }
+  .col-pill.notnull {
+    @apply bg-lime text-ink;
+  }
+  .col-pill.nullable {
+    @apply border-white/45 bg-white/[.12] text-white;
+  }
+  .col-pill.hasdef::after {
+    content: '';
+    @apply h-[7px] w-[7px] rounded-full bg-current opacity-85;
+  }
+
+  /* Tab pil: tab aktif gelap dengan angka lime. */
+  .tab-list {
+    @apply glass mb-4 inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-[0.35rem];
+  }
+  .tab {
+    @apply inline-flex min-h-[44px] cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border-0 bg-transparent px-[1.15rem] font-bold text-ink-2 hover:bg-green-soft;
+  }
+  .tab[aria-selected='true'] {
+    @apply bg-ink text-white hover:bg-ink;
+  }
+  .tab-count {
+    @apply rounded-full bg-ink/[.08] px-2 text-[0.78rem];
+  }
+  .tab[aria-selected='true'] .tab-count {
+    @apply bg-lime text-ink;
+  }
+
+  /* Tabel isi data: header gelap menempel di atas, kolom pertama menempel di kiri. */
+  .data-table {
+    @apply w-full border-collapse text-left text-[0.85rem];
+  }
+  .data-table th {
+    /* Nama kolom ditulis apa adanya (tanpa huruf besar) karena identifier database peka huruf. */
+    @apply sticky top-0 z-[2] whitespace-nowrap bg-ink px-[1.1rem] py-[0.8rem] font-mono text-[0.8rem] font-bold text-white;
+  }
+  .data-table td {
+    @apply max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap border-b border-line px-[1.1rem] py-[0.55rem] font-mono;
+  }
+  .data-table tbody tr:nth-child(even) td {
+    @apply bg-paper-soft;
+  }
+  .data-table tbody tr:hover td {
+    @apply bg-green-soft;
+  }
+  .data-table th:first-child,
+  .data-table td:first-child {
+    @apply sticky left-0;
+  }
+  .data-table th:first-child {
+    @apply z-[3];
+  }
+  .data-table td:first-child {
+    @apply border-r border-line bg-paper font-bold;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+  .tile:hover,
+  .tile:focus-within {
+    transform: none;
   }
 }
