@@ -4,10 +4,17 @@ import RequireAuth from './components/RequireAuth'
 import NotFoundPage from './pages/NotFoundPage'
 import LoginPage from './pages/auth/LoginPage'
 import GroupDetailPage from './pages/admin/GroupDetailPage'
+import GroupFormPage from './pages/admin/GroupFormPage'
 import GroupsPage from './pages/admin/GroupsPage'
 import UserFormPage from './pages/admin/UserFormPage'
 import UsersPage from './pages/admin/UsersPage'
 import ApprovalsPage from './pages/approvals/ApprovalsPage'
+import ConnectionFormPage from './pages/connections/ConnectionFormPage'
+import ConnectionsPage from './pages/connections/ConnectionsPage'
+import DatabasesPage from './pages/databases/DatabasesPage'
+import SchemaPage from './pages/databases/SchemaPage'
+import TableDataPage from './pages/databases/TableDataPage'
+import TablePage from './pages/databases/TablePage'
 
 export default function App() {
   return (
@@ -16,7 +23,12 @@ export default function App() {
 
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
-          <Route index element={<Navigate to="/approvals" replace />} />
+          {/* Sama seperti M1: halaman awal setelah login adalah daftar database. */}
+          <Route index element={<Navigate to="/databases" replace />} />
+          <Route path="databases" element={<DatabasesPage />} />
+          <Route path="databases/:id" element={<SchemaPage />} />
+          <Route path="databases/:id/tables/:schema/:table" element={<TablePage />} />
+          <Route path="databases/:id/tables/:schema/:table/data" element={<TableDataPage />} />
           <Route path="approvals" element={<ApprovalsPage />} />
 
           <Route path="admin" element={<RequireAuth admin />}>
@@ -24,7 +36,11 @@ export default function App() {
             <Route path="users/new" element={<UserFormPage />} />
             <Route path="users/:id" element={<UserFormPage />} />
             <Route path="groups" element={<GroupsPage />} />
+            <Route path="groups/new" element={<GroupFormPage />} />
             <Route path="groups/:id" element={<GroupDetailPage />} />
+            <Route path="connections" element={<ConnectionsPage />} />
+            <Route path="connections/new" element={<ConnectionFormPage />} />
+            <Route path="connections/:id" element={<ConnectionFormPage />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

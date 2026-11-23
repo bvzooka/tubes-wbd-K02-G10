@@ -46,11 +46,11 @@ export default function ApprovalsPage() {
               <h2 className="font-medium">
                 {kindLabel[item.kind]} v{item.version} · {item.database}
               </h2>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted">
                 oleh {item.requested_by}, {new Date(item.requested_at).toLocaleString('id-ID')} · sebagai leader {item.group_name}
               </span>
             </div>
-            <pre className="max-h-64 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">{item.sql}</pre>
+            <pre className="max-h-64 overflow-auto rounded-md bg-ink p-3 text-xs text-paper-soft">{item.sql}</pre>
 
             {rejecting === item ? (
               <div className="space-y-2">
