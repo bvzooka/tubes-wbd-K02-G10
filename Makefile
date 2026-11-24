@@ -1,4 +1,4 @@
-.PHONY: up down run run-worker test test-short test-docker fmt vet seed-large
+.PHONY: up down run run-worker test test-short test-docker fmt vet seed-large build-web app-up app-down
 
 up:
 	docker compose up -d appdb targetdb testdb
@@ -15,6 +15,15 @@ run:
 
 run-worker:
 	go run ./cmd/worker
+
+build-web:
+	cd frontend && npm ci && npm run build
+
+app-up:
+	docker compose --profile app up --build -d server worker
+
+app-down:
+	docker compose --profile app down
 
 test-short:
 	go test -short ./...
