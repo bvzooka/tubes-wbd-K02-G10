@@ -30,10 +30,10 @@ const viewerTargetSQL = `
 
 // menyiapkan satu database target berisi data, satu user View Only, dan satu user tanpa akses
 type viewerFixture struct {
-	app *e2eApp
-	admin *apiClient
-	dbID int64
-	reader *apiClient
+	app      *e2eApp
+	admin    *apiClient
+	dbID     int64
+	reader   *apiClient
 	outsider *apiClient
 }
 

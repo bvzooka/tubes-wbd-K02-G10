@@ -27,7 +27,7 @@ type databaseJSON struct {
 	CanEdit     bool               `json:"can_edit"`
 }
 
-//  halaman ringkasan: tabel dan view dikelompokkan per schema
+// halaman ringkasan: tabel dan view dikelompokkan per schema
 type schemaJSON struct {
 	Database databaseJSON      `json:"database"`
 	Schemas  []schemaGroupJSON `json:"schemas"`
