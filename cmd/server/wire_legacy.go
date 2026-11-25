@@ -15,11 +15,13 @@ import (
 
 // wireLegacyPages mendaftarkan halaman HTML yang belum punya pengganti di SPA.
 // Hapus per modul begitu halaman SPA-nya selesai.
-func wireLegacyPages(ctx context.Context, cfg config.Config, d *httpx.Deps, mux *http.ServeMux) error {
+func wireLegacyPages(ctx context.Context, cfg config.Config, d *httpx.Deps, mux *http.ServeMux, spaMode bool) error {
 	connRepo := connmgr.NewRepo(d.Pool, cfg.SecretKey)
 	connmgr.NewHandler(*d, connmgr.NewService(connRepo, connmgr.DefaultFactory)).Register(mux)
 	viewer.NewHandler(*d, viewer.NewService(d.Authz, d.Drivers)).Register(mux)
-	explain.NewHandler(explain.NewService(d.Authz, d.Drivers), d.Render, d.HandleErr, d.Auth).Register(mux)
+	if !spaMode {
+		explain.NewHandler(explain.NewService(d.Authz, d.Drivers), d.Render, d.HandleErr, d.Auth).Register(mux)
+	}
 
 	migrationSvc := migration.NewService(migration.NewRepo(d.Pool), d.Authz, d.Drivers, d.Clock)
 	recovered, err := migrationSvc.RecoverStuck(ctx)

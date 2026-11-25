@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
+	"strings"
 	"testing"
 )
 
@@ -111,4 +112,29 @@ func TestE2E_APIAdminLeaderAndApprovalFlow(t *testing.T) {
 	}
 	user.must(404, "POST", "/executions/999/approvals/1/approve", nil)
 	user.must(404, "GET", "/does-not-exist", nil)
+}
+
+func TestE2E_MetricsEndpoint(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration")
+	}
+	a := newE2EApp(t)
+	newAPIClient(t, a.base).do("GET", "/auth/me", nil)
+
+	resp, err := http.Get(a.base + "/metrics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var body bytes.Buffer
+	_, _ = body.ReadFrom(resp.Body)
+	for _, want := range []string{
+		`dbplatform_http_requests_total{method="GET",route="GET /api/v1/auth/me",status="401"}`,
+		`dbplatform_connection_locks_active 0`,
+		`dbplatform_jobs_running 0`,
+	} {
+		if !strings.Contains(body.String(), want) {
+			t.Errorf("/metrics tidak memuat %s", want)
+		}
+	}
 }

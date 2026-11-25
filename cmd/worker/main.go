@@ -3,10 +3,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"dbplatform/internal/config"
 	"dbplatform/internal/telemetry"
@@ -44,6 +47,19 @@ func run() error {
 		return err
 	}
 	defer cleanup()
+
+	// server kecil khusus /metrics
+	metrics := &http.Server{Addr: cfg.Worker.MetricsAddr, Handler: metricsHandler(), ReadHeaderTimeout: 5 * time.Second}
+	go func() {
+		if err := metrics.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("server metrics berhenti", "event", "worker.metrics", "error", err)
+		}
+	}()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = metrics.Shutdown(shutdownCtx) // udah mau berhenti, error-nya nggak penting
+	}()
 
 	logger.Info("worker berjalan", "event", "worker.start", "concurrency", cfg.Worker.Concurrency)
 	worker.Run(ctx) // kembali setelah SIGTERM dan job berjalan selesai (atau grace habis)

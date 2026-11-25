@@ -17,6 +17,7 @@ import (
 	"dbplatform/internal/clock"
 	"dbplatform/internal/config"
 	"dbplatform/internal/contract"
+	"dbplatform/internal/explain"
 	"dbplatform/internal/httpx"
 	"dbplatform/internal/middleware"
 	webassets "dbplatform/web"
@@ -64,7 +65,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 	d.Drivers = drivers.Provider
 
 	adminAPI := wireAdmin(&d, authn, mux, spaMode)
-	if err := wireLegacyPages(ctx, cfg, &d, mux); err != nil {
+	if err := wireLegacyPages(ctx, cfg, &d, mux, spaMode); err != nil {
 		return fail(err)
 	}
 
@@ -76,8 +77,10 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 
 		connections: wireConnections(cfg, pool),
 		viewer:      wireViewer(&d),
+		explain:     explain.NewAPIHandler(explain.NewService(d.Authz, d.Drivers)),
 	})
 
+	wireMetrics(mux, pool)
 	if err := wireStatic(mux, d, cfg, pool); err != nil {
 		return fail(err)
 	}
@@ -88,6 +91,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		middleware.Logging(logger),
 		middleware.Recover(logger, handleErr),
 		middleware.SecurityHeaders,
+		middleware.Metrics, // paling dalam: butuh r.Pattern dari mux
 	)(mux)
 	return handler, cleanup, nil
 }
