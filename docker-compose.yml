@@ -9,6 +9,11 @@ services:
       - "5432:5432"
     volumes:
       - appdb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dbplatform -h 127.0.0.1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
   targetdb:
     image: postgres:16
@@ -20,6 +25,11 @@ services:
       - "5433:5432"
     volumes:
       - ./docker/targetdb/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sampledb -h 127.0.0.1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
   testdb:
     image: postgres:16
@@ -37,9 +47,7 @@ services:
       timeout: 3s
       retries: 15
 
-  # Menjalankan test Go di dalam container (berguna jika Windows memblok file .exe hasil go test).
-  #   docker compose run --rm test                    -> semua test
-  #   docker compose run --rm test go test -short ./... -> unit test saja
+
   test:
     profiles: ["tools"]
     image: golang:1.26
@@ -55,7 +63,52 @@ services:
         condition: service_healthy
     command: ["go", "test", "./..."]
 
-  # Opsional untuk bonus MySQL: docker compose --profile mysql up -d
+  # app dlm container: docker compose --profile app up --build -d server worker (make app-up)
+  # APP_SECRET_KEY dan SEED_ADMIN_PASSWORD dibaca dari .env di root repo
+  # dari container, koneksi ke targetdb memakai host "targetdb" port 5432
+  server:
+    profiles: ["app"]
+    build: .
+    image: dbplatform:local
+    environment: &app-env
+      APP_ENV: development
+      APP_DATABASE_URL: postgres://postgres:postgres@appdb:5432/dbplatform?sslmode=disable
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?isi APP_SECRET_KEY di .env (openssl rand -base64 32)}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?isi SEED_ADMIN_PASSWORD di .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-console}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      # SPA sudah ada di image (/app/web/dist). Isi WEB_DIST_DIR: /app/web/dist setelah
+      # bentrok route "GET /" vs "/api/" di cmd/server diperbaiki; sampai itu, server panic.
+      WEB_DIST_DIR: ""
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      appdb:
+        condition: service_healthy
+      targetdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: on-failure:5
+
+  worker:
+    profiles: ["app"]
+    build: .
+    image: dbplatform:local
+    command: ["/app/worker"]
+    environment:
+      <<: *app-env
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: on-failure:5
+
   targetmysql:
     profiles: ["mysql"]
     image: mysql:8.4

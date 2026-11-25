@@ -1,0 +1,15 @@
+# Rahasia lokal tidak boleh masuk image (server membaca .env dari folder kerja).
+.env
+.git
+.github
+.idea
+.vscode
+
+# Hasil build lokal; image membangunnya sendiri.
+frontend/node_modules
+frontend/*.tsbuildinfo
+web/dist
+*.exe
+*.test
+*.out
+bin
