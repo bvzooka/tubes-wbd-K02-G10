@@ -33,6 +33,7 @@ type WorkerConfig struct {
 	Heartbeat    time.Duration
 	MaxAttempts  int
 	RetryBase    time.Duration
+	MetricsAddr  string // alamat HTTP /metrics milik worker
 }
 
 // semua pengaturan aplikasi yang dibaca dari environment sekali saat start
@@ -100,6 +101,7 @@ func Load(getenv func(string) string) (Config, error) {
 		WebDistDir:        str("WEB_DIST_DIR", ""),
 		Worker: WorkerConfig{
 			ID:           str("WORKER_ID", defaultWorkerID()),
+			MetricsAddr:  str("METRICS_ADDR", ":9091"),
 			Concurrency:  num("WORKER_CONCURRENCY", "4"),
 			PollInterval: dur("WORKER_POLL_INTERVAL", "1s"),
 			Lease:        dur("JOB_LEASE", "30s"),

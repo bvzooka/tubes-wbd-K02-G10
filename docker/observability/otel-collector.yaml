@@ -1,0 +1,31 @@
+# trace dari API dan worker dicetak ke log, lalu diubah jadi metrik durasi span buat Prometheus
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+
+processors:
+  batch: {}
+
+connectors:
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [5ms, 25ms, 100ms, 500ms, 1s, 5s, 30s, 120s]
+
+exporters:
+  debug:
+    verbosity: basic
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, spanmetrics]
+    metrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus]

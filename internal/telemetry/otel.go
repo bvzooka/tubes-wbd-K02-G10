@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -28,7 +29,7 @@ func SetupTracing(ctx context.Context, service, exporter, endpoint string) (func
 	case "otlp":
 		opts := []otlptracehttp.Option{otlptracehttp.WithInsecure()}
 		if endpoint != "" {
-			opts = append(opts, otlptracehttp.WithEndpointURL(endpoint))
+			opts = append(opts, otlptracehttp.WithEndpointURL(tracesURL(endpoint)))
 		}
 		exp, err = otlptracehttp.New(ctx, opts...)
 	default:
@@ -44,4 +45,13 @@ func SetupTracing(ctx context.Context, service, exporter, endpoint string) (func
 	)
 	otel.SetTracerProvider(tp)
 	return tp.Shutdown, nil
+}
+
+// http://localhost:4318 -> http://localhost:4318/v1/traces
+func tracesURL(endpoint string) string {
+	endpoint = strings.TrimRight(endpoint, "/")
+	if strings.HasSuffix(endpoint, "/v1/traces") {
+		return endpoint
+	}
+	return endpoint + "/v1/traces"
 }

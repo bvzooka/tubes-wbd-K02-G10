@@ -29,3 +29,7 @@ export const dbmsLabel: Record<DBMS, string> = {
   mysql: 'MySQL',
   mariadb: 'MariaDB',
 }
+
+export function explainPath(dbID: number | string) {
+  return `/databases/${dbID}/explain`
+}

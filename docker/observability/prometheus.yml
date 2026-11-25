@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  # API dan worker jalan di host (make run / make run-worker)
+  - job_name: api
+    static_configs: [{ targets: ["host.docker.internal:8080"] }]
+  - job_name: worker
+    static_configs: [{ targets: ["host.docker.internal:9091"] }]
+  - job_name: otel-collector
+    static_configs: [{ targets: ["otel-collector:8889"] }]

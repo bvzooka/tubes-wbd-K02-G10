@@ -12,6 +12,7 @@ import ApprovalsPage from './pages/approvals/ApprovalsPage'
 import ConnectionFormPage from './pages/connections/ConnectionFormPage'
 import ConnectionsPage from './pages/connections/ConnectionsPage'
 import DatabasesPage from './pages/databases/DatabasesPage'
+import ExplainPage from './pages/databases/ExplainPage'
 import SchemaPage from './pages/databases/SchemaPage'
 import TableDataPage from './pages/databases/TableDataPage'
 import TablePage from './pages/databases/TablePage'
@@ -27,6 +28,7 @@ export default function App() {
           <Route index element={<Navigate to="/databases" replace />} />
           <Route path="databases" element={<DatabasesPage />} />
           <Route path="databases/:id" element={<SchemaPage />} />
+          <Route path="databases/:id/explain" element={<ExplainPage />} />
           <Route path="databases/:id/tables/:schema/:table" element={<TablePage />} />
           <Route path="databases/:id/tables/:schema/:table/data" element={<TableDataPage />} />
           <Route path="approvals" element={<ApprovalsPage />} />

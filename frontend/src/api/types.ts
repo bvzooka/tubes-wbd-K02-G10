@@ -200,3 +200,39 @@ export interface TableData {
   page_size: number
   has_next: boolean
 }
+
+export interface PlanNode {
+  depth: number
+  node_type: string
+  relationship?: string
+  relation?: string
+  alias?: string
+  index_name?: string
+  join_type?: string
+  condition?: string
+  startup_cost: number
+  total_cost: number
+  plan_rows: number
+  plan_width: number
+  analyzed: boolean
+  actual_startup_ms: number
+  actual_total_ms: number
+  actual_rows: number
+  actual_loops: number
+  shared_hit: number
+  shared_read: number
+}
+
+export interface ExplainResult {
+  sql: string
+  analyze: boolean
+  dialect: DBMS
+  plan: {
+    total_cost: number
+    planning_time_ms: number | null
+    execution_time_ms: number | null
+    nodes: PlanNode[]
+    json: string
+  } | null
+  raw_text: string
+}

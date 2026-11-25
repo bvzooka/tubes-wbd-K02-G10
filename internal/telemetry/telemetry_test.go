@@ -74,3 +74,15 @@ func TestLogger_LevelFilter(t *testing.T) {
 		t.Fatalf("log info harus tersaring pada level warn: %s", buf.String())
 	}
 }
+
+func TestTracesURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"http://localhost:4318":           "http://localhost:4318/v1/traces",
+		"http://localhost:4318/":          "http://localhost:4318/v1/traces",
+		"http://collector:4318/v1/traces": "http://collector:4318/v1/traces",
+	} {
+		if got := tracesURL(in); got != want {
+			t.Errorf("tracesURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

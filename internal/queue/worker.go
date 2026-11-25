@@ -78,6 +78,7 @@ func (w *Worker) Run(ctx context.Context) {
 			sleep(ctx, w.cfg.PollInterval)
 			continue
 		}
+		queueWait.Observe(max(0, w.clock.Now().Sub(job.RunAfter).Seconds()))
 		running.Go(func() {
 			defer func() { <-slots }()
 			w.process(jobCtx, job, w.runner.Run)
@@ -118,6 +119,7 @@ func (w *Worker) ReapOnce(ctx context.Context) {
 		if err != nil || !ok {
 			continue
 		}
+		jobsReconciled.Inc()
 		w.process(ctx, job, func(ctx context.Context, job domain.Job, _ contract.Lease) domain.RunResult {
 			res := w.runner.Reconcile(ctx, job)
 			w.logger.InfoContext(ctx, "job reconciled", "event", "recovery.reconciled",
@@ -138,6 +140,11 @@ func (w *Worker) process(ctx context.Context, job domain.Job, run runFunc) {
 	log.InfoContext(ctx, "job claimed", "event", "job.claimed", "fence", job.Fence)
 	log.InfoContext(ctx, "connection lock acquired", "event", "lock.acquired", "connection_id", job.ConnectionID)
 
+	jobsClaimed.Inc()
+	jobsRunning.Inc()
+	defer jobsRunning.Dec()
+	start := time.Now()
+
 	l := startLease(ctx, job, w.repo, w.clock, w.cfg.Lease, w.cfg.Heartbeat, log)
 	result := run(l.Context(), job, l)
 	l.stop()
@@ -147,12 +154,14 @@ func (w *Worker) process(ctx context.Context, job domain.Job, run runFunc) {
 	}
 	if l.Lost() {
 		log.WarnContext(ctx, "lease lost, result left to reaper", "event", "job.finished", "status", "lease_lost")
+		recordAttempt("lease_lost", start)
 		return
 	}
-	w.finalize(context.WithoutCancel(ctx), log, job, result)
+	recordAttempt(w.finalize(context.WithoutCancel(ctx), log, job, result), start)
 }
 
-func (w *Worker) finalize(ctx context.Context, log *slog.Logger, job domain.Job, result domain.RunResult) {
+// balikin label hasil buat metrik
+func (w *Worker) finalize(ctx context.Context, log *slog.Logger, job domain.Job, result domain.RunResult) string {
 	now := w.clock.Now()
 	lastErr := ""
 	if result.Err != nil {
@@ -160,6 +169,7 @@ func (w *Worker) finalize(ctx context.Context, log *slog.Logger, job domain.Job,
 	}
 
 	var err error
+	outcome := string(result.Outcome)
 	switch {
 	case result.Outcome == domain.OutcomeRequeue:
 		runAfter := now.Add(orDefault(result.RetryAfter, w.cfg.PollInterval))
@@ -168,6 +178,7 @@ func (w *Worker) finalize(ctx context.Context, log *slog.Logger, job domain.Job,
 	case result.Retryable && job.Attempt < job.MaxAttempts:
 		runAfter := now.Add(orDefault(result.RetryAfter, RetryDelay(w.cfg.RetryBase, job.Attempt)))
 		err = w.repo.Reschedule(ctx, job, runAfter, lastErr, true)
+		outcome = "retry"
 		log.InfoContext(ctx, "job scheduled for retry", "event", "job.retry", "status", "retry", "run_after", runAfter, "error", lastErr)
 	default:
 		err = w.repo.Finish(ctx, job, lastErr, now)
@@ -177,11 +188,19 @@ func (w *Worker) finalize(ctx context.Context, log *slog.Logger, job domain.Job,
 	switch {
 	case errors.Is(err, ErrLeaseLost):
 		log.WarnContext(ctx, "finalize rejected: fence changed", "event", "job.finished", "status", "lease_lost")
+		return "lease_lost"
 	case err != nil:
 		log.ErrorContext(ctx, "finalize job failed", "event", "job.finished", "error", err)
+		return "finalize_error"
 	default:
 		log.InfoContext(ctx, "connection lock released", "event", "lock.released", "connection_id", job.ConnectionID)
+		return outcome
 	}
+}
+
+func recordAttempt(outcome string, start time.Time) {
+	jobsFinished.WithLabelValues(outcome).Inc()
+	jobDuration.WithLabelValues(outcome).Observe(time.Since(start).Seconds())
 }
 
 // startJobSpan membuat span queue.job yang ter-LINK ke trace request pembuatnya, karena

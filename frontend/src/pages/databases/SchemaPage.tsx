@@ -11,7 +11,7 @@ import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
 import StatCard from '../../components/StatCard'
-import { accessLabel, dbmsLabel, formatRows, tableDataPath, tablePath } from './paths'
+import { accessLabel, dbmsLabel, explainPath, formatRows, tableDataPath, tablePath } from './paths'
 
 export default function SchemaPage() {
   const { id = '' } = useParams()
@@ -52,6 +52,14 @@ export default function SchemaPage() {
         title={db.name}
         titleExtra={<Badge tone={db.can_edit ? 'lime' : 'butter'}>{accessLabel[db.access_level]}</Badge>}
         subtitle="Pilih tabel atau view untuk melihat kolom, constraint, index, dan isi datanya."
+        action={
+          db.can_edit && (
+            <Link to={explainPath(db.id)} className="btn-secondary">
+              <Icon name="bolt" />
+              Analisis query plan
+            </Link>
+          )
+        }
         aside={<StatCard icon="layers" label="Schema" value={data.schemas.length} />}
       />
 
