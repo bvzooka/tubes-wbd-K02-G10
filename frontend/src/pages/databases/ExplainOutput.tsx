@@ -53,7 +53,7 @@ export default function ExplainOutput({ result }: ExplainOutputProps) {
       </Panel>
 
       <details className="card">
-        <summary className="cursor-pointer font-semibold">JSON mentah</summary>
+        <summary className="cursor-pointer py-2.5 font-semibold">JSON mentah</summary>
         <pre className="scroll-thin mt-3 max-h-[420px] overflow-auto font-mono text-[0.8rem]">{plan.json}</pre>
       </details>
     </>

@@ -372,8 +372,9 @@
   .tab-list {
     @apply glass mb-4 inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-[0.35rem];
   }
+  /* Di layar kecil padding dirapatkan supaya tiga tab (kolom, constraint, index) muat di 375px. */
   .tab {
-    @apply inline-flex min-h-[44px] cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border-0 bg-transparent px-[1.15rem] font-bold text-ink-2 hover:bg-green-soft;
+    @apply inline-flex min-h-[44px] cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border-0 bg-transparent px-[1.15rem] font-bold text-ink-2 hover:bg-green-soft max-sm:gap-1.5 max-sm:px-2.5;
   }
   .tab[aria-selected='true'] {
     @apply bg-ink text-white hover:bg-ink;
