@@ -16,6 +16,8 @@ import ExplainPage from './pages/databases/ExplainPage'
 import SchemaPage from './pages/databases/SchemaPage'
 import TableDataPage from './pages/databases/TableDataPage'
 import TablePage from './pages/databases/TablePage'
+import MigrationFormPage from './pages/migrations/MigrationFormPage'
+import MigrationsPage from './pages/migrations/MigrationsPage'
 
 export default function App() {
   return (
@@ -31,6 +33,9 @@ export default function App() {
           <Route path="databases/:id/explain" element={<ExplainPage />} />
           <Route path="databases/:id/tables/:schema/:table" element={<TablePage />} />
           <Route path="databases/:id/tables/:schema/:table/data" element={<TableDataPage />} />
+          <Route path="databases/:id/migrations" element={<MigrationsPage />} />
+          <Route path="databases/:id/migrations/new" element={<MigrationFormPage />} />
+          <Route path="databases/:id/migrations/:version/edit" element={<MigrationFormPage />} />
           <Route path="approvals" element={<ApprovalsPage />} />
 
           <Route path="admin" element={<RequireAuth admin />}>
