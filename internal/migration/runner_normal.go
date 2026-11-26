@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"go.opentelemetry.io/otel/attribute"
 
 	"dbplatform/internal/contract"
 	"dbplatform/internal/dbdriver"
@@ -104,16 +105,22 @@ func classify(err error) *Failure {
 }
 
 // lockTarget mengambil satu koneksi khusus lalu mencoba kunci advisory platform tanpa menunggu
-func lockTarget(ctx context.Context, driver dbdriver.Driver) (dbdriver.Session, bool, error) {
+func lockTarget(ctx context.Context, driver dbdriver.Driver) (session dbdriver.Session, locked bool, err error) {
 	sessioner, ok := driver.(dbdriver.Sessioner)
 	if !ok {
 		return nil, false, domain.ErrUnsupported
 	}
-	session, err := sessioner.OpenSession(ctx)
+	// pengambilan kunci punya span sendiri supaya terlihat di trace, termasuk saat kuncinya sedang dipakai
+	ctx, span := startSpan(ctx, "migration.lock")
+	defer func() {
+		span.SetAttributes(attribute.Bool("lock.acquired", locked))
+		endSpan(span, err)
+	}()
+	session, err = sessioner.OpenSession(ctx)
 	if err != nil {
 		return nil, false, err
 	}
-	locked, err := session.TryLock(ctx, dbdriver.PlatformMigrationLockKey)
+	locked, err = session.TryLock(ctx, dbdriver.PlatformMigrationLockKey)
 	if err != nil || !locked {
 		session.Close()
 		return nil, false, err

@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"dbplatform/internal/contract"
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/dbdriver/pgmeta"
@@ -165,7 +167,7 @@ func (b *batchRun) scope(ctx context.Context, tx dbdriver.ArgTx, root int64) (cu
 // forwardNext menjalankan satu batch dan checkpointnya dalam satu transaction, done true kalau sudah tidak ada baris
 func (b *batchRun) forwardNext(ctx context.Context, cursor *int64, scopeMax int64) (done bool, err error) {
 	var step pgmeta.Batch
-	batchCtx := b.batchContext(ctx)
+	batchCtx, end := b.startBatch(ctx, pgmeta.Forward)
 	err = b.tx(batchCtx, func(tx dbdriver.ArgTx) error {
 		ctx := batchCtx
 		hi, found, err := b.table.next(ctx, tx, *cursor, scopeMax, b.e.Batch.BatchSize)
@@ -176,6 +178,7 @@ func (b *batchRun) forwardNext(ctx context.Context, cursor *int64, scopeMax int6
 		step, err = b.apply(ctx, tx, pgmeta.Forward, *cursor, hi)
 		return err
 	})
+	end(step, done, err)
 	if err != nil || done {
 		return done, err
 	}
@@ -186,7 +189,7 @@ func (b *batchRun) forwardNext(ctx context.Context, cursor *int64, scopeMax int6
 // revertNext membatalkan batch dari yang paling besar ke yang paling kecil
 func (b *batchRun) revertNext(ctx context.Context) (done bool, err error) {
 	var step pgmeta.Batch
-	batchCtx := b.batchContext(ctx)
+	batchCtx, end := b.startBatch(ctx, pgmeta.Revert)
 	err = b.tx(batchCtx, func(tx dbdriver.ArgTx) error {
 		ctx := batchCtx
 		lo, hi, found, err := nextUnreverted(ctx, tx, b.chain)
@@ -197,15 +200,27 @@ func (b *batchRun) revertNext(ctx context.Context) (done bool, err error) {
 		step, err = b.apply(ctx, tx, pgmeta.Revert, lo, hi)
 		return err
 	})
+	end(step, done, err)
 	if err != nil || done {
 		return done, err
 	}
 	return false, b.committed(ctx, step, 0)
 }
 
-// batchContext menambahkan nomor batch yang sedang dikerjakan ke log SQLnya
-func (b *batchRun) batchContext(ctx context.Context) context.Context {
-	return telemetry.WithLogAttrs(ctx, "batch", b.attempt.Batches+1)
+// startBatch membuka span untuk satu batch dan menambahkan nomornya ke log SQL di dalamnya
+// fungsi end dipanggil setelah transaction batch selesai untuk menutup span dengan hasilnya
+func (b *batchRun) startBatch(
+	ctx context.Context, direction string,
+) (batchCtx context.Context, end func(step pgmeta.Batch, empty bool, err error)) {
+	number := b.attempt.Batches + 1
+	ctx, span := startSpan(ctx, "migration.batch",
+		attribute.Int64("execution.id", b.e.ID), attribute.Int("batch.number", number),
+		attribute.String("batch.direction", direction))
+	return telemetry.WithLogAttrs(ctx, "batch", number), func(step pgmeta.Batch, empty bool, err error) {
+		// putaran terakhir cuma memastikan tidak ada baris tersisa, jadi ditandai kosong
+		span.SetAttributes(attribute.Bool("batch.empty", empty), attribute.Int64("batch.rows", step.RowsAffected))
+		endSpan(span, err)
+	}
 }
 
 func (b *batchRun) apply(ctx context.Context, tx dbdriver.ArgTx, direction string, lo, hi int64) (pgmeta.Batch, error) {
