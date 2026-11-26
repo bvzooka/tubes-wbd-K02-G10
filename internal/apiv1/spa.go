@@ -11,6 +11,12 @@ import (
 func SPA(dist fs.FS) http.Handler {
 	files := http.FileServerFS(dist)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// SPA hanya menyajikan file, jadi method lain ditolak daripada dijawab halaman HTML
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "method tidak diizinkan", http.StatusMethodNotAllowed)
+			return
+		}
 		name := path.Clean(r.URL.Path)[1:]
 		if name == "" {
 			name = "index.html"

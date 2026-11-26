@@ -54,7 +54,10 @@ func (r *Runner) runNormal(
 		if err := pgmeta.Ensure(ctx, tx); err != nil {
 			return err
 		}
-		done, err := pgmeta.ExecutionCommitted(ctx, tx, e.ID)
+		if err := checkProofOwner(ctx, tx, e, []int64{e.ID}, proofSince(e)); err != nil {
+			return err
+		}
+		done, err := ownProof(ctx, tx, e)
 		if err != nil || done {
 			// done berarti sudah pernah tercommit, SQL tidak dijalankan lagi
 			return err
@@ -158,7 +161,7 @@ func (r *Runner) findProof(ctx context.Context, e domain.Execution) (committed, 
 		if err := pgmeta.Ensure(ctx, tx); err != nil {
 			return err
 		}
-		committed, err = pgmeta.ExecutionCommitted(ctx, tx, e.ID)
+		committed, err = ownProof(ctx, tx, e)
 		return err
 	})
 	return committed, true, err

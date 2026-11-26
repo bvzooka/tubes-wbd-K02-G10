@@ -189,3 +189,13 @@ func TestSPA_FallsBackToIndex(t *testing.T) {
 		}
 	}
 }
+
+// POST ke alamat halaman tidak boleh dijawab seolah berhasil
+func TestSPA_RejectsWriteMethods(t *testing.T) {
+	dist := fstest.MapFS{"index.html": {Data: []byte("<div id=root></div>")}}
+	rec := httptest.NewRecorder()
+	SPA(dist).ServeHTTP(rec, httptest.NewRequest("POST", "/databases", nil))
+	if rec.Code != 405 || rec.Header().Get("Allow") != "GET, HEAD" {
+		t.Errorf("status %d, Allow %q", rec.Code, rec.Header().Get("Allow"))
+	}
+}

@@ -71,6 +71,56 @@ func (r runEnv) readyWith(t *testing.T, up, down string) migration.Definition {
 	return d
 }
 
+func (r runEnv) checksumOf(t *testing.T, executionID int64) string {
+	t.Helper()
+	e, err := r.repo.GetExecution(context.Background(), executionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e.Checksum
+}
+
+// bukti bernomor sama yang tertinggal di database target tidak boleh dianggap milik permintaan ini
+func TestRunner_Integration_ForeignProofIsRejected(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration")
+	}
+	tests := []struct {
+		name     string
+		checksum func(ours string) string
+		age      string
+	}{
+		{"isi sama tapi dari sebelum platform di-reset", func(ours string) string { return ours }, "1 day"},
+		{"isi berbeda dari platform lain", func(string) string { return "lain" }, "0 seconds"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newRunEnv(t)
+			job := r.enqueue(t, r.ready(t), domain.KindApply)
+			r.targetExec(t, `CREATE SCHEMA _dbplatform;
+				CREATE TABLE _dbplatform.executions (execution_id BIGINT PRIMARY KEY, kind TEXT, attempt INT,
+					checksum TEXT, committed_at TIMESTAMPTZ DEFAULT now())`)
+			_, err := r.target.Exec(context.Background(), `
+				INSERT INTO _dbplatform.executions (execution_id, kind, checksum, committed_at)
+				VALUES ($1, 'apply', $2, now() - $3::text::interval)`,
+				job.ExecutionID, tt.checksum(r.checksumOf(t, job.ExecutionID)), tt.age)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got := r.run(job)
+
+			if got.Outcome != domain.OutcomeFailed || got.Retryable || r.tableExists(t, "a") {
+				t.Errorf("hasil = %+v", got)
+			}
+			e, err := r.repo.GetExecution(context.Background(), job.ExecutionID)
+			if err != nil || e.FailureCode != migration.CodeTargetConflict {
+				t.Errorf("kode = %s, %v", e.FailureCode, err)
+			}
+		})
+	}
+}
+
 func (r runEnv) tableExists(t *testing.T, name string) bool {
 	t.Helper()
 	var found bool
@@ -250,7 +300,8 @@ func TestRunner_Integration_ReconcileUsesProof(t *testing.T) {
 					t.Fatal(err)
 				}
 				if _, err := r.target.Exec(ctx,
-					`INSERT INTO _dbplatform.executions (execution_id) VALUES ($1)`, job.ExecutionID); err != nil {
+					`INSERT INTO _dbplatform.executions (execution_id, kind, checksum) VALUES ($1, 'apply', $2)`,
+					job.ExecutionID, r.checksumOf(t, job.ExecutionID)); err != nil {
 					t.Fatal(err)
 				}
 			}
