@@ -113,6 +113,23 @@ services:
         condition: service_healthy
     restart: on-failure:5
 
+  k6:
+    profiles: ["loadtest"]
+    image: grafana/k6:0.56.0
+    command: ["run", "--summary-export=/results/summary.json", "/scripts/load.js"]
+    volumes:
+      - ./loadtest:/scripts:ro
+      - ./loadtest/results:/results
+    environment:
+      BASE_URL: ${K6_BASE_URL:-http://server:8080}
+      TARGET_HOST: ${K6_TARGET_HOST:-targetdb}
+      TARGET_PORT: ${K6_TARGET_PORT:-5432}
+      ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?isi SEED_ADMIN_PASSWORD di .env}
+      STAGE_SECONDS: ${K6_STAGE_SECONDS:-30}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   targetmysql:
     profiles: ["mysql"]
     image: mysql:8.4

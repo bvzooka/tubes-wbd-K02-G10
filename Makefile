@@ -1,4 +1,4 @@
-.PHONY: up down run run-worker test test-short test-docker fmt vet seed-large build-web app-up app-down obs-up obs-down
+.PHONY: up down run run-worker test test-short test-docker fmt vet seed-large build-web app-up app-down obs-up obs-down loadtest-setup loadtest
 
 up:
 	docker compose up -d appdb targetdb testdb
@@ -28,7 +28,6 @@ app-down:
 obs-up:
 	docker compose --profile observability up -d otel-collector tempo loki prometheus grafana
 
-# hanya menghentikan stack observability; appdb dan targetdb tetap berjalan
 obs-down:
 	docker compose --profile observability rm -sf otel-collector tempo loki prometheus grafana
 
@@ -46,3 +45,10 @@ fmt:
 
 vet:
 	go vet ./...
+
+# database target k6 dibuat ulang dari awal; ROWS mengubah jumlah baris (bawaan 200000)
+loadtest-setup:
+	docker compose exec -T targetdb psql -U postgres -d sampledb -q $(if $(ROWS),-v rows=$(ROWS)) -f - < loadtest/targets.sql
+
+loadtest:
+	docker compose --profile loadtest run --rm k6
