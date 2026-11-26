@@ -236,3 +236,146 @@ export interface ExplainResult {
   } | null
   raw_text: string
 }
+
+// Migration, bentuknya mengikuti internal/migration/api_json.go
+
+export type MigrationState =
+  | 'draft'
+  | 'ready'
+  | 'applied'
+  | 'failed'
+  | 'rolled_back'
+  | 'partial'
+  | 'partially_reverted'
+  | 'unknown'
+  | 'cancelled'
+  | 'superseded'
+
+export type MigrationMode = 'normal' | 'batch'
+
+export interface BatchConfig {
+  schema: string
+  table: string
+  key_column: string
+  batch_size: number
+}
+
+export interface MigrationInput {
+  name: string
+  sql_up: string
+  sql_down: string
+  irreversible: boolean
+  irreversible_reason: string
+  mode: MigrationMode
+  batch: BatchConfig | null
+}
+
+// sql_up dan sql_down kosong di respons daftar
+export interface Migration extends MigrationInput {
+  id: number
+  connection_id: number
+  version: number
+  revision: number
+  state: MigrationState
+  checksum: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface MigrationList {
+  items: Migration[]
+  can_edit: boolean
+}
+
+export type ExecutionKind = 'apply' | 'rollback' | 'forward'
+
+export type ExecutionStatus =
+  | 'pending_review'
+  | 'rejected'
+  | 'approved'
+  | 'cancelled'
+  | 'queued'
+  | 'running'
+  | 'success'
+  | 'failed'
+  | 'partial'
+  | 'partially_reverted'
+  | 'outcome_unknown'
+
+export interface Execution {
+  id: number
+  connection_id: number
+  version: number
+  revision: number
+  kind: ExecutionKind
+  mode: MigrationMode
+  batch: BatchConfig | null
+  sql: string
+  status: ExecutionStatus
+  requested_by: string
+  requested_at: string
+  queued_at: string | null
+  started_at: string | null
+  finished_at: string | null
+  failure_code: string
+  failure_message: string
+  batches_committed: number
+  rows_committed: number
+  rolls_back_execution_id: number | null
+  resumes_execution_id: number | null
+}
+
+export interface MigrationDetail {
+  migration: Migration
+  executions: Execution[]
+  can_edit: boolean
+}
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export interface Approval {
+  group_id: number
+  group_name: string
+  leader_id: number
+  leader_name: string
+  status: ApprovalStatus
+  // true kalau pengajunya leader group itu
+  auto: boolean
+  comment: string
+  decided_at: string | null
+}
+
+export type HistoryStatus = 'success' | 'failed' | 'partial' | 'outcome_unknown'
+
+// satu baris riwayat per attempt
+export interface HistoryEntry {
+  id: number
+  execution_id: number
+  attempt: number
+  migration_id: number
+  version: number
+  revision: number
+  kind: ExecutionKind
+  executed_by: string
+  status: HistoryStatus
+  committed: boolean
+  sql: string
+  rolls_back_execution_id: number | null
+  batches_committed: number
+  rows_committed: number
+  failure_code: string
+  failure_message: string
+  correlation_id: string
+  started_at: string
+  finished_at: string
+}
+
+export interface ExecutionDetail {
+  execution: Execution
+  approvals: Approval[]
+  attempts: HistoryEntry[]
+  // kosong kalau belum pernah masuk antrean
+  job_id: string
+  can_edit: boolean
+}

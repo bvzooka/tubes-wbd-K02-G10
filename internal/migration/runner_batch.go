@@ -21,6 +21,7 @@ type batchRun struct {
 	e       domain.Execution
 	table   batchTable
 	chain   []int64
+	since   time.Time // checkpoint rangkaian ini tidak mungkin lebih tua dari ini
 	attempt *Attempt
 	// true kalau isi transaction sudah selesai dan error yang muncul berasal dari commit
 	committing bool
@@ -44,6 +45,10 @@ func (r *Runner) runBatch(
 	if err != nil {
 		return later(err)
 	}
+	first, err := r.deps.Store.GetExecution(platform, root)
+	if err != nil {
+		return later(err)
+	}
 	session, locked, err := lockTarget(ctx, driver)
 	if err != nil {
 		return r.fail(platform, job, e, a, transient(CodeConnection, err))
@@ -62,7 +67,7 @@ func (r *Runner) runBatch(
 		"execution_id", e.ID, "job_id", job.ID, "attempt", job.Attempt, "mode", e.Mode)
 
 	run := &batchRun{
-		runner: r, session: session, job: job, e: e, table: newBatchTable(*e.Batch), chain: chain, attempt: &a,
+		runner: r, session: session, job: job, e: e, table: newBatchTable(*e.Batch), chain: chain, since: proofSince(first), attempt: &a,
 	}
 	err = run.execute(ctx, lease, root)
 
@@ -87,12 +92,15 @@ func (b *batchRun) execute(ctx context.Context, lease contract.Lease, root int64
 		if err := pgmeta.Ensure(ctx, tx); err != nil {
 			return err
 		}
+		if err := checkProofOwner(ctx, tx, b.e, b.chain, b.since); err != nil {
+			return err
+		}
 		if err := checkBatchKey(ctx, tx, b.table, b.e.Batch.KeyColumn); err != nil {
 			return err
 		}
 		var err error
 		// percobaan ulang melanjutkan hitungan dari checkpoint yang sudah ada
-		if b.attempt.Batches, b.attempt.Rows, err = ownProgress(ctx, tx, b.e.ID); err != nil {
+		if b.attempt.Batches, b.attempt.Rows, err = ownProgress(ctx, tx, b.e); err != nil {
 			return err
 		}
 		if b.e.Kind == domain.KindRollback {
@@ -128,32 +136,28 @@ func (b *batchRun) execute(ctx context.Context, lease contract.Lease, root int64
 
 // scope menentukan batas akhir sekali di awal, jadi baris yang masuk belakangan tidak ikut diproses
 func (b *batchRun) scope(ctx context.Context, tx dbdriver.ArgTx, root int64) (cursor, scopeMax int64, empty bool, err error) {
-	start, currentMax, empty, err := b.table.bounds(ctx, tx)
-	if err != nil {
-		return 0, 0, false, err
-	}
-	scopeMax, found, err := pgmeta.Scope(ctx, tx, root)
-	if err != nil {
-		return 0, 0, false, err
-	}
-	if !found {
-		if empty {
-			return 0, 0, true, nil
-		}
-		scopeMax = currentMax
-		if err := pgmeta.SetScope(ctx, tx, root, scopeMax); err != nil {
-			return 0, 0, false, err
-		}
-	}
-	// resume mulai dari batch terakhir yang tercommit supaya tidak ada yang diulang
 	cursor, resumed, err := pgmeta.ResumeCursor(ctx, tx, b.chain)
 	if err != nil {
 		return 0, 0, false, err
 	}
-	if !resumed {
-		cursor = start
+	// resume mulai dari batch terakhir yang tercommit supaya tidak ada yang diulang
+	if resumed {
+		scopeMax, found, err := pgmeta.Scope(ctx, tx, root)
+		if err == nil && !found {
+			err = errors.New("batas akhir batch tidak ditemukan di database target")
+		}
+		return cursor, scopeMax, false, err
 	}
-	return cursor, scopeMax, empty, nil
+	start, scopeMax, empty, err := b.table.bounds(ctx, tx)
+	if err != nil || empty {
+		return 0, 0, empty, err
+	}
+	// batas yang tersisa tanpa satu pun checkpoint tidak berarti apa-apa, jadi diganti
+	_, err = tx.ExecArgs(ctx, `DELETE FROM `+pgmeta.Schema+`.batch_scopes WHERE execution_id = $1`, root)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	return start, scopeMax, false, pgmeta.SetScope(ctx, tx, root, scopeMax)
 }
 
 // forwardNext menjalankan satu batch dan checkpoint-nya dalam satu transaction, done true kalau sudah tidak ada baris
@@ -277,10 +281,10 @@ func (r *Runner) verifyBatch(
 		if err := pgmeta.Ensure(ctx, tx); err != nil {
 			return err
 		}
-		if done, err = pgmeta.ExecutionCommitted(ctx, tx, e.ID); err != nil {
+		if done, err = ownProof(ctx, tx, e); err != nil {
 			return err
 		}
-		a.Batches, a.Rows, err = ownProgress(ctx, tx, e.ID)
+		a.Batches, a.Rows, err = ownProgress(ctx, tx, e)
 		return err
 	})
 	if err != nil {

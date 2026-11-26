@@ -77,14 +77,14 @@ func nextUnreverted(ctx context.Context, tx dbdriver.ArgTx, chain []int64) (lo, 
 }
 
 // ownProgress menghitung batch dan baris yang tercommit oleh satu eksekusi, dibaca dari checkpoint di target
-func ownProgress(ctx context.Context, tx dbdriver.ArgTx, executionID int64) (batches int, rows int64, err error) {
-	count, _, err := tx.QueryInt(ctx,
-		`SELECT count(*) FROM `+pgmeta.Schema+`.batches WHERE execution_id = $1`, executionID)
+func ownProgress(ctx context.Context, tx dbdriver.ArgTx, e domain.Execution) (batches int, rows int64, err error) {
+	const mine = `.batches WHERE execution_id = $1 AND committed_at >= $2`
+	count, _, err := tx.QueryInt(ctx, `SELECT count(*) FROM `+pgmeta.Schema+mine, e.ID, proofSince(e))
 	if err != nil {
 		return 0, 0, fmt.Errorf("count batches: %w", err)
 	}
 	rows, _, err = tx.QueryInt(ctx,
-		`SELECT COALESCE(sum(rows_affected), 0)::bigint FROM `+pgmeta.Schema+`.batches WHERE execution_id = $1`, executionID)
+		`SELECT COALESCE(sum(rows_affected), 0)::bigint FROM `+pgmeta.Schema+mine, e.ID, proofSince(e))
 	if err != nil {
 		return 0, 0, fmt.Errorf("sum batch rows: %w", err)
 	}

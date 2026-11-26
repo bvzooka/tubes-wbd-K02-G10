@@ -204,6 +204,25 @@ func TestBatch_Integration_KeyMustBeUniqueInteger(t *testing.T) {
 	}
 }
 
+// checkpoint lama bernomor sama akan membuat baris terlewat kalau dipercaya
+func TestBatch_Integration_ForeignCheckpointsAreRejected(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration")
+	}
+	b := newBatchEnv(t)
+	b.do(t, domain.KindApply, false)
+	// seolah database platform di-reset: bukti lama jauh lebih tua dari permintaan berikutnya
+	b.targetExec(t, `
+		UPDATE _dbplatform.batches SET execution_id = execution_id + 1, committed_at = now() - interval '1 day';
+		DELETE FROM _dbplatform.executions`)
+
+	e, _ := b.do(t, domain.KindRollback, false)
+
+	if e.Status != domain.ExecFailed || e.FailureCode != migration.CodeTargetConflict || b.sumVal(t, 1, 25) != 25 {
+		t.Errorf("permintaan = %s %s %s", e.Status, e.FailureCode, e.FailureMessage)
+	}
+}
+
 // worker mati setelah satu batch tercommit
 func TestBatch_Integration_ReconcileCountsCheckpoints(t *testing.T) {
 	if testing.Short() {
