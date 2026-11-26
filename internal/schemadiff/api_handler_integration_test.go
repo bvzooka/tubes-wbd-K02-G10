@@ -43,6 +43,15 @@ func (e diffEnv) call(t *testing.T, h apiv1.Handler, actor domain.Principal, bod
 	return rec.Code, out.Data, nil
 }
 
+func (e diffEnv) draftCount(t *testing.T) int {
+	t.Helper()
+	var n int
+	if err := e.app.QueryRow(context.Background(), `SELECT count(*) FROM db_migrations`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
 func TestAPIHandler_Integration_PreviewThenDraft(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration")

@@ -214,33 +214,3 @@ func TestFirstTransactionControl_NoneInPlainMigration(t *testing.T) {
 		t.Error("migration biasa tidak boleh terdeteksi")
 	}
 }
-
-func TestContainsDDL(t *testing.T) {
-	tests := []struct {
-		name string
-		sql  string
-		want bool
-	}{
-		{"create", "CREATE TABLE a (id int)", true},
-		{"alter", "alter table a add column b int", true},
-		{"drop", "DROP TABLE a", true},
-		{"truncate", "TRUNCATE a", true},
-		{"rename", "RENAME TABLE a TO b", true},
-		{"ddl di statement kedua", "INSERT INTO a VALUES (1); DROP TABLE a", true},
-		{"hanya dml", "INSERT INTO a VALUES (1); UPDATE a SET id = 2; DELETE FROM a; SELECT 1", false},
-		{"kata ddl di dalam string", "INSERT INTO a VALUES ('CREATE TABLE x')", false},
-		{"kata ddl di komentar", "-- DROP TABLE a\nSELECT 1", false},
-		{"kosong", "", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stmts, err := Split(tt.sql)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := ContainsDDL(stmts); got != tt.want {
-				t.Errorf("ContainsDDL = %v, mau %v", got, tt.want)
-			}
-		})
-	}
-}

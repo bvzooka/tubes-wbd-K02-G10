@@ -9,7 +9,6 @@ import (
 	"dbplatform/internal/contract"
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/domain"
-	"dbplatform/internal/migration"
 )
 
 // batas nama migration dan pesan error form schema diff
@@ -21,21 +20,15 @@ const (
 	msgStaleChoice   = "Perubahan yang dipilih sudah tidak berlaku karena schema berubah. Hitung ulang perbedaannya."
 )
 
-// Pakai service migration, ga nyentuh database platform sendiri
-type migrationCreator interface {
-	Create(ctx context.Context, actor domain.Principal, connID int64, in migration.Input) (domain.Migration, error)
-}
-
-// Service menghitung perbedaan schema dan membuat draft migration dari perubahan yang dipilih user
+// Service menghitung perbedaan schema dan menyusun SQL dari perubahan yang dipilih user
 type Service struct {
-	authz      contract.Authorizer
-	drivers    contract.DriverProvider
-	migrations migrationCreator
+	authz   contract.Authorizer
+	drivers contract.DriverProvider
 }
 
-// NewService dibuat dengan authorizer, penyedia driver, dan pembuat migration
-func NewService(authz contract.Authorizer, drivers contract.DriverProvider, migrations migrationCreator) *Service {
-	return &Service{authz: authz, drivers: drivers, migrations: migrations}
+// NewService dibuat dengan authorizer dan penyedia driver
+func NewService(authz contract.Authorizer, drivers contract.DriverProvider) *Service {
+	return &Service{authz: authz, drivers: drivers}
 }
 
 // Result adalah hasil perbandingan: database tujuan dan sumber beserta daftar perubahannya
@@ -106,15 +99,6 @@ func (s *Service) Preview(ctx context.Context, actor domain.Principal, targetID,
 		SourceID: sourceID, SourceName: names[sourceID],
 		Changes: Diff(targetSchema, sourceSchema),
 	}, nil
-}
-
-// CreateDraft membuat migration draft di database tujuan dari perubahan yang dipilih
-func (s *Service) CreateDraft(ctx context.Context, actor domain.Principal, targetID, sourceID int64, selected []string) (domain.Migration, error) {
-	name, sql, err := s.DraftSQL(ctx, actor, targetID, sourceID, selected)
-	if err != nil {
-		return domain.Migration{}, err
-	}
-	return s.migrations.Create(ctx, actor, targetID, migration.Input{Name: name, SQL: sql})
 }
 
 // DraftSQL menyusun nama dan SQL draft dari perubahan terpilih tanpa menyimpannya

@@ -3,10 +3,13 @@ package migration_test
 import (
 	"context"
 	"errors"
+	"sort"
+	"sync"
 	"testing"
 
 	"dbplatform/internal/domain"
 	"dbplatform/internal/migration"
+	"dbplatform/internal/testutil"
 )
 
 // draft yang dipakai di sini sudah rapi, seolah sudah lewat validasi
@@ -133,5 +136,62 @@ func TestDefinitionRepo_Integration_MoveChecksCurrentState(t *testing.T) {
 	}
 	if reopened.State != domain.StateDraft || reopened.Revision != 2 {
 		t.Errorf("setelah dibuka lagi = %+v", reopened)
+	}
+}
+
+// pembuatan bersamaan harus tetap menghasilkan versi berurutan per database
+func TestDefinitionRepo_Integration_ConcurrentCreatesGetGaplessVersions(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration")
+	}
+	e := newRepoEnv(t)
+	other := testutil.SeedConnection(t, e.pool, "lain", true)
+
+	const perConn = 10
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	versions := map[int64][]int{}
+	for _, connID := range []int64{e.conn, other} {
+		for range perConn {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				d, err := e.repo.CreateDefinition(context.Background(), connID, normalInput(), e.user.ID)
+				mu.Lock()
+				defer mu.Unlock()
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				versions[connID] = append(versions[connID], d.Version)
+			}()
+		}
+	}
+	wg.Wait()
+
+	for _, connID := range []int64{e.conn, other} {
+		got := versions[connID]
+		sort.Ints(got)
+		if len(got) != perConn || got[0] != 1 || got[len(got)-1] != perConn {
+			t.Errorf("koneksi %d: versi = %v, mau 1 sampai %d", connID, got, perConn)
+		}
+	}
+}
+
+// versi milik database lain tidak boleh terbaca atau terubah
+func TestDefinitionRepo_Integration_ScopedToConnection(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration")
+	}
+	e := newRepoEnv(t)
+	ctx := context.Background()
+	other := testutil.SeedConnection(t, e.pool, "lain", true)
+	d := e.createDefinition(t, normalInput())
+
+	if _, err := e.repo.GetDefinition(ctx, other, d.Version); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("baca dari koneksi lain: %v", err)
+	}
+	if _, err := e.repo.UpdateDefinition(ctx, other, d.Version, d.Revision, normalInput()); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("ubah dari koneksi lain: %v", err)
 	}
 }

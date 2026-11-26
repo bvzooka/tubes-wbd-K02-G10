@@ -301,9 +301,6 @@ func TestResultTemplate_Renders(t *testing.T) {
 		if !strings.Contains(out, `value="tok"`) || !strings.Contains(out, "/databases/3/explain") {
 			t.Fatal("form CSRF atau action hilang")
 		}
-		if !strings.Contains(out, `formaction="/databases/3/migrations"`) || !strings.Contains(out, `value="execute"`) {
-			t.Fatal("tombol simpan sebagai migration hilang")
-		}
 		if strings.Contains(out, "<b>") || strings.Contains(out, "t<x>") || strings.Contains(out, "<i>") {
 			t.Fatal("data harus di-escape")
 		}

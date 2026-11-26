@@ -4,11 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"strings"
-	"unicode/utf8"
 )
 
-// batas input dan pesan error form migration
+// batas isian dan pesan error migration
 const (
 	maxNameChars = 120
 	maxSQLBytes  = 256 * 1024
@@ -19,35 +17,6 @@ const (
 	msgSQLUnterminated = "SQL tidak valid: tanda kutip, komentar, atau dollar-quote belum ditutup."
 	msgSQLTransaction  = "SQL tidak boleh berisi perintah kontrol transaksi (%s). Seluruh migration sudah dijalankan dalam satu transaction."
 )
-
-// Input adalah isi form migration: nama dan SQL
-type Input struct {
-	Name string
-	SQL  string
-}
-
-// Validate merapikan input lalu mengembalikan pesan error per field, kosong kalau valid
-func Validate(in Input) (Input, map[string]string) {
-	fields := map[string]string{}
-
-	name := strings.TrimSpace(in.Name)
-	if n := utf8.RuneCountInString(name); n < 1 || n > maxNameChars {
-		fields["name"] = msgNameInvalid
-	}
-
-	sql := strings.TrimSpace(in.SQL)
-	switch {
-	case sql == "":
-		fields["sql"] = msgSQLEmpty
-	case len(sql) > maxSQLBytes:
-		fields["sql"] = msgSQLTooLarge
-	default:
-		if msg := CheckSQL(sql); msg != "" {
-			fields["sql"] = msg
-		}
-	}
-	return Input{Name: name, SQL: sql}, fields
-}
 
 // BEGIN/COMMIT dilarang, semua migration udah satu transaction
 func CheckSQL(sql string) string {

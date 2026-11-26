@@ -10,6 +10,21 @@ import (
 	"dbplatform/internal/migration"
 )
 
+// aplikasi tidak lagi bisa membuat data gaya M1, jadi barisnya ditulis langsung
+func (f flowEnv) createM1(t *testing.T, status string) int64 {
+	t.Helper()
+	var id int64
+	err := f.pool.QueryRow(context.Background(), `
+		INSERT INTO db_migrations (connection_id, version, name, sql_text, checksum, status, created_by)
+		SELECT $1, COALESCE(max(version), 0) + 1, 'm1', 'SELECT 1', $2, $3, $4
+		FROM db_migrations WHERE connection_id = $1
+		RETURNING id`, f.conn, migration.Checksum("SELECT 1"), status, f.user.ID).Scan(&id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
 // database test sudah menjalankan konversi saat masih kosong, jadi file yang sama dijalankan lagi setelah data M1 diisi
 func (f flowEnv) convert(t *testing.T) {
 	t.Helper()
@@ -30,12 +45,11 @@ func TestConvertM1_Integration_StatesAndHistory(t *testing.T) {
 	// lima migration gaya M1, hanya kolom status yang terisi
 	statuses := []string{"success", "failed", "cancelled", "success", "draft"}
 	for i, status := range statuses {
-		m := f.create(t, f.conn, "m1", "SELECT 1")
-		f.setStatus(t, f.conn, m.Version, status)
+		id := f.createM1(t, status)
 		if status == "success" || status == "failed" {
 			_, err := f.pool.Exec(ctx, `
 				UPDATE db_migrations SET executed_by = $2, executed_at = now(), finished_at = now(), error_message = $3
-				WHERE id = $1`, m.ID, f.user.ID, map[bool]string{true: "salah sintaks"}[statuses[i] == "failed"])
+				WHERE id = $1`, id, f.user.ID, map[bool]string{true: "salah sintaks"}[statuses[i] == "failed"])
 			if err != nil {
 				t.Fatal(err)
 			}
