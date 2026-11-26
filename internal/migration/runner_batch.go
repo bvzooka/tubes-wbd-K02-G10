@@ -10,6 +10,7 @@ import (
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/dbdriver/pgmeta"
 	"dbplatform/internal/domain"
+	"dbplatform/internal/telemetry"
 )
 
 const batchTimeout = 2 * time.Minute
@@ -49,7 +50,8 @@ func (r *Runner) runBatch(
 	if err != nil {
 		return later(err)
 	}
-	session, locked, err := lockTarget(ctx, driver)
+	sqlCtx := targetContext(ctx, job, e)
+	session, locked, err := lockTarget(sqlCtx, driver)
 	if err != nil {
 		return r.fail(platform, job, e, a, transient(CodeConnection, err))
 	}
@@ -69,7 +71,7 @@ func (r *Runner) runBatch(
 	run := &batchRun{
 		runner: r, session: session, job: job, e: e, table: newBatchTable(*e.Batch), chain: chain, since: proofSince(first), attempt: &a,
 	}
-	err = run.execute(ctx, lease, root)
+	err = run.execute(sqlCtx, lease, root)
 
 	switch {
 	case lease.Lost():
@@ -160,10 +162,12 @@ func (b *batchRun) scope(ctx context.Context, tx dbdriver.ArgTx, root int64) (cu
 	return start, scopeMax, false, pgmeta.SetScope(ctx, tx, root, scopeMax)
 }
 
-// forwardNext menjalankan satu batch dan checkpoint-nya dalam satu transaction, done true kalau sudah tidak ada baris
+// forwardNext menjalankan satu batch dan checkpointnya dalam satu transaction, done true kalau sudah tidak ada baris
 func (b *batchRun) forwardNext(ctx context.Context, cursor *int64, scopeMax int64) (done bool, err error) {
 	var step pgmeta.Batch
-	err = b.tx(ctx, func(tx dbdriver.ArgTx) error {
+	batchCtx := b.batchContext(ctx)
+	err = b.tx(batchCtx, func(tx dbdriver.ArgTx) error {
+		ctx := batchCtx
 		hi, found, err := b.table.next(ctx, tx, *cursor, scopeMax, b.e.Batch.BatchSize)
 		if err != nil || !found {
 			done = !found
@@ -182,7 +186,9 @@ func (b *batchRun) forwardNext(ctx context.Context, cursor *int64, scopeMax int6
 // revertNext membatalkan batch dari yang paling besar ke yang paling kecil
 func (b *batchRun) revertNext(ctx context.Context) (done bool, err error) {
 	var step pgmeta.Batch
-	err = b.tx(ctx, func(tx dbdriver.ArgTx) error {
+	batchCtx := b.batchContext(ctx)
+	err = b.tx(batchCtx, func(tx dbdriver.ArgTx) error {
+		ctx := batchCtx
 		lo, hi, found, err := nextUnreverted(ctx, tx, b.chain)
 		if err != nil || !found {
 			done = !found
@@ -195,6 +201,11 @@ func (b *batchRun) revertNext(ctx context.Context) (done bool, err error) {
 		return done, err
 	}
 	return false, b.committed(ctx, step, 0)
+}
+
+// batchContext menambahkan nomor batch yang sedang dikerjakan ke log SQLnya
+func (b *batchRun) batchContext(ctx context.Context) context.Context {
+	return telemetry.WithLogAttrs(ctx, "batch", b.attempt.Batches+1)
 }
 
 func (b *batchRun) apply(ctx context.Context, tx dbdriver.ArgTx, direction string, lo, hi int64) (pgmeta.Batch, error) {
@@ -223,7 +234,7 @@ func (b *batchRun) committed(ctx context.Context, step pgmeta.Batch, scopeMax in
 	b.attempt.Batches++
 	b.attempt.Rows += step.RowsAffected
 	b.runner.deps.Logger.InfoContext(ctx, "batch committed",
-		"event", "migration.batch_committed", "execution_id", b.e.ID, "job_id", b.job.ID, "attempt", b.job.Attempt,
+		"event", "migration.batch_committed",
 		"batch", step.BatchNo, "direction", step.Direction, "lo", step.LoKey, "hi", step.HiKey, "rows", step.RowsAffected)
 
 	err := b.runner.deps.Store.SaveProgress(context.WithoutCancel(ctx), b.job, b.e.ID, Progress{
@@ -235,7 +246,7 @@ func (b *batchRun) committed(ctx context.Context, step pgmeta.Batch, scopeMax in
 	// progres di platform hanya untuk tampilan, sumber kebenarannya checkpoint di target
 	if err != nil {
 		b.runner.deps.Logger.WarnContext(ctx, "save progress failed",
-			"event", "migration.progress_failed", "execution_id", b.e.ID, "error", err)
+			"event", "migration.progress_failed", "error", err)
 	}
 	return nil
 }
@@ -267,7 +278,8 @@ func (r *Runner) verifyBatch(
 	if err != nil {
 		return unknown(err)
 	}
-	session, locked, err := lockTarget(ctx, driver)
+	sqlCtx := targetContext(ctx, job, e)
+	session, locked, err := lockTarget(sqlCtx, driver)
 	if err != nil {
 		return unknown(err)
 	}
@@ -277,7 +289,8 @@ func (r *Runner) verifyBatch(
 	defer session.Close()
 
 	var done bool
-	err = session.WithTx(ctx, dbdriver.TxOptions{}, func(tx dbdriver.ArgTx) error {
+	err = session.WithTx(sqlCtx, dbdriver.TxOptions{}, func(tx dbdriver.ArgTx) error {
+		ctx := sqlCtx
 		if err := pgmeta.Ensure(ctx, tx); err != nil {
 			return err
 		}

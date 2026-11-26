@@ -30,7 +30,8 @@ func (r *Runner) runNormal(
 	ctx := lease.Context()
 	platform := context.WithoutCancel(ctx)
 
-	session, locked, err := lockTarget(ctx, driver)
+	sqlCtx := targetContext(ctx, job, e)
+	session, locked, err := lockTarget(sqlCtx, driver)
 	if err != nil {
 		return r.fail(platform, job, e, a, transient(CodeConnection, err))
 	}
@@ -50,7 +51,8 @@ func (r *Runner) runNormal(
 
 	opts := dbdriver.TxOptions{Timeout: r.deps.Timeout}
 	committing := false // true kalau semua perintah berhasil dan tinggal commit
-	err = session.WithTx(ctx, opts, func(tx dbdriver.ArgTx) error {
+	err = session.WithTx(sqlCtx, opts, func(tx dbdriver.ArgTx) error {
+		ctx := sqlCtx
 		if err := pgmeta.Ensure(ctx, tx); err != nil {
 			return err
 		}
@@ -124,7 +126,7 @@ func (r *Runner) verify(
 	ctx context.Context, job domain.Job, e domain.Execution, a Attempt, cause error, interrupted bool,
 ) domain.RunResult {
 	platform := context.WithoutCancel(ctx)
-	committed, locked, err := r.findProof(ctx, e)
+	committed, locked, err := r.findProof(targetContext(ctx, job, e), e)
 	switch {
 	case err != nil:
 		a.Outcome, a.FailureCode = domain.OutcomeUnknown, codeUncertain

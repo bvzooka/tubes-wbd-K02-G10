@@ -88,3 +88,21 @@ func TestSignalURL(t *testing.T) {
 		}
 	}
 }
+
+func TestLogger_AttrsFromContext(t *testing.T) {
+	var buf bytes.Buffer
+	parent := WithLogAttrs(context.Background(), "execution_id", 7)
+	child := WithLogAttrs(parent, "batch", 2)
+	logger := NewLogger(&buf, "info")
+
+	logger.InfoContext(child, "anak")
+	logger.InfoContext(parent, "induk")
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if !strings.Contains(lines[0], `"execution_id":7`) || !strings.Contains(lines[0], `"batch":2`) {
+		t.Errorf("log anak = %s", lines[0])
+	}
+	if strings.Contains(lines[1], "batch") {
+		t.Errorf("atribut anak bocor ke induk: %s", lines[1])
+	}
+}
