@@ -385,3 +385,28 @@ export interface ExecutionDetail {
   job_id: string
   can_edit: boolean
 }
+
+// Schema diff, bentuknya mengikuti internal/schemadiff/api_handler.go
+
+export interface SchemaDiffSources {
+  sources: Option[]
+}
+
+export interface SchemaChange {
+  id: string
+  kind: string
+  object: string
+  sql: string
+  destructive: boolean
+}
+
+export interface SchemaDiffPreview {
+  target_name: string
+  source_name: string
+  changes: SchemaChange[]
+}
+
+export interface SchemaDiffCreated {
+  version: number
+  name: string
+}

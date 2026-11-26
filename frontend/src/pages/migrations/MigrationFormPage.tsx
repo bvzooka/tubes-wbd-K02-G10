@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../../api/client'
 import type { Migration, MigrationDetail, MigrationInput, MigrationMode } from '../../api/types'
@@ -55,6 +55,12 @@ function fromMigration(m: Migration): FormValues {
   }
 }
 
+// nama dipotong per karakter supaya tidak melebihi batas isian
+function copyOf(m: Migration): FormValues {
+  const name = Array.from(`Salinan versi ${m.version}: ${m.name}`).slice(0, maxNameChars).join('')
+  return { ...fromMigration(m), name }
+}
+
 // validasi tidak diulang di sini, backend yang menjawab pesan per field
 function toInput(v: FormValues): MigrationInput {
   const size = Number(v.batch_size.trim())
@@ -79,11 +85,16 @@ function toInput(v: FormValues): MigrationInput {
 }
 
 const sqlClass = 'input min-h-[180px] font-mono text-[0.85rem]'
+const maxNameChars = 120
 
-// dipakai untuk membuat draft baru dan mengubah draft yang sudah ada
+// dipakai untuk membuat draft baru, menyalin versi lama, dan mengubah draft yang sudah ada
 export default function MigrationFormPage() {
   const { id = '', version } = useParams()
   const isNew = version === undefined
+  const [params] = useSearchParams()
+  const copyFrom = isNew ? params.get('from') || null : null
+  // versi yang isinya perlu dimuat, kosong untuk draft yang benar-benar baru
+  const loadVersion = version ?? copyFrom
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [form, setForm] = useState<FormValues>(emptyForm)
@@ -91,17 +102,18 @@ export default function MigrationFormPage() {
   const [revision, setRevision] = useState(0)
 
   const detail = useQuery({
-    queryKey: [...migrationsKey(id), version],
-    queryFn: () => api<MigrationDetail>('GET', `/databases/${id}/migrations/${version}`),
-    enabled: !isNew,
+    queryKey: [...migrationsKey(id), loadVersion],
+    queryFn: () => api<MigrationDetail>('GET', `/databases/${id}/migrations/${loadVersion}`),
+    enabled: loadVersion !== null,
     // isian yang sedang diketik tidak boleh diganti otomatis saat tab difokuskan lagi
     refetchOnWindowFocus: false,
   })
   useEffect(() => {
     if (!detail.data) return
-    setForm(fromMigration(detail.data.migration))
-    setRevision(detail.data.migration.revision)
-  }, [detail.data])
+    const m = detail.data.migration
+    setForm(isNew ? copyOf(m) : fromMigration(m))
+    setRevision(m.revision)
+  }, [detail.data, isNew])
 
   const save = useMutation({
     mutationFn: () =>
@@ -114,12 +126,13 @@ export default function MigrationFormPage() {
     },
   })
 
-  if (!isNew && detail.isLoading) return <Loading />
-  if (!isNew && !detail.data) return <ErrorMessage error={detail.error} />
+  if (loadVersion !== null && detail.isLoading) return <Loading />
+  if (loadVersion !== null && !detail.data) return <ErrorMessage error={detail.error} />
 
   const invalid = save.error instanceof ApiError && save.error.status === 422 ? save.error : null
   const fields = invalid?.fields ?? {}
-  const locked = detail.data !== undefined && detail.data.migration.state !== 'draft'
+  // salinan boleh disimpan walau versi asalnya sudah terkunci
+  const locked = !isNew && detail.data !== undefined && detail.data.migration.state !== 'draft'
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -141,7 +154,11 @@ export default function MigrationFormPage() {
       />
       <PageHeader
         title={isNew ? 'Buat migration' : `Ubah versi ${version}`}
-        subtitle="Draft boleh disimpan berkali-kali. SQL baru terkunci setelah dibekukan."
+        subtitle={
+          copyFrom
+            ? `Isi disalin dari versi ${copyFrom} dan baru menjadi versi baru setelah disimpan.`
+            : 'Draft boleh disimpan berkali-kali. SQL baru terkunci setelah dibekukan.'
+        }
       />
 
       <div className="max-w-[860px] space-y-4">

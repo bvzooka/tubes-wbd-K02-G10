@@ -6,6 +6,15 @@ export function newMigrationPath(dbID: number | string) {
   return migrationsPath(dbID) + '/new'
 }
 
+// form draft baru yang isinya diawali dari versi lain
+export function copyMigrationPath(dbID: number | string, version: number | string) {
+  return `${newMigrationPath(dbID)}?from=${version}`
+}
+
+export function schemaDiffPath(dbID: number | string) {
+  return `/databases/${dbID}/schema-diff`
+}
+
 export function migrationPath(dbID: number | string, version: number | string) {
   return `${migrationsPath(dbID)}/${version}`
 }

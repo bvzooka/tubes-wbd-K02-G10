@@ -11,7 +11,7 @@ import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
 import { formatTime, isOpen, kindLabel, modeLabel, StateBadge, StatusBadge } from './labels'
 import SqlBlock from './SqlBlock'
-import { editMigrationPath, executionPath, migrationsKey, migrationsPath } from './paths'
+import { copyMigrationPath, editMigrationPath, executionPath, migrationsKey, migrationsPath } from './paths'
 
 type StatusAction = 'freeze' | 'cancel' | 'reopen' | 'supersede'
 
@@ -103,6 +103,15 @@ export default function MigrationDetailPage() {
           </>
         }
         subtitle={`Dibuat ${m.created_by}, diubah ${formatTime(m.updated_at)}`}
+        // draft masih bisa diubah langsung, jadi salinan hanya ditawarkan sesudahnya
+        action={
+          can_edit && m.state !== 'draft' ? (
+            <Link to={copyMigrationPath(id, m.version)} className="btn-secondary">
+              <Icon name="plus" />
+              Salin ke migration baru
+            </Link>
+          ) : undefined
+        }
       />
 
       <div className="mb-4 space-y-3">
