@@ -1,4 +1,5 @@
-# trace dari API dan worker dicetak ke log, lalu diubah jadi metrik durasi span buat Prometheus
+# trace dari API dan worker disimpan di Tempo dan diubah jadi metrik durasi span buat Prometheus.
+# log dari API dan worker diteruskan ke Loki.
 receivers:
   otlp:
     protocols:
@@ -15,8 +16,11 @@ connectors:
         buckets: [5ms, 25ms, 100ms, 500ms, 1s, 5s, 30s, 120s]
 
 exporters:
-  debug:
-    verbosity: basic
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls: { insecure: true }
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
   prometheus:
     endpoint: 0.0.0.0:8889
 
@@ -25,7 +29,11 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug, spanmetrics]
+      exporters: [otlp/tempo, spanmetrics]
     metrics:
       receivers: [spanmetrics]
       exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/loki]

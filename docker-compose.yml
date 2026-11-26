@@ -77,8 +77,10 @@ services:
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?isi SEED_ADMIN_PASSWORD di .env}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # isi OTEL_TRACES_EXPORTER=otlp dan OTEL_LOGS_EXPORTER=otlp di .env untuk mengirim ke profil observability
       OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-console}
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-none}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       # SPA sudah ada di image (/app/web/dist). Isi WEB_DIST_DIR: /app/web/dist setelah
       # bentrok route "GET /" vs "/api/" di cmd/server diperbaiki; sampai itu, server panic.
       WEB_DIST_DIR: ""
@@ -104,6 +106,9 @@ services:
     environment:
       <<: *app-env
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    # /metrics worker; Prometheus profil observability men-scrape-nya lewat host.docker.internal:9091
+    ports:
+      - "9091:9091"
     depends_on:
       server:
         condition: service_healthy
@@ -125,9 +130,10 @@ services:
       timeout: 3s
       retries: 30
 
-  # Bonus observability: docker compose --profile observability up -d
-  # Grafana di http://localhost:3000. Biar trace masuk, set OTEL_TRACES_EXPORTER=otlp
-  # dan OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+  # Bonus observability: docker compose --profile observability up -d (make obs-up)
+  # Grafana di http://localhost:3000. Biar trace dan log masuk, set OTEL_TRACES_EXPORTER=otlp,
+  # OTEL_LOGS_EXPORTER=otlp, dan OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 di .env
+  # (server di container profil app otomatis memakai http://otel-collector:4318)
   otel-collector:
     profiles: ["observability"]
     image: otel/opentelemetry-collector-contrib:0.114.0
@@ -137,6 +143,21 @@ services:
     ports:
       - "4317:4317"
       - "4318:4318"
+    depends_on: [tempo, loki]
+
+  # penyimpanan trace
+  tempo:
+    profiles: ["observability"]
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./docker/observability/tempo.yaml:/etc/tempo.yaml:ro
+
+  # penyimpanan log, menerima OTLP langsung dari collector
+  loki:
+    profiles: ["observability"]
+    image: grafana/loki:3.3.2
+    command: ["-config.file=/etc/loki/local-config.yaml"]
 
   prometheus:
     profiles: ["observability"]
@@ -154,11 +175,12 @@ services:
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_VIEWERS_CAN_EDIT: "true" # supaya viewer bisa membuka Explore (log ke trace)
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/dbplatform.json
     volumes:
       - ./docker/observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./docker/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    depends_on: [prometheus]
+    depends_on: [prometheus, tempo, loki]
     ports:
       - "3000:3000"
 

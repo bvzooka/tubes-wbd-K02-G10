@@ -1,4 +1,4 @@
-.PHONY: up down run run-worker test test-short test-docker fmt vet seed-large build-web app-up app-down
+.PHONY: up down run run-worker test test-short test-docker fmt vet seed-large build-web app-up app-down obs-up obs-down
 
 up:
 	docker compose up -d appdb targetdb testdb
@@ -24,6 +24,13 @@ app-up:
 
 app-down:
 	docker compose --profile app down
+
+obs-up:
+	docker compose --profile observability up -d otel-collector tempo loki prometheus grafana
+
+# hanya menghentikan stack observability; appdb dan targetdb tetap berjalan
+obs-down:
+	docker compose --profile observability rm -sf otel-collector tempo loki prometheus grafana
 
 test-short:
 	go test -short ./...

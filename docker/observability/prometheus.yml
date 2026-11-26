@@ -2,7 +2,8 @@ global:
   scrape_interval: 5s
 
 scrape_configs:
-  # API dan worker jalan di host (make run / make run-worker)
+  # API dan worker jalan di host (make run / make run-worker) atau di container profil app
+  # container publish port 8080 dan 9091 ke host, jadi alamatnya sama
   - job_name: api
     static_configs: [{ targets: ["host.docker.internal:8080"] }]
   - job_name: worker
