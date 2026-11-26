@@ -21,6 +21,8 @@ type runnerStore interface {
 	GetExecution(ctx context.Context, id int64) (domain.Execution, error)
 	MarkRunning(ctx context.Context, job domain.Job, executionID int64, at time.Time) error
 	RecordAttempt(ctx context.Context, job domain.Job, e domain.Execution, a Attempt) error
+	ChainIDs(ctx context.Context, rootID int64) ([]int64, error)
+	SaveProgress(ctx context.Context, job domain.Job, executionID int64, p Progress) error
 }
 
 type RunnerDeps struct {
@@ -65,7 +67,7 @@ func (r *Runner) Run(ctx context.Context, job domain.Job, lease contract.Lease) 
 		return r.fail(platform, job, e, a, failure)
 	}
 	if e.Mode == domain.ModeBatch {
-		return r.fail(platform, job, e, a, rejected(CodeRevalidation, "mode batch belum tersedia"))
+		return r.runBatch(lease, job, e, driver, a)
 	}
 	return r.runNormal(lease, job, e, driver, a)
 }
@@ -89,7 +91,11 @@ func (r *Runner) Reconcile(ctx context.Context, job domain.Job) domain.RunResult
 	if e.StartedAt != nil {
 		a.StartedAt = *e.StartedAt
 	}
-	return r.verify(ctx, job, e, a, errors.New("worker terputus saat menjalankan migration"), true)
+	cause := errors.New("worker terputus saat menjalankan migration")
+	if e.Mode == domain.ModeBatch {
+		return r.verifyBatch(ctx, job, e, a, cause, true)
+	}
+	return r.verify(ctx, job, e, a, cause, true)
 }
 
 // finish mencatat attempt ke riwayat dan log aplikasi

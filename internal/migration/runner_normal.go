@@ -83,11 +83,19 @@ func (r *Runner) runNormal(
 		release()
 		return r.verify(ctx, job, e, a, err, false)
 	}
-	failure := rejected(codeSQL, "%w", err)
-	if isTransient(err) {
-		failure = transient(CodeConnection, err)
+	return r.fail(platform, job, e, a, classify(err))
+}
+
+// classify menentukan kode kegagalan dan apakah errornya layak dicoba lagi
+func classify(err error) *Failure {
+	var known *Failure
+	if errors.As(err, &known) {
+		return known
 	}
-	return r.fail(platform, job, e, a, failure)
+	if isTransient(err) {
+		return transient(CodeConnection, err)
+	}
+	return rejected(codeSQL, "%w", err)
 }
 
 // lockTarget mengambil satu koneksi khusus lalu mencoba kunci advisory platform tanpa menunggu
@@ -127,8 +135,8 @@ func (r *Runner) verify(
 		return r.finish(platform, job, e, a, false)
 	}
 	// kunci bisa diambil dan buktinya tidak ada, berarti pasti tidak tercommit
-	failure := rejected(codeSQL, "%w", cause)
-	if interrupted || isTransient(cause) {
+	failure := classify(cause)
+	if interrupted {
 		failure = transient(CodeConnection, cause)
 	}
 	return r.fail(platform, job, e, a, failure)

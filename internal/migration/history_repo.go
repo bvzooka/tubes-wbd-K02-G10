@@ -66,6 +66,53 @@ func (r *Repo) MarkRunning(ctx context.Context, job domain.Job, executionID int6
 	return nil
 }
 
+// Progress adalah kemajuan batch yang ditampilkan di halaman monitor
+type Progress struct {
+	Batches  int
+	Rows     int64
+	Cursor   int64
+	ScopeMax int64 // nol saat rollback, nilai lama dipertahankan
+}
+
+func (r *Repo) SaveProgress(ctx context.Context, job domain.Job, executionID int64, p Progress) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+
+	if err := holdFence(ctx, tx, job); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		UPDATE migration_executions
+		SET batches_committed = $2, rows_committed = $3, cursor_value = $4,
+		    scope_max = COALESCE(NULLIF($5::bigint, 0), scope_max)
+		WHERE id = $1 AND status = 'running'`,
+		executionID, p.Batches, p.Rows, p.Cursor, p.ScopeMax)
+	if err != nil {
+		return fmt.Errorf("save progress: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit progress: %w", err)
+	}
+	return nil
+}
+
+// ChainIDs mengembalikan eksekusi awal beserta semua resume dan rollback turunannya
+func (r *Repo) ChainIDs(ctx context.Context, rootID int64) ([]int64, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id FROM migration_executions WHERE id = $1 OR root_execution_id = $1 ORDER BY id`, rootID)
+	if err != nil {
+		return nil, fmt.Errorf("list chain: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("read chain: %w", err)
+	}
+	return ids, nil
+}
+
 // holdFence mengunci baris job sampai commit dan memastikan nomor fence belum berubah
 func holdFence(ctx context.Context, q appdb.DBTX, job domain.Job) error {
 	var fence int64

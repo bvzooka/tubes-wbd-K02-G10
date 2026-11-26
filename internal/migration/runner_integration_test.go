@@ -32,8 +32,13 @@ func (r runEnv) queue() *queue.Repo { return queue.NewRepo(r.pool, clock.System{
 // enqueue melewati alur asli lalu mengambil job seperti yang dilakukan worker
 func (r runEnv) enqueue(t *testing.T, d migration.Definition, kind domain.ExecutionKind) domain.Job {
 	t.Helper()
+	return r.claim(t, d, kind, false)
+}
+
+func (r runEnv) claim(t *testing.T, d migration.Definition, kind domain.ExecutionKind, resume bool) domain.Job {
+	t.Helper()
 	ctx := context.Background()
-	ex, err := r.executions.Request(ctx, r.editor, r.conn, d.Version, kind, false)
+	ex, err := r.executions.Request(ctx, r.editor, r.conn, d.Version, kind, resume)
 	if err != nil {
 		t.Fatal(err)
 	}
