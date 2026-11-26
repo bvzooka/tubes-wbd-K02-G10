@@ -51,6 +51,7 @@ type Config struct {
 
 	LogLevel      string
 	TraceExporter string
+	LogExporter   string // none: log cuma ke stdout; otlp: salinannya jga dikirim ke Collector
 	OTLPEndpoint  string
 	Worker        WorkerConfig
 	WebDistDir    string
@@ -97,6 +98,7 @@ func Load(getenv func(string) string) (Config, error) {
 		SeedAdminPassword: getenv("SEED_ADMIN_PASSWORD"),
 		LogLevel:          str("LOG_LEVEL", "info"),
 		TraceExporter:     str("OTEL_TRACES_EXPORTER", "console"),
+		LogExporter:       str("OTEL_LOGS_EXPORTER", "none"),
 		OTLPEndpoint:      str("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
 		WebDistDir:        str("WEB_DIST_DIR", ""),
 		Worker: WorkerConfig{
@@ -148,6 +150,11 @@ func Load(getenv func(string) string) (Config, error) {
 	case "console", "otlp", "none":
 	default:
 		errs = append(errs, errors.New("OTEL_TRACES_EXPORTER: harus console, otlp, atau none"))
+	}
+	switch cfg.LogExporter {
+	case "otlp", "none":
+	default:
+		errs = append(errs, errors.New("OTEL_LOGS_EXPORTER: harus otlp atau none"))
 	}
 
 	// Semua error config dilaporin sekaligus

@@ -71,6 +71,7 @@ func TestLoad_Invalid(t *testing.T) {
 		{"heartbeat terlalu lama", map[string]string{"APP_SECRET_KEY": validKey(), "JOB_HEARTBEAT": "20s"}, "JOB_HEARTBEAT"},
 		{"concurrency nol", map[string]string{"APP_SECRET_KEY": validKey(), "WORKER_CONCURRENCY": "0"}, "WORKER_CONCURRENCY"},
 		{"exporter salah", map[string]string{"APP_SECRET_KEY": validKey(), "OTEL_TRACES_EXPORTER": "zipkin"}, "OTEL_TRACES_EXPORTER"},
+		{"log exporter salah", map[string]string{"APP_SECRET_KEY": validKey(), "OTEL_LOGS_EXPORTER": "console"}, "OTEL_LOGS_EXPORTER"},
 		{"stubs salah", map[string]string{"APP_SECRET_KEY": validKey(), "APP_STUBS": "mungkin"}, "APP_STUBS"},
 	}
 	for _, tt := range tests {

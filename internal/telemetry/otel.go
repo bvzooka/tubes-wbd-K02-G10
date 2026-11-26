@@ -15,8 +15,8 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-// SetupTracing memasang tracer provider global. exporter: console, otlp, atau none.
-// Fungsi yang dikembalikan wajib dipanggil saat proses berhenti agar span terakhir terkirim.
+// SetupTracing memacer provider global. exporter: console, otlp, atau none.
+// Fungsi yang diasang trkembalikan wajib dipanggil saat proses berhenti agar span terakhir terkirim.
 func SetupTracing(ctx context.Context, service, exporter, endpoint string) (func(context.Context) error, error) {
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 	if exporter == "none" {
@@ -29,7 +29,7 @@ func SetupTracing(ctx context.Context, service, exporter, endpoint string) (func
 	case "otlp":
 		opts := []otlptracehttp.Option{otlptracehttp.WithInsecure()}
 		if endpoint != "" {
-			opts = append(opts, otlptracehttp.WithEndpointURL(tracesURL(endpoint)))
+			opts = append(opts, otlptracehttp.WithEndpointURL(signalURL(endpoint, "traces")))
 		}
 		exp, err = otlptracehttp.New(ctx, opts...)
 	default:
@@ -41,17 +41,24 @@ func SetupTracing(ctx context.Context, service, exporter, endpoint string) (func
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),
-		sdktrace.WithResource(resource.NewSchemaless(semconv.ServiceName(service))),
+		sdktrace.WithResource(serviceResource(service)),
 	)
 	otel.SetTracerProvider(tp)
 	return tp.Shutdown, nil
 }
 
-// http://localhost:4318 -> http://localhost:4318/v1/traces
-func tracesURL(endpoint string) string {
+// menandai span dan log dengan nama service yang sama (service.name).
+func serviceResource(service string) *resource.Resource {
+	return resource.NewSchemaless(semconv.ServiceName(service))
+}
+
+// signalURL melengkapi endpoint OTLP/HTTP dengan path sinyalnya:
+// http://localhost:4318 + traces -> http://localhost:4318/v1/traces
+func signalURL(endpoint, signal string) string {
 	endpoint = strings.TrimRight(endpoint, "/")
-	if strings.HasSuffix(endpoint, "/v1/traces") {
+	path := "/v1/" + signal
+	if strings.HasSuffix(endpoint, path) {
 		return endpoint
 	}
-	return endpoint + "/v1/traces"
+	return endpoint + path
 }
