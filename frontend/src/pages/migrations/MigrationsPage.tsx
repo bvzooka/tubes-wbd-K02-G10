@@ -11,7 +11,7 @@ import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
 import { databasePath } from '../databases/paths'
 import { modeLabel, StateBadge } from './labels'
-import { editMigrationPath, historyPath, migrationPath, migrationsKey, newMigrationPath } from './paths'
+import { editMigrationPath, historyPath, migrationPath, migrationsKey, newMigrationPath, schemaDiffPath } from './paths'
 
 export default function MigrationsPage() {
   const { id = '' } = useParams()
@@ -47,6 +47,12 @@ export default function MigrationsPage() {
         action={
           <>
             {addButton}
+            {can_edit && (
+              <Link to={schemaDiffPath(id)} className="btn-secondary">
+                <Icon name="layers" />
+                Buat dari schema diff
+              </Link>
+            )}
             <Link to={historyPath(id)} className="btn-secondary">
               <Icon name="history" />
               Riwayat eksekusi

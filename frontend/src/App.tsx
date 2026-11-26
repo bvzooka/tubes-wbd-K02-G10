@@ -21,6 +21,7 @@ import HistoryPage from './pages/migrations/HistoryPage'
 import MigrationDetailPage from './pages/migrations/MigrationDetailPage'
 import MigrationFormPage from './pages/migrations/MigrationFormPage'
 import MigrationsPage from './pages/migrations/MigrationsPage'
+import SchemaDiffPage from './pages/schemadiff/SchemaDiffPage'
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="databases/:id/migrations/:version/edit" element={<MigrationFormPage />} />
           <Route path="databases/:id/migrations/:version" element={<MigrationDetailPage />} />
           <Route path="databases/:id/history" element={<HistoryPage />} />
+          <Route path="databases/:id/schema-diff" element={<SchemaDiffPage />} />
           <Route path="executions/:executionID" element={<ExecutionPage />} />
           <Route path="approvals" element={<ApprovalsPage />} />
 
