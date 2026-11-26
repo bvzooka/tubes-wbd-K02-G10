@@ -14,7 +14,7 @@ import (
 type driverBundle struct {
 	Provider  contract.DriverProvider
 	PoolStats obs.PoolSource
-	Close func()
+	Close     func()
 }
 
 // wireDrivers membungkus provider koneksi dengan decorator obs agar semua SQL ke

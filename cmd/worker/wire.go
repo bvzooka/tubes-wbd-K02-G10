@@ -2,18 +2,23 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dbplatform/internal/appdb"
 	"dbplatform/internal/approval"
 	"dbplatform/internal/clock"
 	"dbplatform/internal/config"
 	"dbplatform/internal/connmgr"
+	"dbplatform/internal/contract"
 	"dbplatform/internal/dbdriver/obs"
-	"dbplatform/internal/migration"
 	"dbplatform/internal/queue"
 )
+
+var errRunnerNotReady = errors.New("runner migration belum dirakit: sambungkan migration.Runner di cmd/worker/wire.go")
 
 // hasil rakitan: worker queue dan handler /metrics miliknya
 type workerApp struct {
@@ -33,7 +38,11 @@ func buildWorker(ctx context.Context, cfg config.Config, logger *slog.Logger) (w
 	drivers := obs.WrapProvider(cached, obs.NamesFromDB(pool), logger)
 	cleanup := func() { cached.Close(); pool.Close() }
 
-	runner := migration.NewRunner(pool, drivers, approval.NewService(pool, clk, logger), clk, logger)
+	runner, err := buildRunner(pool, drivers, approval.NewService(pool, clk, logger), clk, logger)
+	if err != nil {
+		cleanup()
+		return workerApp{}, nil, err
+	}
 
 	w := queue.NewWorker(queue.NewRepo(pool, clk), runner, queue.Config{
 		ID:           cfg.Worker.ID,
@@ -44,4 +53,10 @@ func buildWorker(ctx context.Context, cfg config.Config, logger *slog.Logger) (w
 		RetryBase:    cfg.Worker.RetryBase,
 	}, clk, logger)
 	return workerApp{worker: w, metrics: metricsHandler(obs.PlatformPools(pool, cached.PoolStats))}, cleanup, nil
+}
+
+// buildRunner menyambungkan ExecutionRunner milik modul migration.
+// TODO(kurt,2026-11-22): ganti dengan migration.NewRunner(...) setelah runner selesai.
+func buildRunner(_ *pgxpool.Pool, _ contract.DriverProvider, _ contract.Approvals, _ clock.Clock, _ *slog.Logger) (contract.ExecutionRunner, error) {
+	return nil, errRunnerNotReady
 }

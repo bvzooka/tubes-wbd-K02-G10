@@ -4,10 +4,10 @@ import "time"
 
 // pool koneksi pada satu saat, WaitCount dan WaitDuration bersifat kumulatif sejak pool dibuka
 type PoolStats struct {
-	MaxOpen int
-	InUse int
-	Idle int
-	WaitCount int64
+	MaxOpen      int
+	InUse        int
+	Idle         int
+	WaitCount    int64
 	WaitDuration time.Duration
 }
 
