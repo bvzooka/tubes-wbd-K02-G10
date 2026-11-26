@@ -156,10 +156,28 @@ func (r *Repo) UpdateDefinition(ctx context.Context, connID int64, version, revi
 	return r.GetDefinition(ctx, connID, version)
 }
 
-// MoveDefinition mengganti status hanya kalau status dan revisinya masih sama seperti saat dicek
+// MoveDefinition mengganti status hanya kalau status dan revisinya masih sama seperti saat dicek dan tidak ada permintaan yang belum selesai
 func (r *Repo) MoveDefinition(ctx context.Context, d Definition, to domain.MigrationState) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+
+	// dikunci supaya tidak ada permintaan baru yang masuk di antara pengecekan dan ganti status
+	if err := lockMigrations(ctx, tx, d.ConnectionID); err != nil {
+		return err
+	}
+	open, err := hasOpenExecution(ctx, tx, d.ID)
+	if err != nil {
+		return err
+	}
+	if open {
+		return refuse(domain.ErrConflict, "Versi %d masih punya permintaan yang belum selesai.", d.Version)
+	}
+
 	// kembali jadi draft dihitung revisi baru supaya persetujuan lama tidak dianggap berlaku
-	tag, err := r.db.Exec(ctx, `
+	tag, err := tx.Exec(ctx, `
 		UPDATE db_migrations
 		SET state = $4::text, updated_at = now(),
 		    revision = revision + CASE WHEN $4::text = 'draft' THEN 1 ELSE 0 END
@@ -171,5 +189,22 @@ func (r *Repo) MoveDefinition(ctx context.Context, d Definition, to domain.Migra
 	if tag.RowsAffected() == 0 {
 		return refuse(domain.ErrConflict, "Versi %d sudah berubah, muat ulang halamannya.", d.Version)
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit move: %w", err)
+	}
 	return nil
+}
+
+// hasOpenExecution true kalau masih ada permintaan yang menunggu keputusan atau sedang berjalan
+func hasOpenExecution(ctx context.Context, q appdb.DBTX, migrationID int64) (bool, error) {
+	var open bool
+	err := q.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM migration_executions
+			WHERE migration_id = $1 AND status IN ('pending_review', 'approved', 'queued', 'running'))`,
+		migrationID).Scan(&open)
+	if err != nil {
+		return false, fmt.Errorf("check open execution: %w", err)
+	}
+	return open, nil
 }
