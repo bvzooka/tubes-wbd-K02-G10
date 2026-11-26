@@ -1,13 +1,16 @@
 import { Link } from 'react-router-dom'
-import EmptyState from '../components/EmptyState'
+import PageHeader from '../components/PageHeader'
 
 export default function NotFoundPage() {
   return (
-    <div className="text-center">
-      <EmptyState message="Halaman tidak ditemukan atau belum tersedia." />
-      <Link to="/" className="btn-secondary">
-        Kembali
-      </Link>
-    </div>
+    <PageHeader
+      title="Halaman tidak ditemukan"
+      subtitle="Alamat ini tidak ada atau belum tersedia."
+      action={
+        <Link to="/databases" className="btn-secondary">
+          Ke daftar database
+        </Link>
+      }
+    />
   )
 }

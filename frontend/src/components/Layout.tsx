@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
@@ -42,21 +42,51 @@ function NavItemLink({ item }: { item: NavItem }) {
   )
 }
 
+// keepFocusInside membuat Tab dan Shift+Tab berputar di dalam drawer selama drawer terbuka
+function keepFocusInside(e: KeyboardEvent, container: HTMLElement | null) {
+  const focusable = container?.querySelectorAll<HTMLElement>('a[href], button')
+  if (!focusable || focusable.length === 0) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault()
+    first.focus()
+  }
+}
+
 export default function Layout() {
   const [open, setOpen] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLElement>(null)
   const { data: session } = useSession()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const isAdmin = session?.user.is_platform_admin ?? false
 
-  // Drawer mobile tertutup setiap kali halaman berganti.
+  // Drawer mobile tertutup setiap kali halaman berganti. Fokus tidak dikembalikan ke tombol
+  // menu karena user sudah pindah ke halaman lain.
   useEffect(() => setOpen(false), [location.pathname])
 
-  // Esc menutup drawer.
+  // Ditutup oleh user (Esc, tombol tutup, atau lapisan gelap): fokus kembali ke tombol menu.
+  function closeMenu() {
+    setOpen(false)
+    menuButtonRef.current?.focus()
+  }
+
+  // Selama drawer terbuka fokus ada di dalamnya: dimulai dari tombol tutup, Tab berputar di
+  // dalam drawer, dan Esc menutupnya.
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    closeButtonRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMenu()
+      if (e.key === 'Tab') keepFocusInside(e, drawerRef.current)
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
@@ -74,6 +104,7 @@ export default function Layout() {
         <div className="glass flex items-center justify-between gap-3 rounded-full py-2 pl-3 pr-2.5">
           <div className="flex min-w-0 items-center gap-2">
             <button
+              ref={menuButtonRef}
               type="button"
               className="icon-btn md:hidden"
               onClick={() => setOpen(true)}
@@ -130,24 +161,29 @@ export default function Layout() {
             'fixed inset-0 z-40 bg-ink/30 transition-opacity duration-200 md:hidden ' +
             (open ? 'opacity-100' : 'pointer-events-none opacity-0')
           }
-          onClick={() => setOpen(false)}
+          onClick={closeMenu}
           aria-hidden="true"
         />
         <aside
+          ref={drawerRef}
           id="app-nav"
           className={
             // Desktop: kartu kaca yang diam di bawah header dan punya scroll sendiri bila menunya
             // lebih tinggi dari layar; konten di kanan scroll mengikuti halaman.
-            // Mobile: drawer dari kiri; invisible saat tertutup supaya tidak bisa di-Tab.
+            // Mobile: drawer dari kiri; invisible saat tertutup supaya tidak bisa di-Tab. Saat dibuka
+            // visibility langsung berubah (hanya transform yang dianimasikan) supaya tombol tutup
+            // bisa langsung difokus; saat ditutup visibility ikut ditunda sampai geser keluar selesai.
             'glass scroll-thin w-60 flex-none self-start overflow-y-auto overscroll-contain rounded-xl p-2.5 ' +
             'md:sticky md:top-[92px] md:z-20 md:max-h-[calc(100vh-108px)] ' +
-            'max-md:fixed max-md:inset-y-2 max-md:left-2 max-md:z-50 max-md:w-[min(18rem,calc(100vw-4rem))] max-md:bg-white/90 max-md:transition-[transform,visibility] max-md:duration-300 max-md:ease-[cubic-bezier(0.32,0.72,0,1)] ' +
-            (open ? 'max-md:visible max-md:translate-x-0' : 'max-md:invisible max-md:-translate-x-[110%]')
+            'max-md:fixed max-md:inset-y-2 max-md:left-2 max-md:z-50 max-md:w-[min(18rem,calc(100vw-4rem))] max-md:bg-white/90 max-md:duration-300 max-md:ease-[cubic-bezier(0.32,0.72,0,1)] ' +
+            (open
+              ? 'max-md:visible max-md:translate-x-0 max-md:transition-transform'
+              : 'max-md:invisible max-md:-translate-x-[110%] max-md:transition-[transform,visibility]')
           }
         >
           <div className="mb-2 flex items-center justify-between pl-3 md:hidden">
             <span className="font-bold text-ink">Menu</span>
-            <button type="button" className="icon-btn" onClick={() => setOpen(false)} aria-label="Tutup menu">
+            <button ref={closeButtonRef} type="button" className="icon-btn" onClick={closeMenu} aria-label="Tutup menu">
               <Icon name="close" className="h-5 w-5" />
             </button>
           </div>

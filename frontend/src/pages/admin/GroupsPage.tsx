@@ -82,7 +82,8 @@ export default function GroupsPage() {
                         <Icon name="grid" className="h-[18px] w-[18px]" />
                       </span>
                       <span className="min-w-0">
-                        <Link to={`/admin/groups/${g.id}`} className="whitespace-nowrap font-bold">
+                        {/* padding dan margin negatif memperbesar area sentuh tanpa menggeser tata letak */}
+                        <Link to={`/admin/groups/${g.id}`} className="-my-3 inline-block whitespace-nowrap py-3 font-bold">
                           {g.name}
                         </Link>
                         {g.description && (

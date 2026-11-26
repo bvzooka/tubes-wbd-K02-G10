@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
@@ -28,6 +29,13 @@ export default function TableDataPage() {
     queryFn: () => api<TableData>('GET', `${tableDataPath(id, schema, table)}?page=${page}`),
     placeholderData: keepPreviousData,
   })
+
+  // Halaman baru ditampilkan dari baris pertamanya, bukan dari posisi scroll halaman sebelumnya.
+  // Dijalankan saat data halaman baru tiba, supaya data lama tidak ikut melompat selama memuat.
+  const tableRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (tableRef.current) tableRef.current.scrollTop = 0
+  }, [data?.page])
 
   // Halaman disimpan di query string supaya bisa di-refresh dan tombol Back browser bekerja.
   function goTo(next: number) {
@@ -91,6 +99,7 @@ export default function TableDataPage() {
         />
       ) : (
         <div
+          ref={tableRef}
           className={'table-wrap max-h-[68vh] overflow-auto transition-opacity ' + (isPlaceholderData ? 'opacity-60' : '')}
           aria-busy={isFetching}
         >

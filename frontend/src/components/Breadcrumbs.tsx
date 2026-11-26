@@ -24,7 +24,7 @@ export default function Breadcrumbs({ items }: BreadcrumbsProps) {
                 </span>
               )}
               {item.to && !last ? (
-                <Link to={item.to} className="break-all px-0.5 font-medium text-muted hover:text-green">
+                <Link to={item.to} className="-my-3 inline-block break-all px-0.5 py-3 font-medium text-muted hover:text-green">
                   {item.label}
                 </Link>
               ) : (
