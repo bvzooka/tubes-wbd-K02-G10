@@ -81,9 +81,8 @@ services:
       OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-console}
       OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-none}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      # SPA sudah ada di image (/app/web/dist). Isi WEB_DIST_DIR: /app/web/dist setelah
-      # bentrok route "GET /" vs "/api/" di cmd/server diperbaiki; sampai itu, server panic.
-      WEB_DIST_DIR: ""
+      # halaman React hasil build di image, kosongkan untuk memakai halaman HTML lama
+      WEB_DIST_DIR: /app/web/dist
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:

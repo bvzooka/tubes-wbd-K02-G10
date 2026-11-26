@@ -7,6 +7,7 @@ import (
 	"dbplatform/internal/auth"
 	"dbplatform/internal/connmgr"
 	"dbplatform/internal/explain"
+	"dbplatform/internal/migration"
 	"dbplatform/internal/viewer"
 )
 
@@ -17,6 +18,7 @@ type apiHandlers struct {
 	connections *connmgr.APIHandler
 	viewer      *viewer.APIHandler
 	explain     *explain.APIHandler
+	migration   *migration.APIHandler
 }
 
 // peta lengkap /api/v1. Nama method router adalah syarat
@@ -60,6 +62,23 @@ func registerAPIRoutes(api *apiv1.Router, h apiHandlers) {
 	api.DBView("GET /databases/{dbID}/tables/{schema}/{table}", h.viewer.Table)
 	api.DBView("GET /databases/{dbID}/tables/{schema}/{table}/data", h.viewer.Data)
 	api.DBEdit("POST /databases/{dbID}/explain", h.explain.Run)
+
+	api.DBView("GET /databases/{dbID}/migrations", h.migration.List)
+	api.DBEdit("POST /databases/{dbID}/migrations", h.migration.Create)
+	api.DBView("GET /databases/{dbID}/migrations/{version}", h.migration.Get)
+	api.DBEdit("PUT /databases/{dbID}/migrations/{version}", h.migration.Update)
+	api.DBEdit("POST /databases/{dbID}/migrations/{version}/freeze", h.migration.Freeze)
+	api.DBEdit("POST /databases/{dbID}/migrations/{version}/cancel", h.migration.Cancel)
+	api.DBEdit("POST /databases/{dbID}/migrations/{version}/supersede", h.migration.Supersede)
+	api.DBEdit("POST /databases/{dbID}/migrations/{version}/reopen", h.migration.Reopen)
+	api.DBEdit("POST /databases/{dbID}/migrations/{version}/executions", h.migration.Request)
+	api.DBView("GET /databases/{dbID}/executions", h.migration.History)
+
+	// URL-nya tidak memuat database, jadi aksesnya dicek di service lewat database milik permintaan
+	api.Authed("GET /executions/{execID}", h.migration.Detail)
+	api.Authed("POST /executions/{execID}/cancel", h.migration.CancelExecution)
+	api.Authed("POST /executions/{execID}/run", h.migration.Run)
+	api.Authed("GET /jobs/{jobID}", h.migration.Job)
 
 	api.Authed("GET /approvals", h.approvals.Inbox)
 	api.Authed("POST /executions/{execID}/approvals/{groupID}/approve", h.approvals.Approve)

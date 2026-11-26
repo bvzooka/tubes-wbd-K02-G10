@@ -152,6 +152,12 @@ type e2eApp struct {
 // Jalanin aplikasi lewat buildApp di atas database sementara
 func newE2EApp(t *testing.T) *e2eApp {
 	t.Helper()
+	return newE2EAppWith(t, func(*config.Config) {})
+}
+
+// sama dengan newE2EApp tapi config bisa diubah dulu
+func newE2EAppWith(t *testing.T, change func(*config.Config)) *e2eApp {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
@@ -180,6 +186,7 @@ func newE2EApp(t *testing.T) *e2eApp {
 		SeedAdminUsername: "admin",
 		SeedAdminPassword: e2eAdminPassword,
 	}
+	change(&cfg)
 	handler, cleanup, err := buildApp(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("buildApp: %v", err)

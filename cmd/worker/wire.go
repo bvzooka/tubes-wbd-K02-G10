@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"dbplatform/internal/access"
 	"dbplatform/internal/appdb"
 	"dbplatform/internal/approval"
 	"dbplatform/internal/clock"
@@ -15,10 +15,9 @@ import (
 	"dbplatform/internal/connmgr"
 	"dbplatform/internal/contract"
 	"dbplatform/internal/dbdriver/obs"
+	"dbplatform/internal/migration"
 	"dbplatform/internal/queue"
 )
-
-var errRunnerNotReady = errors.New("runner migration belum dirakit: sambungkan migration.Runner di cmd/worker/wire.go")
 
 // hasil rakitan: worker queue dan handler /metrics miliknya
 type workerApp struct {
@@ -38,11 +37,7 @@ func buildWorker(ctx context.Context, cfg config.Config, logger *slog.Logger) (w
 	drivers := obs.WrapProvider(cached, obs.NamesFromDB(pool), logger)
 	cleanup := func() { cached.Close(); pool.Close() }
 
-	runner, err := buildRunner(pool, drivers, approval.NewService(pool, clk, logger), clk, logger)
-	if err != nil {
-		cleanup()
-		return workerApp{}, nil, err
-	}
+	runner := buildRunner(pool, drivers, approval.NewService(pool, clk, logger), clk, logger)
 
 	w := queue.NewWorker(queue.NewRepo(pool, clk), runner, queue.Config{
 		ID:           cfg.Worker.ID,
@@ -55,8 +50,13 @@ func buildWorker(ctx context.Context, cfg config.Config, logger *slog.Logger) (w
 	return workerApp{worker: w, metrics: metricsHandler(obs.PlatformPools(pool, cached.PoolStats))}, cleanup, nil
 }
 
-// buildRunner menyambungkan ExecutionRunner milik modul migration.
-// TODO(kurt,2026-11-22): ganti dengan migration.NewRunner(...) setelah runner selesai.
-func buildRunner(_ *pgxpool.Pool, _ contract.DriverProvider, _ contract.Approvals, _ clock.Clock, _ *slog.Logger) (contract.ExecutionRunner, error) {
-	return nil, errRunnerNotReady
+// merakit runner migration beserta pemeriksa syarat yang dijalankan sebelum eksekusi
+func buildRunner(
+	pool *pgxpool.Pool, drivers contract.DriverProvider, approvals contract.Approvals, clk clock.Clock, logger *slog.Logger,
+) contract.ExecutionRunner {
+	repo := migration.NewRepo(pool)
+	return migration.NewRunner(migration.RunnerDeps{
+		Store: repo, Drivers: drivers, Clock: clk, Logger: logger,
+		Revalidator: migration.NewRevalidator(pool, repo, access.New(pool), approvals, drivers),
+	})
 }
