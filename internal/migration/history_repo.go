@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -41,6 +42,26 @@ func (r *Repo) RecordAttempt(ctx context.Context, job domain.Job, e domain.Execu
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit attempt: %w", err)
+	}
+	return nil
+}
+
+// MarkRunning menandai permintaan sedang dijalankan oleh pemegang job yang sah
+func (r *Repo) MarkRunning(ctx context.Context, job domain.Job, executionID int64, at time.Time) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+
+	if err := holdFence(ctx, tx, job); err != nil {
+		return err
+	}
+	if err := r.SetExecutionStatus(ctx, tx, executionID, domain.ExecQueued, domain.ExecRunning, at); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit running: %w", err)
 	}
 	return nil
 }

@@ -134,6 +134,7 @@ func (r *Repo) SetExecutionStatus(ctx context.Context, q appdb.DBTX, id int64, f
 		SET status = $3::text,
 		    approved_at = CASE WHEN $3::text = 'approved' THEN $4::timestamptz ELSE approved_at END,
 		    queued_at   = CASE WHEN $3::text = 'queued' THEN $4::timestamptz ELSE queued_at END,
+		    started_at  = CASE WHEN $3::text = 'running' THEN COALESCE(started_at, $4::timestamptz) ELSE started_at END,
 		    finished_at = CASE WHEN $3::text = 'cancelled' THEN $4::timestamptz ELSE finished_at END
 		WHERE id = $1 AND status = $2`,
 		id, from, to, at)
