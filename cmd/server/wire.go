@@ -70,10 +70,12 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 	}
 
 	api := apiv1.NewRouter(mux, authn.apiMiddleware(writeAPIErr), writeAPIErr)
+	approvals := approval.NewService(pool, clk, logger)
 	registerAPIRoutes(api, apiHandlers{
 		auth:      authn.api,
 		admin:     adminAPI,
-		approvals: approval.NewAPIHandler(approval.NewService(pool, clk, logger)),
+		approvals: approval.NewAPIHandler(approvals),
+		migration: wireMigration(cfg, &d, approvals),
 
 		connections: wireConnections(cfg, pool),
 		viewer:      wireViewer(&d),
@@ -121,7 +123,8 @@ func wireStatic(mux *http.ServeMux, d httpx.Deps, cfg config.Config, pool *pgxpo
 	})
 
 	if cfg.WebDistDir != "" {
-		mux.Handle("GET /", apiv1.SPA(os.DirFS(cfg.WebDistDir)))
+		// tanpa method supaya tidak bentrok dengan route /api/
+		mux.Handle("/", apiv1.SPA(os.DirFS(cfg.WebDistDir)))
 		return nil
 	}
 	static, err := fs.Sub(webassets.FS, "static")
