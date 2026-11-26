@@ -110,10 +110,21 @@ func (s *Service) Preview(ctx context.Context, actor domain.Principal, targetID,
 
 // CreateDraft membuat migration draft di database tujuan dari perubahan yang dipilih
 func (s *Service) CreateDraft(ctx context.Context, actor domain.Principal, targetID, sourceID int64, selected []string) (domain.Migration, error) {
+	name, sql, err := s.DraftSQL(ctx, actor, targetID, sourceID, selected)
+	if err != nil {
+		return domain.Migration{}, err
+	}
+	return s.migrations.Create(ctx, actor, targetID, migration.Input{Name: name, SQL: sql})
+}
+
+// DraftSQL menyusun nama dan SQL draft dari perubahan terpilih tanpa menyimpannya
+func (s *Service) DraftSQL(
+	ctx context.Context, actor domain.Principal, targetID, sourceID int64, selected []string,
+) (name, sql string, err error) {
 	// Diff dihitung ulang di server, SQL ga pernah ambil dari browser
 	result, err := s.Preview(ctx, actor, targetID, sourceID)
 	if err != nil {
-		return domain.Migration{}, err
+		return "", "", err
 	}
 
 	ids := make(map[string]bool, len(selected))
@@ -123,7 +134,7 @@ func (s *Service) CreateDraft(ctx context.Context, actor domain.Principal, targe
 		}
 	}
 	if len(ids) == 0 {
-		return domain.Migration{}, &domain.ValidationError{Fields: map[string]string{"changes": msgNothingChosen}}
+		return "", "", &domain.ValidationError{Fields: map[string]string{"changes": msgNothingChosen}}
 	}
 	known := make(map[string]bool, len(result.Changes))
 	for _, c := range result.Changes {
@@ -132,12 +143,12 @@ func (s *Service) CreateDraft(ctx context.Context, actor domain.Principal, targe
 	for id := range ids {
 		// Kalau ada ID asing, schema udah berubah sejak preview
 		if !known[id] {
-			return domain.Migration{}, &domain.ValidationError{Fields: map[string]string{"changes": msgStaleChoice}}
+			return "", "", &domain.ValidationError{Fields: map[string]string{"changes": msgStaleChoice}}
 		}
 	}
 
-	name := truncate("Schema diff dari "+result.SourceName, maxNameChars)
-	return s.migrations.Create(ctx, actor, targetID, migration.Input{Name: name, SQL: SQL(Select(result.Changes, ids))})
+	name = truncate("Schema diff dari "+result.SourceName, maxNameChars)
+	return name, SQL(Select(result.Changes, ids)), nil
 }
 
 // introspect membaca schema satu database, hanya PostgreSQL karena SQL yang dibuat memakai sintaks PostgreSQL

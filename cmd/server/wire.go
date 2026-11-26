@@ -71,11 +71,13 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 
 	api := apiv1.NewRouter(mux, authn.apiMiddleware(writeAPIErr), writeAPIErr)
 	approvals := approval.NewService(pool, clk, logger)
+	migrationAPI, schemaDiffAPI := wireMigration(cfg, &d, approvals)
 	registerAPIRoutes(api, apiHandlers{
-		auth:      authn.api,
-		admin:     adminAPI,
-		approvals: approval.NewAPIHandler(approvals),
-		migration: wireMigration(cfg, &d, approvals),
+		auth:       authn.api,
+		admin:      adminAPI,
+		approvals:  approval.NewAPIHandler(approvals),
+		migration:  migrationAPI,
+		schemaDiff: schemaDiffAPI,
 
 		connections: wireConnections(cfg, pool),
 		viewer:      wireViewer(&d),

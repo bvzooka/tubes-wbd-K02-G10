@@ -8,6 +8,7 @@ import (
 	"dbplatform/internal/connmgr"
 	"dbplatform/internal/explain"
 	"dbplatform/internal/migration"
+	"dbplatform/internal/schemadiff"
 	"dbplatform/internal/viewer"
 )
 
@@ -19,6 +20,7 @@ type apiHandlers struct {
 	viewer      *viewer.APIHandler
 	explain     *explain.APIHandler
 	migration   *migration.APIHandler
+	schemaDiff  *schemadiff.APIHandler
 }
 
 // peta lengkap /api/v1. Nama method router adalah syarat
@@ -73,6 +75,10 @@ func registerAPIRoutes(api *apiv1.Router, h apiHandlers) {
 	api.DBEdit("POST /databases/{dbID}/migrations/{version}/reopen", h.migration.Reopen)
 	api.DBEdit("POST /databases/{dbID}/migrations/{version}/executions", h.migration.Request)
 	api.DBView("GET /databases/{dbID}/executions", h.migration.History)
+
+	api.DBEdit("GET /databases/{dbID}/schema-diff", h.schemaDiff.Sources)
+	api.DBEdit("POST /databases/{dbID}/schema-diff/preview", h.schemaDiff.Preview)
+	api.DBEdit("POST /databases/{dbID}/schema-diff", h.schemaDiff.Create)
 
 	// URL-nya tidak memuat database, jadi aksesnya dicek di service lewat database milik permintaan
 	api.Authed("GET /executions/{execID}", h.migration.Detail)
