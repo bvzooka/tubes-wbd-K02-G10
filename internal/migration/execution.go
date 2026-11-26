@@ -23,6 +23,7 @@ type executionStore interface {
 	LatestForwardExecution(ctx context.Context, q appdb.DBTX, migrationID int64, statuses ...domain.ExecutionStatus) (domain.Execution, error)
 	SetExecutionStatus(ctx context.Context, q appdb.DBTX, id int64, from, to domain.ExecutionStatus, at time.Time) error
 	JobID(ctx context.Context, q appdb.DBTX, executionID int64) (string, error)
+	ListHistory(ctx context.Context, connID int64, f HistoryFilter, limit, offset int) ([]domain.HistoryEntry, error)
 }
 
 // ExecutionDeps dikumpulkan jadi struct supaya urutan argumen tidak tertukar saat perakitan
