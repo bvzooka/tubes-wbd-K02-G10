@@ -114,12 +114,17 @@ func (r *Repo) ExecutionIn(ctx context.Context, q appdb.DBTX, id int64) (domain.
 	return oneExecution(ctx, q, `WHERE e.id = $1`, id)
 }
 
-// LatestForwardExecution mencari apply atau forward terakhir berstatus tertentu, itu yang akan dibatalkan atau dilanjutkan
-func (r *Repo) LatestForwardExecution(ctx context.Context, q appdb.DBTX, migrationID int64, status domain.ExecutionStatus) (domain.Execution, error) {
+// LatestForwardExecution mencari apply atau forward terakhir dengan salah satu status itu, itu yang akan dibatalkan atau dilanjutkan
+func (r *Repo) LatestForwardExecution(ctx context.Context, q appdb.DBTX, migrationID int64, statuses ...domain.ExecutionStatus) (domain.Execution, error) {
 	return oneExecution(ctx, q, `
-		WHERE e.migration_id = $1 AND e.status = $2 AND e.kind IN ('apply', 'forward')
+		WHERE e.migration_id = $1 AND e.status = ANY($2) AND e.kind IN ('apply', 'forward')
 		ORDER BY e.id DESC
-		LIMIT 1`, migrationID, status)
+		LIMIT 1`, migrationID, statuses)
+}
+
+// HasOpenExecution membuka pengecekan permintaan yang belum selesai untuk service
+func (r *Repo) HasOpenExecution(ctx context.Context, q appdb.DBTX, migrationID int64) (bool, error) {
+	return hasOpenExecution(ctx, q, migrationID)
 }
 
 // SetExecutionStatus hanya mengubah kalau status asalnya masih sama, jadi dua klik bersamaan tidak sama-sama berhasil
@@ -127,8 +132,9 @@ func (r *Repo) SetExecutionStatus(ctx context.Context, q appdb.DBTX, id int64, f
 	tag, err := q.Exec(ctx, `
 		UPDATE migration_executions
 		SET status = $3::text,
-		    queued_at   = CASE WHEN $3::text = 'queued' THEN $4 ELSE queued_at END,
-		    finished_at = CASE WHEN $3::text = 'cancelled' THEN $4 ELSE finished_at END
+		    approved_at = CASE WHEN $3::text = 'approved' THEN $4::timestamptz ELSE approved_at END,
+		    queued_at   = CASE WHEN $3::text = 'queued' THEN $4::timestamptz ELSE queued_at END,
+		    finished_at = CASE WHEN $3::text = 'cancelled' THEN $4::timestamptz ELSE finished_at END
 		WHERE id = $1 AND status = $2`,
 		id, from, to, at)
 	if err != nil {
