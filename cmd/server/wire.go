@@ -80,7 +80,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		explain:     explain.NewAPIHandler(explain.NewService(d.Authz, d.Drivers)),
 	})
 
-	wireMetrics(mux, pool)
+	wireMetrics(mux, pool, drivers.PoolStats)
 	if err := wireStatic(mux, d, cfg, pool); err != nil {
 		return fail(err)
 	}

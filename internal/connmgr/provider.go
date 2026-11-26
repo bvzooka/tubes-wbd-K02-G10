@@ -72,6 +72,20 @@ func (p *Provider) Get(ctx context.Context, id int64) (dbdriver.Driver, error) {
 	return drv, nil
 }
 
+// mengembalikan statistik pool tiap driver yang sedang di-cache
+func (p *Provider) PoolStats() []dbdriver.PoolStats {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	stats := make([]dbdriver.PoolStats, 0, len(p.cache))
+	for _, e := range p.cache {
+		if s, ok := e.drv.(dbdriver.PoolStatter); ok {
+			stats = append(stats, s.PoolStats())
+		}
+	}
+	return stats
+}
+
 // menutup semua driver yg di cache
 func (p *Provider) Close() {
 	p.mu.Lock()

@@ -1,4 +1,4 @@
-// Command worker mengambil job migration dari queue dan menjalankannya di database target.
+// mengambil job migration dari queue dan menjalankannya di db target
 package main
 
 import (
@@ -30,7 +30,12 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	logger := telemetry.NewLogger(os.Stdout, cfg.LogLevel).With("worker_id", cfg.Worker.ID)
+	logExport, shutdownLogs, err := telemetry.SetupLogExport(context.Background(), "dbplatform-worker", cfg.LogExporter, cfg.OTLPEndpoint)
+	if err != nil {
+		return err
+	}
+	defer telemetry.ShutdownWithin(5*time.Second, shutdownLogs) // log terakhir best-effort
+	logger := telemetry.NewLogger(os.Stdout, cfg.LogLevel, logExport).With("worker_id", cfg.Worker.ID)
 	slog.SetDefault(logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -42,14 +47,14 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.WithoutCancel(ctx)) }() // span terakhir best-effort
 
-	worker, cleanup, err := buildWorker(ctx, cfg, logger)
+	app, cleanup, err := buildWorker(ctx, cfg, logger)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
 	// server kecil khusus /metrics
-	metrics := &http.Server{Addr: cfg.Worker.MetricsAddr, Handler: metricsHandler(), ReadHeaderTimeout: 5 * time.Second}
+	metrics := &http.Server{Addr: cfg.Worker.MetricsAddr, Handler: app.metrics, ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		if err := metrics.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server metrics berhenti", "event", "worker.metrics", "error", err)
@@ -62,7 +67,7 @@ func run() error {
 	}()
 
 	logger.Info("worker berjalan", "event", "worker.start", "concurrency", cfg.Worker.Concurrency)
-	worker.Run(ctx) // kembali setelah SIGTERM dan job berjalan selesai (atau grace habis)
+	app.worker.Run(ctx) // kembali setelah SIGTERM & job berjalan selesai (atau grace habis)
 	logger.Info("worker berhenti", "event", "worker.stop")
 	return nil
 }
