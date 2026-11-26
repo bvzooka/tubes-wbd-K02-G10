@@ -11,7 +11,7 @@ import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
 import { databasePath } from '../databases/paths'
 import { modeLabel, StateBadge } from './labels'
-import { editMigrationPath, migrationsKey, newMigrationPath } from './paths'
+import { editMigrationPath, migrationPath, migrationsKey, newMigrationPath } from './paths'
 
 export default function MigrationsPage() {
   const { id = '' } = useParams()
@@ -68,7 +68,9 @@ export default function MigrationsPage() {
                 <tr key={m.id}>
                   <td className="font-bold tabular-nums">v{m.version}</td>
                   <td>
-                    {m.name}
+                    <Link to={migrationPath(id, m.version)} className="font-bold">
+                      {m.name}
+                    </Link>
                     {m.irreversible && <span className="mt-1 block text-[0.78rem] text-muted">irreversible</span>}
                   </td>
                   <td>

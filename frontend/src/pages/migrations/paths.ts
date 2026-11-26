@@ -6,6 +6,14 @@ export function newMigrationPath(dbID: number | string) {
   return migrationsPath(dbID) + '/new'
 }
 
+export function migrationPath(dbID: number | string, version: number | string) {
+  return `${migrationsPath(dbID)}/${version}`
+}
+
+export function executionPath(executionID: number | string) {
+  return `/executions/${executionID}`
+}
+
 export function editMigrationPath(dbID: number | string, version: number | string) {
   return `${migrationsPath(dbID)}/${version}/edit`
 }

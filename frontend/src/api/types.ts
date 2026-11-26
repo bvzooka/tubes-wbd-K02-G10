@@ -331,3 +331,51 @@ export interface MigrationDetail {
   executions: Execution[]
   can_edit: boolean
 }
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export interface Approval {
+  group_id: number
+  group_name: string
+  leader_id: number
+  leader_name: string
+  status: ApprovalStatus
+  // true kalau pengajunya leader group itu
+  auto: boolean
+  comment: string
+  decided_at: string | null
+}
+
+export type HistoryStatus = 'success' | 'failed' | 'partial' | 'outcome_unknown'
+
+// satu baris riwayat per attempt
+export interface HistoryEntry {
+  id: number
+  execution_id: number
+  attempt: number
+  migration_id: number
+  version: number
+  revision: number
+  kind: ExecutionKind
+  executed_by: string
+  status: HistoryStatus
+  committed: boolean
+  sql: string
+  rolls_back_execution_id: number | null
+  batches_committed: number
+  rows_committed: number
+  failure_code: string
+  failure_message: string
+  correlation_id: string
+  started_at: string
+  finished_at: string
+}
+
+export interface ExecutionDetail {
+  execution: Execution
+  approvals: Approval[]
+  attempts: HistoryEntry[]
+  // kosong kalau belum pernah masuk antrean
+  job_id: string
+  can_edit: boolean
+}
