@@ -1,5 +1,3 @@
-// Package obs membungkus driver database target agar setiap SQL, termasuk query
-// read-only, menghasilkan log sql.start/sql.result dan satu span db.query.
 package obs
 
 import (
@@ -22,15 +20,13 @@ import (
 	"dbplatform/internal/telemetry"
 )
 
-// NameLookup mengembalikan nama koneksi untuk atribut log "database".
 type NameLookup func(ctx context.Context, connectionID int64) string
 
-// NamesFromDB membaca nama koneksi dari tabel connections di database platform.
 func NamesFromDB(db appdb.DBTX) NameLookup {
 	return func(ctx context.Context, id int64) string {
 		var name string
 		if err := db.QueryRow(ctx, `SELECT name FROM connections WHERE id = $1`, id).Scan(&name); err != nil {
-			return "" // nama hanya untuk log; kegagalan tidak boleh membatalkan query
+			return ""
 		}
 		return name
 	}
@@ -108,6 +104,40 @@ func (o *observer) observe(ctx context.Context, op, query string, params []any, 
 	return nil
 }
 
+// transaction mencatat mulai dan akhir sebuah transaction secara terpisah dari SQL di dalamnya
+// run memanggil done dengan hasil isi transaction, dari situ diketahui akhirnya commit atau rollback
+func (o *observer) transaction(ctx context.Context, run func(done func(error) error) error) error {
+	attrs := []any{"actor", actorOf(ctx), "database", o.database}
+	o.logger.InfoContext(ctx, "transaction begin", append([]any{"event", "tx.begin"}, attrs...)...)
+
+	start := time.Now()
+	finished := false
+	var bodyErr error
+	err := run(func(result error) error {
+		finished, bodyErr = true, result
+		return result
+	})
+
+	event, status := "tx.commit", "ok"
+	switch {
+	case !finished:
+		// isi transaction tidak pernah dijalankan, berarti gagal saat membuka
+		event, status = "tx.begin", "error"
+	case errors.Is(bodyErr, dbdriver.ErrForceRollback):
+		event = "tx.rollback"
+	case bodyErr != nil:
+		event, status = "tx.rollback", "error"
+	case err != nil:
+		status = "error"
+	}
+	attrs = append(attrs, "event", event, "status", status, "duration_ms", time.Since(start).Milliseconds())
+	if err != nil {
+		attrs = append(attrs, "error", err.Error())
+	}
+	o.logger.InfoContext(ctx, "transaction end", attrs...)
+	return err
+}
+
 func actorOf(ctx context.Context) string {
 	if p, ok := domain.PrincipalFrom(ctx); ok {
 		return p.Username
@@ -167,8 +197,10 @@ func (d *driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 }
 
 func (d *driver) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(tx dbdriver.Tx) error) error {
-	return d.inner.WithTx(ctx, opts, func(inner dbdriver.Tx) error {
-		return fn(&tx{inner: inner, o: d.o})
+	return d.o.transaction(ctx, func(done func(error) error) error {
+		return d.inner.WithTx(ctx, opts, func(inner dbdriver.Tx) error {
+			return done(fn(&tx{inner: inner, o: d.o}))
+		})
 	})
 }
 
@@ -239,8 +271,10 @@ func (s *session) Unlock(ctx context.Context, key int64) error {
 }
 
 func (s *session) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(tx dbdriver.ArgTx) error) error {
-	return s.inner.WithTx(ctx, opts, func(inner dbdriver.ArgTx) error {
-		return fn(&argTx{tx: tx{inner: inner, o: s.o}, inner: inner})
+	return s.o.transaction(ctx, func(done func(error) error) error {
+		return s.inner.WithTx(ctx, opts, func(inner dbdriver.ArgTx) error {
+			return done(fn(&argTx{tx: tx{inner: inner, o: s.o}, inner: inner}))
+		})
 	})
 }
 

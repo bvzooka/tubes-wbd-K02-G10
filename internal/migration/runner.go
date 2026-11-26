@@ -9,6 +9,7 @@ import (
 	"dbplatform/internal/clock"
 	"dbplatform/internal/contract"
 	"dbplatform/internal/domain"
+	"dbplatform/internal/telemetry"
 )
 
 const (
@@ -62,7 +63,7 @@ func (r *Runner) Run(ctx context.Context, job domain.Job, lease contract.Lease) 
 	}
 
 	a := Attempt{StartedAt: r.deps.Clock.Now()}
-	driver, failure := r.deps.Revalidator.Check(lease.Context(), e)
+	driver, failure := r.deps.Revalidator.Check(targetContext(lease.Context(), job, e), e)
 	if failure != nil {
 		return r.fail(platform, job, e, a, failure)
 	}
@@ -131,6 +132,13 @@ func (r *Runner) fail(ctx context.Context, job domain.Job, e domain.Execution, a
 }
 
 // later mengembalikan job ke antrean tanpa dihitung sebagai percobaan
+// targetContext menandai semua log SQL ke database target dengan identitas pekerjaannya
+func targetContext(ctx context.Context, job domain.Job, e domain.Execution) context.Context {
+	return telemetry.WithLogAttrs(ctx,
+		"migration_id", e.MigrationID, "execution_id", e.ID, "job_id", job.ID,
+		"attempt", job.Attempt, "requested_by", e.RequestedByName)
+}
+
 func later(err error) domain.RunResult {
 	return domain.RunResult{Outcome: domain.OutcomeRequeue, RetryAfter: busyDelay, Err: err}
 }

@@ -95,7 +95,19 @@ func TestWrap_EveryCallIsLoggedAndTraced(t *testing.T) {
 	if got := len(exp.GetSpans()); got != calls {
 		t.Fatalf("span db.query = %d, want %d", got, calls)
 	}
-	evs := events(t, buf)
+	// awal dan akhir transaction dicatat terpisah dari pasangan log tiap SQL
+	var evs []map[string]any
+	transaction := map[any]int{}
+	for _, ev := range events(t, buf) {
+		if ev["event"] == "tx.begin" || ev["event"] == "tx.commit" {
+			transaction[ev["event"]]++
+			continue
+		}
+		evs = append(evs, ev)
+	}
+	if transaction["tx.begin"] != 1 || transaction["tx.commit"] != 1 {
+		t.Errorf("log transaction = %v", transaction)
+	}
 	if len(evs) != 2*calls {
 		t.Fatalf("log = %d baris, want %d", len(evs), 2*calls)
 	}
@@ -154,5 +166,21 @@ func TestWrap_ErrorsCarrySQLStateAndRedactSecrets(t *testing.T) {
 	}
 	if !strings.Contains(out, `"sqlstate":"42601"`) {
 		t.Fatalf("sqlstate harus dicatat: %s", out)
+	}
+}
+
+// akhir transaction harus tercatat sebagai commit atau rollback sesuai hasil isinya
+func TestWrap_TransactionEndIsLogged(t *testing.T) {
+	buf, _ := setup(t)
+	drv := Wrap(fakeDriver{}, telemetry.NewLogger(buf, "info"), "toko")
+	boom := errors.New("gagal")
+	for _, result := range []error{nil, boom, dbdriver.ErrForceRollback} {
+		_ = drv.WithTx(context.Background(), dbdriver.TxOptions{}, func(dbdriver.Tx) error { return result })
+	}
+	got := buf.String()
+	for event, want := range map[string]int{`"event":"tx.begin"`: 3, `"event":"tx.commit"`: 1, `"event":"tx.rollback"`: 2} {
+		if n := strings.Count(got, event); n != want {
+			t.Errorf("%s muncul %d kali, mau %d", event, n, want)
+		}
 	}
 }
