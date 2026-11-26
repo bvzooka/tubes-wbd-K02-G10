@@ -10,6 +10,10 @@ export function migrationPath(dbID: number | string, version: number | string) {
   return `${migrationsPath(dbID)}/${version}`
 }
 
+export function historyPath(dbID: number | string) {
+  return `/databases/${dbID}/history`
+}
+
 export function executionPath(executionID: number | string) {
   return `/executions/${executionID}`
 }

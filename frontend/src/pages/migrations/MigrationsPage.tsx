@@ -11,7 +11,7 @@ import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
 import { databasePath } from '../databases/paths'
 import { modeLabel, StateBadge } from './labels'
-import { editMigrationPath, migrationPath, migrationsKey, newMigrationPath } from './paths'
+import { editMigrationPath, historyPath, migrationPath, migrationsKey, newMigrationPath } from './paths'
 
 export default function MigrationsPage() {
   const { id = '' } = useParams()
@@ -44,7 +44,15 @@ export default function MigrationsPage() {
         eyebrow={{ icon: 'history', label: dbName }}
         title="Migration"
         subtitle="Perubahan database berurutan menurut versi. Versi kecil harus selesai sebelum versi di atasnya."
-        action={addButton}
+        action={
+          <>
+            {addButton}
+            <Link to={historyPath(id)} className="btn-secondary">
+              <Icon name="history" />
+              Riwayat eksekusi
+            </Link>
+          </>
+        }
       />
 
       {items.length === 0 ? (

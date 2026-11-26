@@ -17,6 +17,7 @@ import SchemaPage from './pages/databases/SchemaPage'
 import TableDataPage from './pages/databases/TableDataPage'
 import TablePage from './pages/databases/TablePage'
 import ExecutionPage from './pages/migrations/ExecutionPage'
+import HistoryPage from './pages/migrations/HistoryPage'
 import MigrationDetailPage from './pages/migrations/MigrationDetailPage'
 import MigrationFormPage from './pages/migrations/MigrationFormPage'
 import MigrationsPage from './pages/migrations/MigrationsPage'
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="databases/:id/migrations/new" element={<MigrationFormPage />} />
           <Route path="databases/:id/migrations/:version/edit" element={<MigrationFormPage />} />
           <Route path="databases/:id/migrations/:version" element={<MigrationDetailPage />} />
+          <Route path="databases/:id/history" element={<HistoryPage />} />
           <Route path="executions/:executionID" element={<ExecutionPage />} />
           <Route path="approvals" element={<ApprovalsPage />} />
 

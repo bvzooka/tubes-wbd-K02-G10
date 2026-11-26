@@ -371,6 +371,12 @@ export interface HistoryEntry {
   finished_at: string
 }
 
+export interface HistoryList {
+  items: HistoryEntry[]
+  page: number
+  has_next: boolean
+}
+
 export interface ExecutionDetail {
   execution: Execution
   approvals: Approval[]
