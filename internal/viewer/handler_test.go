@@ -73,7 +73,7 @@ func TestViewer_Integration_ViewOnlyCanBrowse(t *testing.T) {
 
 	resp, body := a.Get(t, c, "/databases")
 	wantStatus(t, resp, http.StatusOK, "daftar")
-	for _, want := range []string{"Sampel", "View Only", fmt.Sprintf(`href="/databases/%d"`, a.ConnID), "/migrations"} {
+	for _, want := range []string{"Sampel", "View Only", fmt.Sprintf(`href="/databases/%d"`, a.ConnID)} {
 		if !strings.Contains(body, want) {
 			t.Errorf("daftar database tidak memuat %q", want)
 		}

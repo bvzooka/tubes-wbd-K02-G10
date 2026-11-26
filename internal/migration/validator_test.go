@@ -5,55 +5,14 @@ import (
 	"testing"
 )
 
-func TestValidate_Name(t *testing.T) {
-	tests := []struct {
-		name    string
-		in      string
-		want    string
-		wantErr bool
-	}{
-		{"valid", "tambah tabel customers", "tambah tabel customers", false},
-		{"dirapikan", "  tambah kolom  ", "tambah kolom", false},
-		{"satu karakter", "a", "a", false},
-		{"batas atas", strings.Repeat("a", 120), strings.Repeat("a", 120), false},
-		{"unicode dihitung per karakter", strings.Repeat("é", 120), strings.Repeat("é", 120), false},
-		{"kosong", "", "", true},
-		{"hanya spasi", "   \t", "", true},
-		{"terlalu panjang", strings.Repeat("a", 121), strings.Repeat("a", 121), true},
-		{"unicode terlalu panjang", strings.Repeat("é", 121), strings.Repeat("é", 121), true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, fields := Validate(Input{Name: tt.in, SQL: "SELECT 1"})
-			if got.Name != tt.want {
-				t.Errorf("nama = %q, mau %q", got.Name, tt.want)
-			}
-			if (fields["name"] != "") != tt.wantErr {
-				t.Errorf("pesan nama = %q, wantErr = %v", fields["name"], tt.wantErr)
-			}
-			if fields["sql"] != "" {
-				t.Errorf("SQL valid tidak boleh memberi error: %q", fields["sql"])
-			}
-		})
-	}
-}
-
-func TestValidate_SQLLimits(t *testing.T) {
-	exactly := "SELECT '" + strings.Repeat("a", maxSQLBytes-len("SELECT ''")) + "'"
-	if len(exactly) != maxSQLBytes {
-		t.Fatalf("panjang fixture = %d", len(exactly))
-	}
+func TestCheckSQL_Messages(t *testing.T) {
 	tests := []struct {
 		name string
 		sql  string
 		want string
 	}{
 		{"valid", "CREATE TABLE a (id int)", ""},
-		{"dirapikan", "\n  SELECT 1;  \n", ""},
-		{"tepat 256 KB", exactly, ""},
-		{"lebih dari 256 KB", exactly + "x", msgSQLTooLarge},
 		{"kosong", "", msgSQLEmpty},
-		{"hanya spasi", " \n\t ", msgSQLEmpty},
 		{"hanya komentar", "-- tidak ada apa-apa", msgSQLEmpty},
 		{"hanya titik koma", ";;;", msgSQLEmpty},
 		{"string tak ditutup", "SELECT 'abc", msgSQLUnterminated},
@@ -62,15 +21,14 @@ func TestValidate_SQLLimits(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, fields := Validate(Input{Name: "ok", SQL: tt.sql})
-			if fields["sql"] != tt.want {
-				t.Errorf("pesan sql = %q, mau %q", fields["sql"], tt.want)
+			if got := CheckSQL(tt.sql); got != tt.want {
+				t.Errorf("pesan = %q, mau %q", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestValidate_TransactionControlRejected(t *testing.T) {
+func TestCheckSQL_TransactionControlRejected(t *testing.T) {
 	tests := []struct {
 		name string
 		sql  string
@@ -86,15 +44,15 @@ func TestValidate_TransactionControlRejected(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, fields := Validate(Input{Name: "ok", SQL: tt.sql})
-			if !strings.Contains(fields["sql"], "kontrol transaksi") || !strings.Contains(fields["sql"], "("+tt.want+")") {
-				t.Errorf("pesan sql = %q, mau memuat kontrol transaksi (%s)", fields["sql"], tt.want)
+			got := CheckSQL(tt.sql)
+			if !strings.Contains(got, "kontrol transaksi") || !strings.Contains(got, "("+tt.want+")") {
+				t.Errorf("pesan = %q, mau memuat kontrol transaksi (%s)", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestValidate_LegitimateSQLNotMistakenForTransactionControl(t *testing.T) {
+func TestCheckSQL_LegitimateSQLNotMistakenForTransactionControl(t *testing.T) {
 	for _, sql := range []string{
 		"INSERT INTO log (msg) VALUES ('BEGIN; COMMIT;')",
 		"-- COMMIT\nSELECT 1",
@@ -103,17 +61,10 @@ func TestValidate_LegitimateSQLNotMistakenForTransactionControl(t *testing.T) {
 		"ALTER TABLE a ADD COLUMN begin_at timestamptz",
 	} {
 		t.Run(sql, func(t *testing.T) {
-			if _, fields := Validate(Input{Name: "ok", SQL: sql}); fields["sql"] != "" {
-				t.Errorf("SQL sah ditolak: %q", fields["sql"])
+			if got := CheckSQL(sql); got != "" {
+				t.Errorf("SQL sah ditolak: %q", got)
 			}
 		})
-	}
-}
-
-func TestValidate_ReportsAllFieldsAtOnce(t *testing.T) {
-	_, fields := Validate(Input{Name: "", SQL: ""})
-	if fields["name"] == "" || fields["sql"] == "" {
-		t.Errorf("fields = %v, mau name dan sql terisi", fields)
 	}
 }
 

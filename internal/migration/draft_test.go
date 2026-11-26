@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"strings"
 	"testing"
 
 	"dbplatform/internal/domain"
@@ -25,6 +26,11 @@ func validBatchDraft() DraftInput {
 	}
 }
 
+// bigSQL membuat SELECT yang panjangnya persis sebanyak n byte
+func bigSQL(n int) string {
+	return "SELECT '" + strings.Repeat("a", n-len("SELECT ''")) + "'"
+}
+
 // field kosong artinya draft harus boleh disimpan
 func TestCleanDraft_Rules(t *testing.T) {
 	tests := []struct {
@@ -34,7 +40,11 @@ func TestCleanDraft_Rules(t *testing.T) {
 	}{
 		{"valid", func(*DraftInput) {}, ""},
 		{"nama kosong", func(in *DraftInput) { in.Name = "  " }, "name"},
+		{"nama 120 karakter unicode", func(in *DraftInput) { in.Name = strings.Repeat("é", maxNameChars) }, ""},
+		{"nama terlalu panjang", func(in *DraftInput) { in.Name = strings.Repeat("é", maxNameChars+1) }, "name"},
 		{"sql up kosong", func(in *DraftInput) { in.UpSQL = "" }, "sql_up"},
+		{"sql up tepat batas", func(in *DraftInput) { in.UpSQL = bigSQL(maxSQLBytes) }, ""},
+		{"sql up terlalu besar", func(in *DraftInput) { in.UpSQL = bigSQL(maxSQLBytes + 1) }, "sql_up"},
 		{"sql down boleh kosong dulu", func(in *DraftInput) { in.DownSQL = "" }, ""},
 		{"kontrol transaksi", func(in *DraftInput) { in.UpSQL = "BEGIN; SELECT 1; COMMIT" }, "sql_up"},
 		{"vacuum", func(in *DraftInput) { in.UpSQL = "VACUUM customers" }, "sql_up"},

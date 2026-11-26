@@ -9,7 +9,6 @@ import (
 
 	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/domain"
-	"dbplatform/internal/migration"
 )
 
 const (
@@ -89,26 +88,10 @@ func (p *svcProvider) Get(_ context.Context, id int64) (dbdriver.Driver, error) 
 	return d, nil
 }
 
-type svcMigrations struct {
-	calls []migration.Input
-	conns []int64
-	err   error
-}
-
-func (m *svcMigrations) Create(_ context.Context, _ domain.Principal, connID int64, in migration.Input) (domain.Migration, error) {
-	if m.err != nil {
-		return domain.Migration{}, m.err
-	}
-	m.calls = append(m.calls, in)
-	m.conns = append(m.conns, connID)
-	return domain.Migration{ConnectionID: connID, Version: len(m.calls), Name: in.Name, SQL: in.SQL, Status: domain.MigrationDraft}, nil
-}
-
 type svcFixture struct {
-	svc        *Service
-	authz      *svcAuthz
-	provider   *svcProvider
-	migrations *svcMigrations
+	svc      *Service
+	authz    *svcAuthz
+	provider *svcProvider
 }
 
 func orders() domain.Table {
@@ -144,8 +127,7 @@ func newSvcFixture() svcFixture {
 		},
 		errs: map[int64]error{},
 	}
-	migrations := &svcMigrations{}
-	return svcFixture{svc: NewService(authz, provider, migrations), authz: authz, provider: provider, migrations: migrations}
+	return svcFixture{svc: NewService(authz, provider), authz: authz, provider: provider}
 }
 
 func TestService_Preview_DirectionIsSourceIntoTarget(t *testing.T) {
@@ -270,7 +252,7 @@ func TestService_Sources(t *testing.T) {
 	}
 }
 
-func TestService_CreateDraft_UsesChosenChangesInDiffOrder(t *testing.T) {
+func TestService_DraftSQL_UsesChosenChangesInDiffOrder(t *testing.T) {
 	f := newSvcFixture()
 	f.provider.drivers[sourceID].schema = schema(customers(), orders(), table("public", "extra",
 		[]domain.Column{col(1, "id", "integer", false, nil)}, []domain.Constraint{pk("extra_pkey", "id")}, nil))
@@ -280,94 +262,77 @@ func TestService_CreateDraft_UsesChosenChangesInDiffOrder(t *testing.T) {
 	}
 
 	picked := []string{preview.Changes[3].ID, preview.Changes[0].ID}
-	m, err := f.svc.CreateDraft(context.Background(), editorUser, targetID, sourceID, picked)
+	name, sql, err := f.svc.DraftSQL(context.Background(), editorUser, targetID, sourceID, picked)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := preview.Changes[0].SQL + "\n" + preview.Changes[3].SQL
-	if len(f.migrations.calls) != 1 || f.migrations.calls[0].SQL != want {
-		t.Errorf("SQL draft = %q, mau urutan diff: %q", f.migrations.calls[0].SQL, want)
+	if sql != want {
+		t.Errorf("SQL draft = %q, mau urutan diff: %q", sql, want)
 	}
-	if f.migrations.conns[0] != targetID || m.ConnectionID != targetID {
-		t.Errorf("draft harus dibuat di database tujuan: %v", f.migrations.conns)
-	}
-	if f.migrations.calls[0].Name != "Schema diff dari sumber <asli>" {
-		t.Errorf("nama = %q", f.migrations.calls[0].Name)
+	if name != "Schema diff dari sumber <asli>" {
+		t.Errorf("nama = %q", name)
 	}
 }
 
-func TestService_CreateDraft_LongSourceNameIsTruncated(t *testing.T) {
+func TestService_DraftSQL_LongSourceNameIsTruncated(t *testing.T) {
 	f := newSvcFixture()
 	f.authz.accessible[1].Name = strings.Repeat("é", 200)
 	preview, _ := f.svc.Preview(context.Background(), editorUser, targetID, sourceID)
 
-	if _, err := f.svc.CreateDraft(context.Background(), editorUser, targetID, sourceID, []string{preview.Changes[0].ID}); err != nil {
+	name, _, err := f.svc.DraftSQL(context.Background(), editorUser, targetID, sourceID, []string{preview.Changes[0].ID})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if n := len([]rune(f.migrations.calls[0].Name)); n != 120 {
+	if n := len([]rune(name)); n != 120 {
 		t.Errorf("panjang nama = %d, mau 120", n)
 	}
 }
 
-func TestService_CreateDraft_RejectsEmptyAndStaleSelections(t *testing.T) {
+func TestService_DraftSQL_RejectsEmptyAndStaleSelections(t *testing.T) {
 	f := newSvcFixture()
 	preview, _ := f.svc.Preview(context.Background(), editorUser, targetID, sourceID)
 
 	for name, ids := range map[string][]string{"kosong": nil, "hanya spasi": {"  ", ""}} {
-		_, err := f.svc.CreateDraft(context.Background(), editorUser, targetID, sourceID, ids)
+		_, _, err := f.svc.DraftSQL(context.Background(), editorUser, targetID, sourceID, ids)
 		var verr *domain.ValidationError
 		if !errors.As(err, &verr) || verr.Fields["changes"] != msgNothingChosen {
 			t.Errorf("%s: err = %v", name, err)
 		}
 	}
-	_, err := f.svc.CreateDraft(context.Background(), editorUser, targetID, sourceID, []string{preview.Changes[0].ID, "palsu123456"})
+	_, sql, err := f.svc.DraftSQL(context.Background(), editorUser, targetID, sourceID, []string{preview.Changes[0].ID, "palsu123456"})
 	var verr *domain.ValidationError
-	if !errors.As(err, &verr) || verr.Fields["changes"] != msgStaleChoice {
-		t.Errorf("ID tak dikenal: err = %v", err)
-	}
-	if len(f.migrations.calls) != 0 {
-		t.Error("tidak boleh ada draft untuk pilihan yang tidak valid")
+	if !errors.As(err, &verr) || verr.Fields["changes"] != msgStaleChoice || sql != "" {
+		t.Errorf("ID tak dikenal: sql = %q, err = %v", sql, err)
 	}
 }
 
-func TestService_CreateDraft_ChoiceFromOldPreviewIsRejectedAfterSchemaChanges(t *testing.T) {
+func TestService_DraftSQL_ChoiceFromOldPreviewIsRejectedAfterSchemaChanges(t *testing.T) {
 	f := newSvcFixture()
 	preview, _ := f.svc.Preview(context.Background(), editorUser, targetID, sourceID)
 	oldID := preview.Changes[0].ID
 
 	f.provider.drivers[sourceID].schema = schema(customers())
-	_, err := f.svc.CreateDraft(context.Background(), editorUser, targetID, sourceID, []string{oldID})
+	_, _, err := f.svc.DraftSQL(context.Background(), editorUser, targetID, sourceID, []string{oldID})
 	var verr *domain.ValidationError
 	if !errors.As(err, &verr) || verr.Fields["changes"] != msgStaleChoice {
 		t.Errorf("err = %v, mau pilihan kedaluwarsa", err)
 	}
-	if len(f.migrations.calls) != 0 {
-		t.Error("tidak boleh ada draft")
-	}
 }
 
-func TestService_CreateDraft_AccessAndUpstreamErrors(t *testing.T) {
+func TestService_DraftSQL_RequiresAccess(t *testing.T) {
 	f := newSvcFixture()
 	preview, _ := f.svc.Preview(context.Background(), editorUser, targetID, sourceID)
 	ids := []string{preview.Changes[0].ID}
 
 	for name, actor := range map[string]domain.Principal{"view_only di target": readerUser, "tanpa akses ke sumber": noSourceUser, "Platform Admin": rootUser} {
-		if _, err := f.svc.CreateDraft(context.Background(), actor, targetID, sourceID, ids); !errors.Is(err, domain.ErrForbidden) {
+		if _, _, err := f.svc.DraftSQL(context.Background(), actor, targetID, sourceID, ids); !errors.Is(err, domain.ErrForbidden) {
 			t.Errorf("%s: err = %v, mau ErrForbidden", name, err)
 		}
 	}
-	if len(f.migrations.calls) != 0 {
-		t.Error("tidak boleh ada draft untuk yang tidak berhak")
-	}
-
-	verr := &domain.ValidationError{Fields: map[string]string{"sql": "SQL maksimal 256 KB."}}
-	f.migrations.err = verr
-	if _, err := f.svc.CreateDraft(context.Background(), editorUser, targetID, sourceID, ids); !errors.Is(err, verr) {
-		t.Errorf("error validasi dari migration harus diteruskan: %v", err)
-	}
 }
 
-func TestService_CreateDraft_DestructiveChangesOnlyIfChosen(t *testing.T) {
+func TestService_DraftSQL_DestructiveChangesOnlyIfChosen(t *testing.T) {
 	f := newSvcFixture()
 	f.provider.drivers[targetID].schema = schema(customers(), orders())
 	f.provider.drivers[sourceID].schema = schema(customers())
@@ -376,10 +341,11 @@ func TestService_CreateDraft_DestructiveChangesOnlyIfChosen(t *testing.T) {
 		t.Fatalf("preview = %v", kinds(preview.Changes))
 	}
 
-	if _, err := f.svc.CreateDraft(context.Background(), editorUser, targetID, sourceID, []string{preview.Changes[0].ID}); err != nil {
+	_, sql, err := f.svc.DraftSQL(context.Background(), editorUser, targetID, sourceID, []string{preview.Changes[0].ID})
+	if err != nil {
 		t.Fatalf("pengguna yang memilihnya secara sadar boleh: %v", err)
 	}
-	if !strings.Contains(f.migrations.calls[0].SQL, "DROP TABLE") {
-		t.Errorf("sql = %s", f.migrations.calls[0].SQL)
+	if !strings.Contains(sql, "DROP TABLE") {
+		t.Errorf("sql = %s", sql)
 	}
 }

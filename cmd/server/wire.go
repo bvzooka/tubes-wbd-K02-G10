@@ -65,9 +65,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 	d.Drivers = drivers.Provider
 
 	adminAPI := wireAdmin(&d, authn, mux, spaMode)
-	if err := wireLegacyPages(ctx, cfg, &d, mux, spaMode); err != nil {
-		return fail(err)
-	}
+	wireLegacyPages(cfg, &d, mux, spaMode)
 
 	api := apiv1.NewRouter(mux, authn.apiMiddleware(writeAPIErr), writeAPIErr)
 	approvals := approval.NewService(pool, clk, logger)

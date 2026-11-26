@@ -72,7 +72,7 @@ func (r *Repo) CreateDefinition(ctx context.Context, connID int64, in DraftInput
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 
-	// kunci yang sama dengan M1 supaya dua orang tidak dapat nomor versi yang sama
+	// dikunci per database supaya dua orang tidak dapat nomor versi yang sama
 	if err := lockMigrations(ctx, tx, connID); err != nil {
 		return Definition{}, err
 	}

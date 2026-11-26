@@ -225,16 +225,6 @@ func (a *e2eApp) id(t *testing.T, table, column, value string) int64 {
 	return n
 }
 
-func (a *e2eApp) migrationStatus(t *testing.T, connID int64, version int) string {
-	t.Helper()
-	return a.scalar(t, a.app, `SELECT status FROM db_migrations WHERE connection_id = $1 AND version = $2`, connID, version)
-}
-
-func (a *e2eApp) migrationCount(t *testing.T) string {
-	t.Helper()
-	return a.scalar(t, a.app, `SELECT count(*)::text FROM db_migrations`)
-}
-
 func (a *e2eApp) tableExists(t *testing.T, name string) bool {
 	t.Helper()
 	return a.scalar(t, a.target, `SELECT (to_regclass($1) IS NOT NULL)::text`, name) == "true"
@@ -278,7 +268,8 @@ func step(t *testing.T, name string, fn func(t *testing.T)) {
 	}
 }
 
-// Flow lengkapnya: admin siapin data, tiga jenis user bekerja, aturan akses dijalanin
+// Flow halaman lama: admin siapin data, tiga jenis user bekerja, aturan akses dijalanin
+// alur migration diuji terpisah lewat API
 func TestE2E_FullFlow(t *testing.T) {
 	if testing.Short() {
 		t.Skip("e2e")
@@ -335,120 +326,23 @@ func TestE2E_FullFlow(t *testing.T) {
 			t.Error("daftar database harus memuat koneksi yang berhak diakses")
 		}
 		expect(t, editor.get(db("")), http.StatusOK, "detail database")
-		expect(t, editor.get(db("/migrations")), http.StatusOK, "riwayat migration")
-		expect(t, editor.get(db("/migrations/new")), http.StatusOK, "editor migration")
 		expect(t, editor.get("/admin/users"), http.StatusForbidden, "halaman admin untuk non-admin")
 	})
 
-	step(t, "migration dua statement dibuat dan dijalankan dengan sukses", func(t *testing.T) {
-		sql := "CREATE TABLE e2e_pelanggan (id int PRIMARY KEY, nama text);\nINSERT INTO e2e_pelanggan VALUES (1, 'ani');"
-		r := editor.post(db("/migrations"), editor.form(url.Values{"name": {"buat tabel pelanggan"}, "sql": {sql}}))
-		expectRedirect(t, r, db("/migrations/1"), "simpan draft")
-		if got := a.migrationStatus(t, connID, 1); got != "draft" {
-			t.Fatalf("status = %s, mau draft", got)
-		}
-		if a.tableExists(t, "e2e_pelanggan") {
-			t.Fatal("draft tidak boleh mengubah target")
-		}
-		detail := editor.get(db("/migrations/1"))
-		expect(t, detail, http.StatusOK, "detail draft")
-		if !strings.Contains(detail.Body, "e2e_pelanggan") {
-			t.Error("detail harus menampilkan SQL")
-		}
-
-		expectRedirect(t, editor.post(db("/migrations/1/execute"), editor.form(nil)), db("/migrations/1"), "jalankan")
-		if got := a.migrationStatus(t, connID, 1); got != "success" {
-			t.Fatalf("status = %s, mau success", got)
-		}
-		if !a.tableExists(t, "e2e_pelanggan") || a.rows(t, "e2e_pelanggan") != "1" {
-			t.Error("target harus berisi tabel e2e_pelanggan dengan 1 baris")
-		}
-		if got := a.scalar(t, a.app, `SELECT u.username FROM db_migrations m JOIN users u ON u.id = m.executed_by WHERE m.version = 1`); got != "penyunting" {
-			t.Errorf("pelaksana = %q", got)
-		}
-	})
-
-	// Bukti rollback: tabel dari statement pertama harus ikut batal
-	step(t, "statement kedua yang gagal membatalkan seluruh perubahan di target", func(t *testing.T) {
-		sql := "CREATE TABLE e2e_gagal (id int);\nINSERT INTO e2e_gagal VALUES (1);\nINSERT INTO tidak_ada VALUES (1);"
-		r := editor.post(db("/migrations"), editor.form(url.Values{"name": {"migration rusak"}, "sql": {sql}, "action": {"execute"}}))
-		expectRedirect(t, r, db("/migrations/2"), "simpan lalu jalankan")
-		if got := a.migrationStatus(t, connID, 2); got != "failed" {
-			t.Fatalf("status = %s, mau failed", got)
-		}
-		if msg := a.scalar(t, a.app, `SELECT error_message FROM db_migrations WHERE version = 2`); !strings.Contains(msg, "tidak_ada") {
-			t.Errorf("pesan error = %q", msg)
-		}
-		if a.tableExists(t, "e2e_gagal") {
-			t.Fatal("ROLLBACK GAGAL: tabel dari statement pertama masih ada di target")
-		}
-		if !a.tableExists(t, "e2e_pelanggan") {
-			t.Error("tabel hasil migration sebelumnya tidak boleh ikut hilang")
-		}
-		expectRedirect(t, editor.post(db("/migrations/2/execute"), editor.form(nil)), db("/migrations/2"), "jalankan ulang yang gagal")
-		if got := a.migrationStatus(t, connID, 2); got != "failed" {
-			t.Errorf("status = %s, harus tetap failed", got)
-		}
-	})
-
-	step(t, "versi harus berurutan dan draft bisa dibatalkan", func(t *testing.T) {
-		for _, m := range []struct{ name, sql string }{{"v3", "CREATE TABLE e2e_t3 (id int)"}, {"v4", "CREATE TABLE e2e_t4 (id int)"}} {
-			expectRedirect(t, editor.post(db("/migrations"), editor.form(url.Values{"name": {m.name}, "sql": {m.sql}})), db("/migrations/"), "buat "+m.name)
-		}
-		expectRedirect(t, editor.post(db("/migrations/4/execute"), editor.form(nil)), db("/migrations/4"), "jalankan v4 lebih dulu")
-		if a.migrationStatus(t, connID, 4) != "draft" || a.tableExists(t, "e2e_t4") {
-			t.Fatal("v4 tidak boleh jalan selama v3 masih draft")
-		}
-		expectRedirect(t, editor.post(db("/migrations/3/cancel"), editor.form(nil)), db("/migrations/3"), "batalkan v3")
-		if got := a.migrationStatus(t, connID, 3); got != "cancelled" {
-			t.Fatalf("v3 = %s, mau cancelled", got)
-		}
-		expectRedirect(t, editor.post(db("/migrations/4/execute"), editor.form(nil)), db("/migrations/4"), "jalankan v4")
-		if a.migrationStatus(t, connID, 4) != "success" || !a.tableExists(t, "e2e_t4") {
-			t.Error("v4 harus berhasil setelah v3 dibatalkan")
-		}
-	})
-
-	step(t, "riwayat memuat semua migration, EXPLAIN dan validasi bekerja", func(t *testing.T) {
-		history := editor.get(db("/migrations"))
-		expect(t, history, http.StatusOK, "riwayat")
-		for _, name := range []string{"buat tabel pelanggan", "migration rusak", "v3", "v4"} {
-			if !strings.Contains(history.Body, name) {
-				t.Errorf("riwayat tidak memuat %q", name)
-			}
-		}
+	step(t, "EXPLAIN bekerja dari halaman lama", func(t *testing.T) {
+		testutil.MustExec(t, a.target, "CREATE TABLE e2e_pelanggan (id int PRIMARY KEY, nama text); INSERT INTO e2e_pelanggan VALUES (1, 'ani')")
 		explain := editor.post(db("/explain"), editor.form(url.Values{"sql": {"SELECT * FROM e2e_pelanggan"}}))
 		expect(t, explain, http.StatusOK, "EXPLAIN")
-
-		before := a.migrationCount(t)
-		bad := editor.post(db("/migrations"), editor.form(url.Values{"name": {"x"}, "sql": {"CREATE TABLE a (id int); COMMIT;"}}))
-		expect(t, bad, http.StatusUnprocessableEntity, "SQL berisi COMMIT")
-		if a.migrationCount(t) != before {
-			t.Error("SQL tidak valid tidak boleh tersimpan")
-		}
-	})
-
-	step(t, "draft disiapkan untuk uji penolakan view_only", func(t *testing.T) {
-		expectRedirect(t, editor.post(db("/migrations"), editor.form(url.Values{"name": {"draft-uji"}, "sql": {"DROP TABLE e2e_pelanggan"}})), db("/migrations/5"), "buat draft uji")
 	})
 
 	step(t, "user view_only bisa melihat tetapi semua aksi tulis ditolak", func(t *testing.T) {
 		expectRedirect(t, reader.login("pembaca", e2eReaderPassword), "/databases", "login pembaca")
-		expect(t, reader.get(db("/migrations")), http.StatusOK, "riwayat")
-		expect(t, reader.get(db("/migrations/1")), http.StatusOK, "detail")
+		expect(t, reader.get(db("")), http.StatusOK, "detail")
 
-		before := a.migrationCount(t)
 		token := reader.csrf()
 		writes := map[string]e2eResponse{
-			"editor baru":        reader.get(db("/migrations/new")),
-			"ubah draft":         reader.get(db("/migrations/5/edit")),
-			"buat":               reader.post(db("/migrations"), url.Values{"csrf_token": {token}, "name": {"retas"}, "sql": {"DROP TABLE e2e_pelanggan"}}),
-			"buat dan jalankan":  reader.post(db("/migrations"), url.Values{"csrf_token": {token}, "name": {"retas"}, "sql": {"DROP TABLE e2e_pelanggan"}, "action": {"execute"}}),
-			"simpan perubahan":   reader.post(db("/migrations/5"), url.Values{"csrf_token": {token}, "name": {"x"}, "sql": {"DROP TABLE e2e_pelanggan"}}),
-			"jalankan":           reader.post(db("/migrations/5/execute"), url.Values{"csrf_token": {token}}),
-			"batalkan":           reader.post(db("/migrations/5/cancel"), url.Values{"csrf_token": {token}}),
 			"EXPLAIN":            reader.post(db("/explain"), url.Values{"csrf_token": {token}, "sql": {"SELECT 1"}}),
-			"tanpa token CSRF":   reader.post(db("/migrations/5/execute"), url.Values{}),
+			"tanpa token CSRF":   reader.post(db("/explain"), url.Values{"sql": {"SELECT 1"}}),
 			"halaman admin":      reader.get("/admin/groups"),
 			"POST halaman admin": reader.post("/admin/users", url.Values{"csrf_token": {token}, "username": {"retas"}, "password": {"retas-password-123"}}),
 		}
@@ -457,10 +351,7 @@ func TestE2E_FullFlow(t *testing.T) {
 				t.Errorf("%s: status %d, mau 403", name, r.Code)
 			}
 		}
-		if a.migrationCount(t) != before || a.migrationStatus(t, connID, 5) != "draft" {
-			t.Error("data migration tidak boleh berubah oleh view_only")
-		}
-		if !a.tableExists(t, "e2e_pelanggan") || a.rows(t, "e2e_pelanggan") != "1" {
+		if a.rows(t, "e2e_pelanggan") != "1" {
 			t.Error("database target tidak boleh berubah oleh view_only")
 		}
 	})
@@ -472,28 +363,24 @@ func TestE2E_FullFlow(t *testing.T) {
 		if strings.Contains(list.Body, e2eConnName) {
 			t.Error("user tanpa akses tidak boleh melihat nama database")
 		}
-		for _, p := range []string{db(""), db("/migrations"), db("/migrations/1"), db("/migrations/999"), db("/migrations/new")} {
+		for _, p := range []string{db(""), db("/tables/public/e2e_pelanggan"), db("/tables/public/e2e_pelanggan/data")} {
 			expect(t, outsider.get(p), http.StatusForbidden, "GET "+p)
 		}
 
 		anon := newE2EClient(t, a.base)
 		expectRedirect(t, anon.get("/databases"), "/login", "GET tanpa login")
-		expectRedirect(t, anon.get(db("/migrations")), "/login", "riwayat tanpa login")
-		expectRedirect(t, anon.post(db("/migrations/5/execute"), url.Values{}), "/login", "POST tanpa login")
-		if a.migrationStatus(t, connID, 5) != "draft" {
-			t.Error("pengunjung tanpa login tidak boleh mengubah migration")
-		}
+		expectRedirect(t, anon.get(db("")), "/login", "detail tanpa login")
+		expectRedirect(t, anon.post(db("/explain"), url.Values{}), "/login", "POST tanpa login")
 	})
 
 	step(t, "perubahan keanggotaan berlaku seketika tanpa login ulang", func(t *testing.T) {
 		userID := a.id(t, "users", "username", "penyunting")
 		base := fmt.Sprintf("/admin/groups/%d", editorGroup)
 		expectRedirect(t, admin.post(fmt.Sprintf("%s/members/%d/delete", base, userID), admin.form(nil)), base, "keluarkan penyunting")
-		expect(t, editor.get(db("/migrations")), http.StatusForbidden, "riwayat setelah dikeluarkan")
 		expect(t, editor.get(db("")), http.StatusForbidden, "detail setelah dikeluarkan")
 
 		expectRedirect(t, admin.post(base+"/members", admin.form(url.Values{"user_id": {strconv.FormatInt(userID, 10)}})), base, "masukkan lagi")
-		expect(t, editor.get(db("/migrations")), http.StatusOK, "riwayat setelah dimasukkan lagi")
+		expect(t, editor.get(db("")), http.StatusOK, "detail setelah dimasukkan lagi")
 	})
 
 	step(t, "login salah, logout, sesi lama tidak berlaku, lalu login ulang", func(t *testing.T) {
@@ -526,6 +413,6 @@ func TestE2E_FullFlow(t *testing.T) {
 		}
 
 		expectRedirect(t, editor.login("penyunting", e2eEditorPassword), "/databases", "login ulang")
-		expect(t, editor.get(db("/migrations")), http.StatusOK, "riwayat setelah login ulang")
+		expect(t, editor.get(db("")), http.StatusOK, "detail setelah login ulang")
 	})
 }

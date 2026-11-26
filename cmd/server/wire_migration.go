@@ -20,7 +20,6 @@ func wireMigration(
 		Queue: queue.NewRepo(d.Pool, d.Clock), Clock: d.Clock, Logger: d.Logger,
 		MaxAttempts: cfg.Worker.MaxAttempts,
 	})
-	// pembuat draft versi M1 tidak dipasang, API menyimpan draft lewat service definisi
-	diff := schemadiff.NewService(d.Authz, d.Drivers, nil)
+	diff := schemadiff.NewService(d.Authz, d.Drivers)
 	return migration.NewAPIHandler(definitions, executions), schemadiff.NewAPIHandler(diff, definitions)
 }

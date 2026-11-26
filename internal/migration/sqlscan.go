@@ -260,14 +260,3 @@ func FirstTransactionControl(stmts []Statement) (Statement, bool) {
 	}
 	return Statement{}, false
 }
-
-// ContainsDDL true kalau ada perintah yang mengubah struktur, yang di MySQL tidak bisa di-rollback
-func ContainsDDL(stmts []Statement) bool {
-	for _, s := range stmts {
-		switch s.Keyword {
-		case "CREATE", "ALTER", "DROP", "TRUNCATE", "RENAME":
-			return true
-		}
-	}
-	return false
-}
