@@ -2,6 +2,7 @@ package migration
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -48,7 +49,14 @@ func versionPath(r *http.Request) (int64, int, error) {
 		return 0, 0, err
 	}
 	version, err := apiv1.PathID(r, "version")
-	return connID, int(version), err
+	if err != nil {
+		return 0, 0, err
+	}
+	// kolom version bertipe INTEGER, jadi angka yang lebih besar pasti tidak ada
+	if version > math.MaxInt32 {
+		return 0, 0, domain.ErrNotFound
+	}
+	return connID, int(version), nil
 }
 
 func (h *APIHandler) List(w http.ResponseWriter, r *http.Request) error {
