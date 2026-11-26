@@ -13,6 +13,7 @@ import (
 	"dbplatform/internal/domain"
 	"dbplatform/internal/migration"
 	"dbplatform/internal/queue"
+	"dbplatform/internal/telemetry"
 )
 
 type flowEnv struct {
@@ -119,6 +120,36 @@ func TestExecutionService_Integration_RequestApproveRun(t *testing.T) {
 	}
 	if err := f.executions.Cancel(ctx, f.editor, ex.ID); !errors.Is(err, domain.ErrConflict) {
 		t.Errorf("batalkan yang sudah antre: %v", err)
+	}
+}
+
+// Job mewarisi correlation_id pengajuan, bukan milik request run, supaya log worker dan riwayat attempt bisa ditelusuri dengan ID yang sama.
+func TestExecutionService_Integration_JobKeepsRequestCorrelation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration")
+	}
+	f := newFlowEnv(t)
+	ctx := context.Background()
+	d := f.ready(t)
+
+	requestCtx := telemetry.WithCorrelationID(ctx, "pengajuan-0001")
+	ex, err := f.executions.Request(requestCtx, f.editor, f.conn, d.Version, domain.KindApply, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.approveByViewer(t, ex.ID)
+
+	runCtx := telemetry.WithCorrelationID(ctx, "run-00000001")
+	jobID, err := f.executions.Run(runCtx, f.editor, ex.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := f.pool.QueryRow(ctx, `SELECT correlation_id FROM migration_jobs WHERE id = $1::uuid`, jobID).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != "pengajuan-0001" {
+		t.Errorf("correlation_id job = %q, mau milik pengajuan", got)
 	}
 }
 

@@ -212,8 +212,10 @@ func (s *ExecutionService) enqueue(ctx context.Context, q appdb.DBTX, e domain.E
 	if err != nil {
 		return "", err
 	}
+	// job memakai correlation_id milik pengajuan. biar pengajuan, run, kerja worker, dan riwayat attempt bisa dicari dengan satu ID
 	job, err := s.deps.Queue.Enqueue(ctx, q, domain.EnqueueInput{
 		ExecutionID: e.ID, ConnectionID: e.ConnectionID, MaxAttempts: s.deps.MaxAttempts,
+		CorrelationID: e.CorrelationID,
 	})
 	if err != nil {
 		return "", err
