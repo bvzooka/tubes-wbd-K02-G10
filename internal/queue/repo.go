@@ -24,6 +24,10 @@ const defaultMaxAttempts = 3
 const jobColumns = `id, execution_id, connection_id, state, attempt, max_attempts, run_after,
 	fence, traceparent, correlation_id, last_error`
 
+const lockWaitSQL = `GREATEST(0, EXTRACT(EPOCH FROM LEAST($2::timestamptz, COALESCE(
+		(SELECT max(GREATEST(o.finished_at, o.heartbeat_at)) FROM migration_jobs o
+		 WHERE o.connection_id = j.connection_id AND o.id <> j.id), j.run_after)) - j.run_after))::float8`
+
 type Repo struct {
 	pool  *pgxpool.Pool
 	clock clock.Clock
@@ -33,8 +37,7 @@ func NewRepo(pool *pgxpool.Pool, clk clock.Clock) *Repo {
 	return &Repo{pool: pool, clock: clk}
 }
 
-// Enqueue idempoten: memanggil dua kali untuk eksekusi yang sama mengembalikan job yang sama.
-// Traceparent dan correlation ID diambil dari ctx bila tidak diisi.
+// Enqueue idempoten memanggil dua kali untuk eksekusi yang sama mengembalikan job yang sama
 func (r *Repo) Enqueue(ctx context.Context, tx appdb.DBTX, in domain.EnqueueInput) (domain.Job, error) {
 	if in.Traceparent == "" {
 		in.Traceparent = Traceparent(ctx)
@@ -62,6 +65,7 @@ func (r *Repo) Get(ctx context.Context, jobID string) (domain.Job, error) {
 // database hanya menjalankan satu job pada satu waktu.
 func (r *Repo) Claim(ctx context.Context, owner string, lease time.Duration, now time.Time) (domain.Job, bool, error) {
 	var job domain.Job
+	var waited float64
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		var err error
 		job, err = scanJob(tx.QueryRow(ctx, `
@@ -81,7 +85,7 @@ func (r *Repo) Claim(ctx context.Context, owner string, lease time.Duration, now
 			    lease_owner = $1, lease_expires_at = $2::timestamptz + $3::interval, heartbeat_at = $2,
 			    started_at = COALESCE(started_at, $2)
 			FROM next WHERE j.id = next.next_id
-			RETURNING `+jobColumns, owner, now, lease))
+			RETURNING `+jobColumns+`, `+lockWaitSQL, owner, now, lease), &waited)
 		if err != nil {
 			return err
 		}
@@ -93,11 +97,11 @@ func (r *Repo) Claim(ctx context.Context, owner string, lease time.Duration, now
 	if err != nil {
 		return domain.Job{}, false, fmt.Errorf("claim job: %w", err)
 	}
+	lockWait.Observe(waited)
 	return job, true, nil
 }
 
-// TakeOver dipakai reaper untuk mengambil alih job running yang lease-nya habis. Fence
-// baru membuat semua penulisan worker lama ditolak.
+// TakeOver dipakai reaper untuk mengambil alih job running yang lease-nya habis. Fence baru membuat semua penulisan worker lama ditolak.
 func (r *Repo) TakeOver(ctx context.Context, stale domain.Job, owner string, lease time.Duration, now time.Time) (domain.Job, bool, error) {
 	var job domain.Job
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
@@ -137,8 +141,7 @@ func (r *Repo) Expired(ctx context.Context, now time.Time) ([]domain.Job, error)
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Job, error) { return scanJob(row) })
 }
 
-// Heartbeat memperpanjang lease job dan lock koneksi dalam satu statement. false berarti
-// fence sudah tidak cocok: lease hilang.
+// Heartbeat memperpanjang lease job dan lock koneksi dalam satu statement. false berarti fence sudah tidak cocok: lease hilang.
 func (r *Repo) Heartbeat(ctx context.Context, job domain.Job, lease time.Duration, now time.Time) (bool, error) {
 	tag, err := r.pool.Exec(ctx, `
 		WITH j AS (
@@ -164,8 +167,7 @@ func (r *Repo) Finish(ctx context.Context, job domain.Job, lastErr string, now t
 		job.ID, job.Fence, now, lastErr)
 }
 
-// Reschedule mengembalikan job ke antrean. countAttempt=false dipakai bila job belum
-// sempat dijalankan (target sibuk), sehingga jatah attempt tidak berkurang.
+// Reschedule mengembalikan job ke antrean. countAttempt=false dipakai bila job belum sempat dijalankan (target sibuk), sehingga jatah attempt tidak berkurang.
 func (r *Repo) Reschedule(ctx context.Context, job domain.Job, runAfter time.Time, lastErr string, countAttempt bool) error {
 	return r.release(ctx, job, `
 		UPDATE migration_jobs
@@ -215,10 +217,12 @@ func acquireLock(ctx context.Context, tx pgx.Tx, job domain.Job, owner string, l
 	return nil
 }
 
-func scanJob(row pgx.Row) (domain.Job, error) {
+// extra menampung kolom tambahan setelah jobColumns
+func scanJob(row pgx.Row, extra ...any) (domain.Job, error) {
 	var j domain.Job
-	err := row.Scan(&j.ID, &j.ExecutionID, &j.ConnectionID, &j.State, &j.Attempt, &j.MaxAttempts,
-		&j.RunAfter, &j.Fence, &j.Traceparent, &j.CorrelationID, &j.LastError)
+	dest := append([]any{&j.ID, &j.ExecutionID, &j.ConnectionID, &j.State, &j.Attempt, &j.MaxAttempts,
+		&j.RunAfter, &j.Fence, &j.Traceparent, &j.CorrelationID, &j.LastError}, extra...)
+	err := row.Scan(dest...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return j, domain.ErrNotFound
 	}
