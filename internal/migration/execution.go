@@ -24,11 +24,13 @@ type executionStore interface {
 	SetExecutionStatus(ctx context.Context, q appdb.DBTX, id int64, from, to domain.ExecutionStatus, at time.Time) error
 	JobID(ctx context.Context, q appdb.DBTX, executionID int64) (string, error)
 	ListHistory(ctx context.Context, connID int64, f HistoryFilter, limit, offset int) ([]domain.HistoryEntry, error)
+	ListExecutions(ctx context.Context, connID int64, version int) ([]domain.Execution, error)
 }
 
 // ExecutionDeps dikumpulkan jadi struct supaya urutan argumen tidak tertukar saat perakitan
 type ExecutionDeps struct {
 	Store       executionStore
+	DB          appdb.DBTX // untuk pembacaan di luar transaction
 	Authz       contract.Authorizer
 	Approvals   contract.Approvals
 	Queue       contract.JobQueue

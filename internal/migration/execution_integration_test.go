@@ -32,7 +32,7 @@ func newFlowEnv(t *testing.T) flowEnv {
 		serviceEnv: e,
 		approvals:  approvals,
 		executions: migration.NewExecutionService(migration.ExecutionDeps{
-			Store: e.repo, Authz: access.New(e.pool), Approvals: approvals,
+			Store: e.repo, DB: e.pool, Authz: access.New(e.pool), Approvals: approvals,
 			Queue: queue.NewRepo(e.pool, clock.System{}), Clock: clock.System{}, Logger: logger, MaxAttempts: 3,
 		}),
 	}

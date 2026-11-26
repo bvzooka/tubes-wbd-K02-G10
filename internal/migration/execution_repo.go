@@ -114,6 +114,29 @@ func (r *Repo) ExecutionIn(ctx context.Context, q appdb.DBTX, id int64) (domain.
 	return oneExecution(ctx, q, `WHERE e.id = $1`, id)
 }
 
+// ListExecutions mengurutkan dari permintaan terbaru
+func (r *Repo) ListExecutions(ctx context.Context, connID int64, version int) ([]domain.Execution, error) {
+	rows, err := r.db.Query(ctx,
+		selectExecution+` WHERE e.connection_id = $1 AND e.version = $2 ORDER BY e.id DESC`, connID, version)
+	if err != nil {
+		return nil, fmt.Errorf("list executions: %w", err)
+	}
+	defer rows.Close()
+
+	var list []domain.Execution
+	for rows.Next() {
+		e, err := scanExecution(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan execution: %w", err)
+		}
+		list = append(list, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read executions: %w", err)
+	}
+	return list, nil
+}
+
 // LatestForwardExecution mencari apply atau forward terakhir dengan salah satu status itu, itu yang akan dibatalkan atau dilanjutkan
 func (r *Repo) LatestForwardExecution(ctx context.Context, q appdb.DBTX, migrationID int64, statuses ...domain.ExecutionStatus) (domain.Execution, error) {
 	return oneExecution(ctx, q, `
