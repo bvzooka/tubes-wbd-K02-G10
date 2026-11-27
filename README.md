@@ -557,6 +557,6 @@ Temuan 4, masih terbuka dengan keputusan diterima:
 
 | Anggota | Bagian |
 | --- | --- |
-| Kurt Mikhael Purba - 13524065 | Kerangka API `/api/v1`, API login, admin, dan EXPLAIN, persetujuan leader, antrean dan worker, log, tracing, dan metrik, kerangka SPA beserta halaman login, admin, dan persetujuan, bonus CodeQL dan observability |
-| Reva Natania Sitohang - 13524098 | API koneksi dan viewer, session database target dan tabel bukti eksekusi, halaman SPA koneksi dan database, desain dan responsif, Docker, bonus k6 dan observability |
-| Amanda Aurellia Salsabilla - 13524131 | Migration (definisi, alur status, rollback dan forward, runner normal dan batch, riwayat) beserta API dan halaman SPA-nya, schema diff di SPA, konversi data Milestone 1, perakitan server, CI |
+| Kurt Mikhael Purba - 13524065 | Kerangka API `/api/v1`, API login, admin, dan EXPLAIN, persetujuan leader, antrean dan worker, pemecahan wiring server, log, tracing, dan metrik, kerangka SPA beserta halaman login, admin, persetujuan, dan query plan, bonus CodeQL dan observability |
+| Reva Natania Sitohang - 13524098 | API koneksi dan viewer, session database target dan tabel bukti eksekusi, log SQL viewer dan uji koneksi, halaman SPA koneksi dan database, desain dan responsif, Docker, bonus k6 dan observability |
+| Amanda Aurellia Salsabilla - 13524131 | Migration (definisi, alur status, rollback dan forward, runner normal dan batch, riwayat) beserta API dan halaman SPA-nya, API dan halaman schema diff, konversi data Milestone 1, CI |
