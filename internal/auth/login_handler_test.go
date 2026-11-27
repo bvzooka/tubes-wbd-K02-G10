@@ -216,6 +216,10 @@ func TestSafeNext(t *testing.T) {
 		"https://evil.example/":  "/databases",
 		"databases":              "/databases",
 		"/ok\r\nSet-Cookie: a=b": "/databases",
+		// tab dibuang browser sehingga sisanya terbaca sebagai //evil.example
+		"/\t/evil.example": "/databases",
+		"/\x00/evil":       "/databases",
+		"/ok\x7f":          "/databases",
 	}
 	for in, want := range tests {
 		if got := safeNext(in); got != want {

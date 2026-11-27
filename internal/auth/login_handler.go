@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"unicode"
 
 	"dbplatform/internal/clock"
 	"dbplatform/internal/contract"
@@ -158,7 +159,8 @@ func safeNext(next string) string {
 	if len(next) > 1 && (next[1] == '/' || next[1] == '\\') {
 		return defaultAfterLogin
 	}
-	if strings.ContainsAny(next, "\\\r\n") {
+	// browser membuang tab dan baris baru dari URL, jadi path berisi karakter kontrol bisa terbaca sebagai //situs-lain
+	if strings.Contains(next, "\\") || strings.ContainsFunc(next, unicode.IsControl) {
 		return defaultAfterLogin
 	}
 	return next

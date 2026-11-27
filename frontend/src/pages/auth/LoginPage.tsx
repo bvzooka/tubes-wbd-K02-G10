@@ -8,7 +8,11 @@ import { sessionKey, useSession } from '../../hooks/useSession'
 
 // safeNext hanya menerima path lokal agar tidak bisa dipakai untuk open redirect.
 function safeNext(next: string | null) {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
+  if (!next?.startsWith('/')) return '/'
+  // sama dengan aturan di backend, browser membuang tab dan membaca backslash sebagai garis miring
+  if (/[\\\u0000-\u001f\u007f]/.test(next)) return '/'
+  // garis miring ganda di bagian path bisa dibaca router sebagai alamat situs lain
+  return next.split(/[?#]/)[0].includes('//') ? '/' : next
 }
 
 export default function LoginPage() {
