@@ -16,18 +16,26 @@ interface Decision {
   comment: string
 }
 
+// dibandingkan lewat key, bukan objek, karena item diganti baru setiap inbox dimuat ulang
+const itemKey = (item: InboxItem) => `${item.execution_id}-${item.group_id}`
+
 export default function ApprovalsPage() {
   const queryClient = useQueryClient()
-  const [rejecting, setRejecting] = useState<InboxItem | null>(null)
+  const [rejecting, setRejecting] = useState<string | null>(null)
   const [comment, setComment] = useState('')
+
+  // alasan selalu dimulai kosong supaya tidak terbawa ke permintaan lain
+  function openReject(key: string | null) {
+    setRejecting(key)
+    setComment('')
+  }
 
   const inbox = useQuery({ queryKey: ['approvals'], queryFn: () => api<InboxItem[]>('GET', '/approvals') })
   const decide = useMutation({
     mutationFn: ({ item, approve, comment }: Decision) =>
       api('POST', `/executions/${item.execution_id}/approvals/${item.group_id}/${approve ? 'approve' : 'reject'}`, { comment }),
     onSuccess: () => {
-      setRejecting(null)
-      setComment('')
+      openReject(null)
       queryClient.invalidateQueries({ queryKey: ['approvals'] })
     },
   })
@@ -41,7 +49,7 @@ export default function ApprovalsPage() {
 
       <div className="space-y-4">
         {inbox.data?.map((item) => (
-          <article key={`${item.execution_id}-${item.group_id}`} className="card space-y-3">
+          <article key={itemKey(item)} className="card space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-medium">
                 {kindLabel[item.kind]} v{item.version} · {item.database}
@@ -52,7 +60,7 @@ export default function ApprovalsPage() {
             </div>
             <pre className="max-h-64 overflow-auto rounded-md bg-ink p-3 text-xs text-paper-soft">{item.sql}</pre>
 
-            {rejecting === item ? (
+            {rejecting === itemKey(item) ? (
               <div className="space-y-2">
                 <label className="block">
                   <span className="mb-[0.35rem] block">Alasan penolakan (wajib)</span>
@@ -72,7 +80,7 @@ export default function ApprovalsPage() {
                   >
                     Tolak
                   </button>
-                  <button className="btn-secondary" onClick={() => setRejecting(null)}>
+                  <button className="btn-secondary" onClick={() => openReject(null)}>
                     Batal
                   </button>
                 </div>
@@ -86,7 +94,7 @@ export default function ApprovalsPage() {
                 >
                   Setujui
                 </button>
-                <button className="btn-secondary" onClick={() => setRejecting(item)}>
+                <button className="btn-secondary" onClick={() => openReject(itemKey(item))}>
                   Tolak…
                 </button>
                 <Link to={`/executions/${item.execution_id}`} className="btn-secondary">
