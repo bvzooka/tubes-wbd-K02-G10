@@ -487,12 +487,21 @@ Hasil pengujian terakhir: semua ambang lulus, 7.963 request tanpa error, 191 dar
 
 ### Security: CodeQL
 
-GitHub Actions (`.github/workflows/codeql.yml`) memindai kode Go dan JavaScript/TypeScript pada setiap push dan pull request ke `main`, serta mingguan. Temuan Go per 27 November 2026:
+GitHub Actions (`.github/workflows/codeql.yml`) memindai kode Go dan JavaScript/TypeScript pada setiap push dan pull request ke `main`, serta mingguan.
+
+Hasil scan commit `627dba4` pada 27 November 2026 ([log GitHub Actions](https://github.com/bvzooka/tubes-wbd-K02-G10/actions/runs/45918983234)):
+
+| Bahasa | Rule dijalankan | Temuan terbuka |
+|---|---|---|
+| Go | 34 | 4 |
+| JavaScript/TypeScript | 87 | 0 |
+
+Tidak adanya temuan bukan berarti kode pasti aman. Seluruh temuan:
 
 | # | Rule | Severity | Lokasi | Dampak yang mungkin | Keputusan dan alasan |
 |---|---|---|---|---|---|
 | 1, 2 | `go/cookie-secure-not-set` | medium | `internal/httpx/flash.go` | cookie pesan flash terkirim lewat HTTP | **Diterima.** `Secure` aktif saat `APP_ENV=production`, dan sengaja mati saat pengembangan di `http://localhost`. Cookie hanya berisi pesan bertanda tangan untuk halaman lama. |
-| 3 | `go/unvalidated-url-redirection` | medium | `internal/auth/login_handler.go` | tautan login bisa mengarahkan korban ke situs lain | **Valid, belum diperbaiki.** Penyaring `next` meloloskan karakter tab, yang dibuang browser sehingga menjadi URL `//situs-lain`. Hanya halaman login lama (tanpa `WEB_DIST_DIR`) yang memakainya. |
+| 3 | `go/unvalidated-url-redirection` | medium | `internal/auth/login_handler.go` | tautan login bisa mengarahkan korban ke situs lain | **Valid, sudah diperbaiki** pada commit `627dba4`. Penyaring `next` dulu meloloskan karakter tab, yang dibuang browser sehingga menjadi URL `//situs-lain` (di SPA akibatnya halaman kosong). Kini karakter kontrol dan backslash ditolak di halaman login lama maupun SPA, dibuktikan `TestSafeNext`. Scan ulang masih menandainya terbuka. Dugaan kami, CodeQL tidak mengenali penyaring buatan sendiri ini. |
 | 4 | `go/sql-injection` | high | `internal/dbdriver/mysql/driver.go` | SQL buatan pengguna dijalankan di database target | **Diterima.** Menjalankan SQL pengguna adalah fitur EXPLAIN. Dibatasi untuk View + Edit, satu statement DML, transaction yang selalu di-rollback, dan batas waktu. |
 | 5 | `go/incorrect-integer-conversion` | high | `internal/migration/api_handler.go` | nomor versi besar terpotong menjadi angka lain | **Diperbaiki** pada commit `e6b6a6b`: angka di luar jangkauan 32 bit dijawab 404. Scan ulang menandai temuan ini `fixed`. |
 
