@@ -9,6 +9,8 @@ import ErrorMessage from '../../components/ErrorMessage'
 import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
+import { useDatabaseName } from '../../hooks/useDatabaseName'
+import { databasePath } from '../databases/paths'
 import { formatTime, isOpen, kindLabel, modeLabel, StateBadge, StatusBadge } from './labels'
 import SqlBlock from './SqlBlock'
 import { copyMigrationPath, editMigrationPath, executionPath, migrationsKey, migrationsPath } from './paths'
@@ -53,6 +55,7 @@ export default function MigrationDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const base = `/databases/${id}/migrations/${version}`
+  const dbName = useDatabaseName(id)
 
   const detail = useQuery({
     queryKey: [...migrationsKey(id), version],
@@ -91,14 +94,19 @@ export default function MigrationDetailPage() {
   return (
     <>
       <Breadcrumbs
-        items={[{ label: 'Database', to: '/databases' }, { label: 'Migration', to: migrationsPath(id) }, { label: `v${m.version}` }]}
+        items={[
+          { label: 'Database', to: '/databases' },
+          { label: dbName, to: databasePath(id) },
+          { label: 'Migration', to: migrationsPath(id) },
+          { label: `v${m.version}` },
+        ]}
       />
       <PageHeader
         eyebrow={{ icon: 'history', label: `Versi ${m.version} · revisi ${m.revision}` }}
         title={m.name}
         titleExtra={
           <>
-            <StateBadge state={m.state} />
+            <StateBadge state={m.state} openStatus={m.open_status} />
             <Badge tone="outline">{modeLabel[m.mode]}</Badge>
           </>
         }
@@ -205,7 +213,7 @@ export default function MigrationDetailPage() {
               {executions.map((e) => (
                 <tr key={e.id}>
                   <td>
-                    <Link to={executionPath(e.id)} className="font-bold">
+                    <Link to={executionPath(e.id)} className="tap-link font-bold">
                       #{e.id}
                     </Link>
                   </td>

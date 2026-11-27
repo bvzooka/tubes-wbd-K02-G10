@@ -9,22 +9,23 @@ import (
 // bentuk JSON dipisah dari tipe domain supaya perubahan di dalam tidak langsung mengubah API
 
 type definitionJSON struct {
-	ID                 int64                 `json:"id"`
-	ConnectionID       int64                 `json:"connection_id"`
-	Version            int                   `json:"version"`
-	Revision           int                   `json:"revision"`
-	Name               string                `json:"name"`
-	SQLUp              string                `json:"sql_up"`
-	SQLDown            string                `json:"sql_down"`
-	Irreversible       bool                  `json:"irreversible"`
-	IrreversibleReason string                `json:"irreversible_reason"`
-	Mode               domain.MigrationMode  `json:"mode"`
-	Batch              *domain.BatchConfig   `json:"batch"`
-	State              domain.MigrationState `json:"state"`
-	Checksum           string                `json:"checksum"`
-	CreatedBy          string                `json:"created_by"`
-	CreatedAt          time.Time             `json:"created_at"`
-	UpdatedAt          time.Time             `json:"updated_at"`
+	ID                 int64                  `json:"id"`
+	ConnectionID       int64                  `json:"connection_id"`
+	Version            int                    `json:"version"`
+	Revision           int                    `json:"revision"`
+	Name               string                 `json:"name"`
+	SQLUp              string                 `json:"sql_up"`
+	SQLDown            string                 `json:"sql_down"`
+	Irreversible       bool                   `json:"irreversible"`
+	IrreversibleReason string                 `json:"irreversible_reason"`
+	Mode               domain.MigrationMode   `json:"mode"`
+	Batch              *domain.BatchConfig    `json:"batch"`
+	State              domain.MigrationState  `json:"state"`
+	OpenStatus         domain.ExecutionStatus `json:"open_status"`
+	Checksum           string                 `json:"checksum"`
+	CreatedBy          string                 `json:"created_by"`
+	CreatedAt          time.Time              `json:"created_at"`
+	UpdatedAt          time.Time              `json:"updated_at"`
 }
 
 type executionJSON struct {
@@ -87,7 +88,8 @@ func toDefinitionJSON(d Definition) definitionJSON {
 	return definitionJSON{
 		ID: d.ID, ConnectionID: d.ConnectionID, Version: d.Version, Revision: d.Revision, Name: d.Name,
 		SQLUp: d.UpSQL, SQLDown: d.DownSQL, Irreversible: d.Irreversible, IrreversibleReason: d.IrreversibleReason,
-		Mode: d.Mode, Batch: d.Batch, State: d.State, Checksum: d.Checksum, CreatedBy: d.CreatedByName,
+		Mode: d.Mode, Batch: d.Batch, State: d.State, OpenStatus: d.OpenStatus, Checksum: d.Checksum,
+		CreatedBy: d.CreatedByName,
 		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt,
 	}
 }

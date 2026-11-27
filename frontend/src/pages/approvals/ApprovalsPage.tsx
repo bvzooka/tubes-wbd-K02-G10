@@ -54,12 +54,16 @@ export default function ApprovalsPage() {
 
             {rejecting === item ? (
               <div className="space-y-2">
-                <textarea
-                  className="input min-h-[88px] py-2"
-                  placeholder="Alasan penolakan (wajib)"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                />
+                <label className="block">
+                  <span className="mb-[0.35rem] block">Alasan penolakan (wajib)</span>
+                  <textarea
+                    // fokus pindah ke sini saat form dibuka supaya bisa langsung diketik
+                    autoFocus
+                    className="input min-h-[88px] py-2"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                  />
+                </label>
                 <div className="flex flex-wrap gap-2">
                   <button
                     className="btn-danger"

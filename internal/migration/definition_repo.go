@@ -15,12 +15,14 @@ import (
 
 type Definition struct {
 	DraftInput
-	ID            int64
-	ConnectionID  int64
-	Version       int
-	Revision      int
-	Checksum      string
-	State         domain.MigrationState
+	ID           int64
+	ConnectionID int64
+	Version      int
+	Revision     int
+	Checksum     string
+	State        domain.MigrationState
+	// status permintaan yang belum selesai, kosong kalau tidak ada
+	OpenStatus    domain.ExecutionStatus
 	CreatedBy     int64
 	CreatedByName string
 	CreatedAt     time.Time
@@ -31,7 +33,10 @@ type Definition struct {
 const selectDefinitionTemplate = `
 	SELECT m.id, m.connection_id, m.version, m.revision, m.name, %s, %s,
 	       m.irreversible, m.irreversible_reason, m.mode, m.batch_config,
-	       m.checksum, m.state, m.created_by, u.username, m.created_at, m.updated_at
+	       m.checksum, m.state, m.created_by, u.username, m.created_at, m.updated_at,
+	       COALESCE((SELECT e.status FROM migration_executions e
+	                 WHERE e.migration_id = m.id AND e.status IN ('pending_review', 'approved', 'queued', 'running')
+	                 ORDER BY e.id DESC LIMIT 1), '')
 	FROM db_migrations m
 	JOIN users u ON u.id = m.created_by`
 
@@ -47,6 +52,7 @@ func scanDefinition(row pgx.Row) (Definition, error) {
 		&d.ID, &d.ConnectionID, &d.Version, &d.Revision, &d.Name, &d.UpSQL, &d.DownSQL,
 		&d.Irreversible, &d.IrreversibleReason, &d.Mode, &d.Batch,
 		&d.Checksum, &d.State, &d.CreatedBy, &d.CreatedByName, &d.CreatedAt, &d.UpdatedAt,
+		&d.OpenStatus,
 	)
 	return d, err
 }

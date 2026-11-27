@@ -1,13 +1,14 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
-import type { DatabaseItem, HistoryEntry, HistoryList, HistoryStatus } from '../../api/types'
+import type { HistoryEntry, HistoryList, HistoryStatus } from '../../api/types'
 import Breadcrumbs from '../../components/Breadcrumbs'
 import EmptyState from '../../components/EmptyState'
 import ErrorMessage from '../../components/ErrorMessage'
 import Loading from '../../components/Loading'
 import Pager from '../../components/Pager'
 import PageHeader from '../../components/PageHeader'
+import { useDatabaseName } from '../../hooks/useDatabaseName'
 import { databasePath } from '../databases/paths'
 import { formatTime, kindLabel, StatusBadge } from './labels'
 import { executionPath, migrationPath, migrationsPath } from './paths'
@@ -37,8 +38,7 @@ export default function HistoryPage() {
     // baris lama tetap tampil selagi yang baru diambil, jadi tabel tidak berkedip
     placeholderData: keepPreviousData,
   })
-  const databases = useQuery({ queryKey: ['databases'], queryFn: () => api<DatabaseItem[]>('GET', '/databases') })
-  const dbName = databases.data?.find((d) => String(d.id) === id)?.name ?? `Database ${id}`
+  const dbName = useDatabaseName(id)
 
   // mengganti saringan selalu kembali ke halaman pertama
   function setFilter(name: string, value: string) {
@@ -119,19 +119,25 @@ function HistoryCard({ entry: h, databaseID }: { entry: HistoryEntry; databaseID
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="m-0 text-[1.05rem]">
           {kindLabel[h.kind]}{' '}
-          <Link to={migrationPath(databaseID, h.version)}>
+          <Link to={migrationPath(databaseID, h.version)} className="tap-link">
             v{h.version} revisi {h.revision}
           </Link>
         </h2>
         <StatusBadge status={h.status} />
       </div>
       <p className="m-0 text-[0.86rem] text-muted">
-        Eksekusi <Link to={executionPath(h.execution_id)}>#{h.execution_id}</Link> · percobaan {h.attempt} · migration ID{' '}
-        {h.migration_id} · oleh {h.executed_by} · {formatTime(h.finished_at)}
+        Eksekusi{' '}
+        <Link to={executionPath(h.execution_id)} className="tap-link">
+          #{h.execution_id}
+        </Link>{' '}
+        · percobaan {h.attempt} · migration ID {h.migration_id} · oleh {h.executed_by} · {formatTime(h.finished_at)}
       </p>
       {h.rolls_back_execution_id && (
         <p className="m-0 text-[0.86rem]">
-          Membatalkan eksekusi <Link to={executionPath(h.rolls_back_execution_id)}>#{h.rolls_back_execution_id}</Link>
+          Membatalkan eksekusi{' '}
+          <Link to={executionPath(h.rolls_back_execution_id)} className="tap-link">
+            #{h.rolls_back_execution_id}
+          </Link>
         </p>
       )}
       {h.batches_committed > 0 && (
@@ -141,7 +147,7 @@ function HistoryCard({ entry: h, databaseID }: { entry: HistoryEntry; databaseID
       )}
       {h.failure_message && <p className="m-0 break-words text-[0.86rem] text-danger">{h.failure_message}</p>}
       <details>
-        <summary className="cursor-pointer text-[0.86rem] font-bold text-green">Lihat SQL</summary>
+        <summary className="cursor-pointer text-[0.86rem] font-bold text-green max-md:py-3">Lihat SQL</summary>
         <pre className="mb-0 mt-2 max-h-72 overflow-auto rounded-md bg-ink p-3 font-mono text-xs text-paper-soft">
           {h.sql || '(tidak ada SQL yang dijalankan)'}
         </pre>

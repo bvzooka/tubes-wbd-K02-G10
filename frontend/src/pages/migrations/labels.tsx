@@ -61,11 +61,17 @@ export function formatTime(value: string | null) {
   return value ? new Date(value).toLocaleString('id-ID') : '–'
 }
 
-export function StateBadge({ state }: { state: MigrationState }) {
+// permintaan yang masih terbuka ikut tampil, untuk yang belum pernah jalan ia menggantikan "Siap diajukan"
+export function StateBadge({ state, openStatus }: { state: MigrationState; openStatus: ExecutionStatus | '' }) {
   const style = stateStyle[state]
   return (
-    <Badge tone={style.tone} dot>
-      {style.label}
-    </Badge>
+    <span className="inline-flex flex-wrap gap-1.5">
+      {!(openStatus && state === 'ready') && (
+        <Badge tone={style.tone} dot>
+          {style.label}
+        </Badge>
+      )}
+      {openStatus && <StatusBadge status={openStatus} />}
+    </span>
   )
 }

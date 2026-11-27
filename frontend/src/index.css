@@ -119,6 +119,10 @@
   .check {
     @apply flex min-h-[44px] cursor-pointer items-center gap-2.5 font-semibold text-ink-2;
   }
+  /* link kecil di tabel dan kartu diberi tinggi sentuh di ponsel, tampilan desktop tidak berubah */
+  .tap-link {
+    @apply max-md:inline-flex max-md:min-h-[44px] max-md:min-w-[28px] max-md:items-center;
+  }
   .check input {
     @apply m-0 h-[1.15rem] w-[1.15rem] accent-green;
   }

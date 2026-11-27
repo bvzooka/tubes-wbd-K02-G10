@@ -9,7 +9,9 @@ import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
 import StatCard from '../../components/StatCard'
+import { useDatabaseName } from '../../hooks/useDatabaseName'
 import { useSession } from '../../hooks/useSession'
+import { databasePath } from '../databases/paths'
 import { ApprovalBadge, formatTime, kindLabel, modeLabel, StatusBadge } from './labels'
 import SqlBlock from './SqlBlock'
 import { migrationPath, migrationsPath } from './paths'
@@ -31,6 +33,8 @@ export default function ExecutionPage() {
       return status === 'queued' || status === 'running' ? pollMs : false
     },
   })
+
+  const dbName = useDatabaseName(detail.data?.execution.connection_id)
 
   // status migration dan kotak persetujuan ikut berubah, jadi cache-nya dibuang juga
   const refresh = () => {
@@ -69,6 +73,7 @@ export default function ExecutionPage() {
       <Breadcrumbs
         items={[
           { label: 'Database', to: '/databases' },
+          { label: dbName, to: databasePath(e.connection_id) },
           { label: 'Migration', to: migrationsPath(e.connection_id) },
           { label: `v${e.version}`, to: migrationPath(e.connection_id, e.version) },
           { label: `Permintaan #${e.id}` },

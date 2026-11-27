@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
-import type { DatabaseItem, MigrationList } from '../../api/types'
+import type { MigrationList } from '../../api/types'
 import Badge from '../../components/Badge'
 import Breadcrumbs from '../../components/Breadcrumbs'
 import EmptyState from '../../components/EmptyState'
@@ -9,6 +9,7 @@ import ErrorMessage from '../../components/ErrorMessage'
 import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
+import { useDatabaseName } from '../../hooks/useDatabaseName'
 import { databasePath } from '../databases/paths'
 import { modeLabel, StateBadge } from './labels'
 import { editMigrationPath, historyPath, migrationPath, migrationsKey, newMigrationPath, schemaDiffPath } from './paths'
@@ -19,9 +20,7 @@ export default function MigrationsPage() {
     queryKey: migrationsKey(id),
     queryFn: () => api<MigrationList>('GET', `/databases/${id}/migrations`),
   })
-  // nama database diambil dari daftar database, cache-nya sama dengan halaman Database
-  const databases = useQuery({ queryKey: ['databases'], queryFn: () => api<DatabaseItem[]>('GET', '/databases') })
-  const dbName = databases.data?.find((d) => String(d.id) === id)?.name ?? `Database ${id}`
+  const dbName = useDatabaseName(id)
 
   if (list.isLoading) return <Loading />
   if (!list.data) return <ErrorMessage error={list.error} />
@@ -82,7 +81,7 @@ export default function MigrationsPage() {
                 <tr key={m.id}>
                   <td className="font-bold tabular-nums">v{m.version}</td>
                   <td>
-                    <Link to={migrationPath(id, m.version)} className="font-bold">
+                    <Link to={migrationPath(id, m.version)} className="tap-link font-bold">
                       {m.name}
                     </Link>
                     {m.irreversible && <span className="mt-1 block text-[0.78rem] text-muted">irreversible</span>}
@@ -91,7 +90,7 @@ export default function MigrationsPage() {
                     <Badge tone="outline">{modeLabel[m.mode]}</Badge>
                   </td>
                   <td>
-                    <StateBadge state={m.state} />
+                    <StateBadge state={m.state} openStatus={m.open_status} />
                   </td>
                   <td className="whitespace-nowrap">{m.created_by}</td>
                   <td className="whitespace-nowrap">{new Date(m.updated_at).toLocaleString('id-ID')}</td>

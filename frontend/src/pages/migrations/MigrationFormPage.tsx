@@ -11,6 +11,8 @@ import FormSection from '../../components/FormSection'
 import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
+import { useDatabaseName } from '../../hooks/useDatabaseName'
+import { databasePath } from '../databases/paths'
 import { migrationsKey, migrationsPath } from './paths'
 
 // angka disimpan sebagai string selama diketik
@@ -97,6 +99,7 @@ export default function MigrationFormPage() {
   const loadVersion = version ?? copyFrom
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const dbName = useDatabaseName(id)
   const [form, setForm] = useState<FormValues>(emptyForm)
   // revisi yang sedang disunting, dikirim balik supaya perubahan orang lain tidak tertimpa
   const [revision, setRevision] = useState(0)
@@ -148,6 +151,7 @@ export default function MigrationFormPage() {
       <Breadcrumbs
         items={[
           { label: 'Database', to: '/databases' },
+          { label: dbName, to: databasePath(id) },
           { label: 'Migration', to: migrationsPath(id) },
           { label: isNew ? 'Baru' : `v${version}` },
         ]}
