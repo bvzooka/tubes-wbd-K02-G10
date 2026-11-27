@@ -498,19 +498,27 @@ Hasil pengujian terakhir: semua ambang lulus, 7.963 request tanpa error, 191 dar
 
 GitHub Actions (`.github/workflows/codeql.yml`) memindai kode Go dan JavaScript/TypeScript pada setiap push dan pull request ke `main`, serta mingguan.
 
-Hasil scan commit `627dba4` pada 27 November 2026 ([log GitHub Actions](https://github.com/bvzooka/tubes-wbd-K02-G10/actions/runs/45918983234)):
+Hasil scan pada 27 November 2026, sebelum dan sesudah perbaikan temuan:
 
-| Bahasa | Rule dijalankan | Temuan terbuka |
-|---|---|---|
-| Go | 34 | 4 |
-| JavaScript/TypeScript | 87 | 0 |
+| Bahasa | Rule dijalankan | Terbuka di `627dba4` ([log](https://github.com/bvzooka/tubes-wbd-K02-G10/actions/runs/45918983234)) | Terbuka di `7542892` ([log](https://github.com/bvzooka/tubes-wbd-K02-G10/actions/runs/45924877238)) |
+|---|---|---|---|
+| Go | 34 | 4 | 1 |
+| JavaScript/TypeScript | 87 | 0 | 0 |
 
-Tidak adanya temuan bukan berarti kode pasti aman. Seluruh temuan:
+Sebelum perbaikan temuan 1 sampai 3 (temuan 5 sudah tertutup):
+
+![Code scanning sebelum perbaikan: 4 temuan terbuka](docs/codeql/sebelum.png)
+
+Sesudah perbaikan:
+
+![Code scanning sesudah perbaikan: 1 temuan terbuka](docs/codeql/sesudah.png)
+
+Hasil yang bersih tidak berarti kode pasti aman. Seluruh temuan:
 
 | # | Rule | Severity | Lokasi | Dampak yang mungkin | Keputusan dan alasan |
 |---|---|---|---|---|---|
-| 1, 2 | `go/cookie-secure-not-set` | medium | `internal/httpx/flash.go` | cookie pesan flash terkirim lewat HTTP | **Diterima.** `Secure` aktif saat `APP_ENV=production`, dan sengaja mati saat pengembangan di `http://localhost`. Cookie hanya berisi pesan bertanda tangan untuk halaman lama. |
-| 3 | `go/unvalidated-url-redirection` | medium | `internal/auth/login_handler.go` | tautan login bisa mengarahkan korban ke situs lain | **Valid, sudah diperbaiki** pada commit `627dba4`. Penyaring `next` dulu meloloskan karakter tab, yang dibuang browser sehingga menjadi URL `//situs-lain` (di SPA akibatnya halaman kosong). Kini karakter kontrol dan backslash ditolak di halaman login lama maupun SPA, dibuktikan `TestSafeNext`. Scan ulang masih menandainya terbuka. Dugaan kami, CodeQL tidak mengenali penyaring buatan sendiri ini. |
+| 1, 2 | `go/cookie-secure-not-set` | medium | `internal/httpx/flash.go` | cookie pesan flash terkirim lewat HTTP | **Sudah diperbaiki** pada commit `e2236f9`: atribut `Secure` kini selalu aktif. Cookie ini hanya dipakai halaman lama. Lewat HTTP selain `localhost`, browser tidak menyimpannya sehingga pesan di halaman lama tidak muncul. |
+| 3 | `go/unvalidated-url-redirection` | medium | `internal/auth/login_handler.go` | tautan login bisa mengarahkan korban ke situs lain | **Valid, sudah diperbaiki.** Penyaring `next` dulu meloloskan karakter tab, yang dibuang browser sehingga menjadi URL `//situs-lain` (di SPA akibatnya halaman kosong). Commit `627dba4` menolak karakter kontrol dan backslash di halaman login lama maupun SPA, dibuktikan `TestSafeNext`. Scan masih menandainya karena pemeriksaan itu tidak dikenali, lalu commit `2d01671` memindahkannya ke fungsi `isLocalURL` yang dikenali CodeQL sehingga temuannya tertutup. |
 | 4 | `go/sql-injection` | high | `internal/dbdriver/mysql/driver.go` | SQL buatan pengguna dijalankan di database target | **Diterima**, disetujui pemilik driver. Menjalankan SQL pengguna adalah fitur EXPLAIN, satu-satunya jalan SQL pengguna ke driver MySQL. Dibatasi untuk View + Edit, satu statement DML (driver juga menolak lebih dari satu statement), transaction `READ ONLY` bila tanpa ANALYZE dan selalu di-rollback, serta batas waktu 15 detik. `Exec` yang menerima banyak statement tidak terjangkau SQL pengguna karena migration menolak koneksi selain PostgreSQL. |
 | 5 | `go/incorrect-integer-conversion` | high | `internal/migration/api_handler.go` | nomor versi besar terpotong menjadi angka lain | **Diperbaiki** pada commit `e6b6a6b`: angka di luar jangkauan 32 bit dijawab 404. Scan ulang menandai temuan ini `fixed`. |
 
