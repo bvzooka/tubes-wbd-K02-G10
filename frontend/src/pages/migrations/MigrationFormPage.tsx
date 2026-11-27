@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../../api/client'
@@ -129,6 +129,16 @@ export default function MigrationFormPage() {
     },
   })
 
+  // tombol Simpan draft ada di bawah form, jadi halaman digulir ke pesan errornya supaya kelihatan
+  const pageRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!save.error) return
+    // isian yang ditolak didahulukan, selain itu ke kotak pesan di atas form
+    const page = pageRef.current
+    const target = page?.querySelector('.field-error') ?? page?.querySelector('[role="alert"]')
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [save.error])
+
   if (loadVersion !== null && detail.isLoading) return <Loading />
   if (loadVersion !== null && !detail.data) return <ErrorMessage error={detail.error} />
 
@@ -165,7 +175,7 @@ export default function MigrationFormPage() {
         }
       />
 
-      <div className="max-w-[860px] space-y-4">
+      <div ref={pageRef} className="max-w-[860px] space-y-4">
         {locked && (
           <p className="alert alert-warning">
             <span className="alert-mark" aria-hidden="true">
