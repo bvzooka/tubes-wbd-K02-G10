@@ -82,6 +82,6 @@ func (f *Flasher) cookie(value string, maxAge int) *http.Cookie {
 		MaxAge:   maxAge,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   f.secure,
+		Secure:   true,
 	}
 }
