@@ -77,7 +77,7 @@ func buildApp(ctx context.Context, cfg config.Config, logger *slog.Logger) (http
 		migration:  migrationAPI,
 		schemaDiff: schemaDiffAPI,
 
-		connections: wireConnections(cfg, pool),
+		connections: wireConnections(cfg, pool, logger),
 		viewer:      wireViewer(&d),
 		explain:     explain.NewAPIHandler(explain.NewService(d.Authz, d.Drivers)),
 	})

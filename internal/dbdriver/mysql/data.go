@@ -3,11 +3,14 @@ package mysql
 import (
 	"context"
 	"database/sql"
-	"dbplatform/internal/domain"
 	"errors"
-	gomysql "github.com/go-sql-driver/mysql"
 	"strings"
 	"time"
+
+	gomysql "github.com/go-sql-driver/mysql"
+
+	"dbplatform/internal/dbdriver"
+	"dbplatform/internal/domain"
 )
 
 // membatasi waktu pembacaan satu halaman data
@@ -37,15 +40,12 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 	spec := txSpec{readOnly: true, timeout: tableDataTimeout}
 	err := d.runTx(ctx, d.ro, spec, func(ctx context.Context, tx *sql.Tx) error {
 		var canonical string
-		err := tx.QueryRowContext(ctx, tableExistsSQL, ref.Schema, ref.Table).Scan(&canonical)
-		if errors.Is(err, sql.ErrNoRows) {
-			return domain.ErrNotFound
-		}
-		if err != nil {
+		if err := eachRow(ctx, tx, tableExistsSQL, []any{ref.Schema, ref.Table}, scanInto(&canonical)); err != nil {
 			return err
 		}
-		// nama di MySQL bisa tidak peka huruf besar-kecil, hanya yang persis sama dianggap ada
-		if canonical != ref.Table {
+		// tabel yang tidak ada membuat canonical tetap kosong. Nama di MySQL bisa tidak peka
+		// huruf besar-kecil, jadi hanya yang persis sama dianggap ada
+		if canonical == "" || canonical != ref.Table {
 			return domain.ErrNotFound
 		}
 
@@ -53,18 +53,21 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 		if err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, selectSQL(ref, pk), page.PageSize+1, page.Offset())
-		if err != nil {
-			return notFoundOnMissing(err)
-		}
-		defer rows.Close()
-		rs, more, err := collect(rows, page.PageSize)
-		if err != nil {
-			return err
-		}
-		out.ResultSet = *rs
-		out.HasNext = more
-		return nil
+		query, args := selectSQL(ref, pk), []any{page.PageSize + 1, page.Offset()}
+		return dbdriver.RunQuery(ctx, query, args, func(ctx context.Context) (int64, error) {
+			rows, err := tx.QueryContext(ctx, query, args...)
+			if err != nil {
+				return 0, notFoundOnMissing(err)
+			}
+			defer rows.Close()
+			rs, more, err := collect(rows, page.PageSize)
+			if err != nil {
+				return 0, err
+			}
+			out.ResultSet = *rs
+			out.HasNext = more
+			return int64(len(rs.Rows)), nil
+		})
 	})
 	if err != nil {
 		return nil, unwrapNotFound(err)
@@ -74,23 +77,16 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 
 // primaryKeyColumns mengambil kolom primary key berurutan
 func primaryKeyColumns(ctx context.Context, tx *sql.Tx, ref domain.TableRef) ([]string, error) {
-	rows, err := tx.QueryContext(ctx, primaryKeySQL, ref.Schema, ref.Table)
-	if err != nil {
-		return nil, err
-	}
 	var pk []string
-	for rows.Next() {
+	err := eachRow(ctx, tx, primaryKeySQL, []any{ref.Schema, ref.Table}, func(rows *sql.Rows) error {
 		var col string
 		if err := rows.Scan(&col); err != nil {
-			rows.Close()
-			return nil, err
+			return err
 		}
 		pk = append(pk, col)
-	}
-	if err := closeRows(rows); err != nil {
-		return nil, err
-	}
-	return pk, nil
+		return nil
+	})
+	return pk, err
 }
 
 // selectSQL menyusun query halaman, limit dan offset diisi sebagai parameter

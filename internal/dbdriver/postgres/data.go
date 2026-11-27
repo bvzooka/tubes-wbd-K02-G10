@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"dbplatform/internal/dbdriver"
 	"dbplatform/internal/domain"
 )
 
@@ -49,18 +50,20 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 		}
 
 		// limit size+1 untuk tahu apakah masih ada halaman berikutnya
-		rows, err := tx.Query(ctx, selectPageSQL(ref, order), pgx.QueryExecModeExec,
-			int64(page.PageSize+1), int64(page.Offset()))
-		if err != nil {
-			return err
-		}
-		rs, more, err := collect(rows, page.PageSize)
-		if err != nil {
-			return err
-		}
-		out.ResultSet = *rs
-		out.HasNext = more
-		return nil
+		sql, limit, offset := selectPageSQL(ref, order), int64(page.PageSize+1), int64(page.Offset())
+		return dbdriver.RunQuery(ctx, sql, []any{limit, offset}, func(ctx context.Context) (int64, error) {
+			rows, err := tx.Query(ctx, sql, pgx.QueryExecModeExec, limit, offset)
+			if err != nil {
+				return 0, err
+			}
+			rs, more, err := collect(rows, page.PageSize)
+			if err != nil {
+				return 0, err
+			}
+			out.ResultSet = *rs
+			out.HasNext = more
+			return int64(len(rs.Rows)), nil
+		})
 	})
 	if err != nil {
 		return nil, unwrapNotFound(err)
@@ -70,9 +73,12 @@ func (d *Driver) TableData(ctx context.Context, ref domain.TableRef, page domain
 
 // ensureTableExists mengembalikan ErrNotFound bila tabel tidak ada atau termasuk tabel sistem
 func ensureTableExists(ctx context.Context, tx pgx.Tx, ref domain.TableRef) error {
-	var one int
-	err := tx.QueryRow(ctx, tableExistsSQL, ref.Schema, ref.Table).Scan(&one)
-	if errors.Is(err, pgx.ErrNoRows) {
+	found := false
+	err := eachRow(ctx, tx, tableExistsSQL, []any{ref.Schema, ref.Table}, func(pgx.Rows) error {
+		found = true
+		return nil
+	})
+	if err == nil && !found {
 		return domain.ErrNotFound
 	}
 	return err
@@ -80,23 +86,16 @@ func ensureTableExists(ctx context.Context, tx pgx.Tx, ref domain.TableRef) erro
 
 // primaryKeyColumns mengambil kolom primary key berurutan, sudah diberi quote dan siap dipakai di ORDER BY
 func primaryKeyColumns(ctx context.Context, tx pgx.Tx, ref domain.TableRef) ([]string, error) {
-	rows, err := tx.Query(ctx, primaryKeySQL, ref.Schema, ref.Table)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 	var order []string
-	for rows.Next() {
+	err := eachRow(ctx, tx, primaryKeySQL, []any{ref.Schema, ref.Table}, func(rows pgx.Rows) error {
 		var col string
 		if err := rows.Scan(&col); err != nil {
-			return nil, err
+			return err
 		}
 		order = append(order, pgx.Identifier{col}.Sanitize())
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return order, nil
+		return nil
+	})
+	return order, err
 }
 
 // selectPageSQL menyusun query satu halaman, limit dan offset diisi sebagai parameter $1 dan $2.

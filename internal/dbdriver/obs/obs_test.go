@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -18,16 +19,37 @@ import (
 	"dbplatform/internal/telemetry"
 )
 
+// menjalankan SQL internalnya lewat dbdriver.RunQuery seperti driver asli
 type fakeDriver struct{ execErr error }
+
+const (
+	fakeTablesSQL  = "SELECT relname FROM pg_class"
+	fakeColumnsSQL = "SELECT attname FROM pg_attribute"
+	fakePageSQL    = `SELECT * FROM "public"."t" LIMIT $1 OFFSET $2`
+)
+
+// fakeQuery berpura-pura menjalankan sql dan membaca rows baris
+func fakeQuery(ctx context.Context, sql string, args []any, rows int64) error {
+	return dbdriver.RunQuery(ctx, sql, args, func(context.Context) (int64, error) { return rows, nil })
+}
 
 func (fakeDriver) Dialect() domain.DBMS                { return domain.DBMSPostgres }
 func (fakeDriver) Capabilities() dbdriver.Capabilities { return dbdriver.Capabilities{} }
-func (fakeDriver) Ping(context.Context) error          { return nil }
+func (fakeDriver) Ping(ctx context.Context) error      { return fakeQuery(ctx, "-- ping", nil, 0) }
 func (fakeDriver) Close()                              {}
-func (fakeDriver) Introspect(context.Context) (*domain.Schema, error) {
+func (fakeDriver) Introspect(ctx context.Context) (*domain.Schema, error) {
+	if err := fakeQuery(ctx, fakeTablesSQL, nil, 2); err != nil {
+		return nil, err
+	}
+	if err := fakeQuery(ctx, fakeColumnsSQL, nil, 5); err != nil {
+		return nil, err
+	}
 	return &domain.Schema{Tables: []domain.Table{{Name: "a"}, {Name: "b"}}}, nil
 }
-func (fakeDriver) TableData(context.Context, domain.TableRef, domain.PageRequest) (*domain.TableData, error) {
+func (fakeDriver) TableData(ctx context.Context, _ domain.TableRef, page domain.PageRequest) (*domain.TableData, error) {
+	if err := fakeQuery(ctx, fakePageSQL, []any{page.PageSize + 1, 0}, 3); err != nil {
+		return nil, err
+	}
 	return &domain.TableData{ResultSet: domain.ResultSet{Rows: make([][]domain.Cell, 3)}}, nil
 }
 func (f fakeDriver) WithTx(ctx context.Context, _ dbdriver.TxOptions, fn func(dbdriver.Tx) error) error {
@@ -84,14 +106,15 @@ func TestWrap_EveryCallIsLoggedAndTraced(t *testing.T) {
 
 	_ = drv.Ping(ctx)
 	_, _ = drv.Introspect(ctx)
-	_, _ = drv.TableData(ctx, domain.TableRef{Schema: "public", Table: "t"}, domain.PageRequest{Page: 1})
+	_, _ = drv.TableData(ctx, domain.TableRef{Schema: "public", Table: "t"}, domain.PageRequest{Page: 1, PageSize: 50})
 	_ = drv.WithTx(ctx, dbdriver.TxOptions{}, func(tx dbdriver.Tx) error {
 		_, _ = tx.Exec(ctx, "UPDATE t SET a = 1")
 		_, _ = tx.Query(ctx, "SELECT 1")
 		return nil
 	})
 
-	const calls = 5
+	// ping 1, introspect 2 query, table data 1, exec 1, query 1
+	const calls = 6
 	if got := len(exp.GetSpans()); got != calls {
 		t.Fatalf("span db.query = %d, want %d", got, calls)
 	}
@@ -120,9 +143,66 @@ func TestWrap_EveryCallIsLoggedAndTraced(t *testing.T) {
 			t.Errorf("log %d: %v", i, ev)
 		}
 	}
-	if evs[5]["rows"] != float64(3) {
-		t.Errorf("TableData harus mencatat jumlah baris: %v", evs[5])
+	// yang dicatat adalah SQL yang benar-benar dijalankan driver, bukan teks pengganti
+	wantQueries := []struct{ op, query string }{
+		{"ping", "-- ping"}, {"introspect", fakeTablesSQL}, {"introspect", fakeColumnsSQL}, {"table_data", fakePageSQL},
 	}
+	for i, w := range wantQueries {
+		ev := evs[2*i]
+		if ev["op"] != w.op || ev["query"] != w.query {
+			t.Errorf("query %d = %v %q, want %s %q", i, ev["op"], ev["query"], w.op, w.query)
+		}
+	}
+	page := evs[7]
+	if page["rows"] != float64(3) || fmt.Sprint(page["params"]) != "[51 0]" {
+		t.Errorf("TableData harus mencatat jumlah baris dan parameter: %v", page)
+	}
+}
+
+func TestWrapFactory_ConnectIsLoggedEvenWhenItFails(t *testing.T) {
+	buf, _ := setup(t)
+	logger := telemetry.NewLogger(buf, "info")
+	conn := domain.Connection{Host: "targetdb", Port: 5432, DatabaseName: "sampledb"}
+	refused := errors.New("connection refused")
+
+	failing := WrapFactory(func(ctx context.Context, _ domain.Connection, _ string) (dbdriver.Driver, error) {
+		return nil, fakeQueryErr(ctx, refused)
+	}, logger)
+	if _, err := failing(context.Background(), conn, "rahasia"); !errors.Is(err, refused) {
+		t.Fatalf("error = %v", err)
+	}
+
+	working := WrapFactory(func(ctx context.Context, _ domain.Connection, _ string) (dbdriver.Driver, error) {
+		return fakeDriver{}, fakeQuery(ctx, "-- ping", nil, 0)
+	}, logger)
+	drv, err := working(context.Background(), conn, "rahasia")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = drv.Ping(context.Background())
+
+	var got []string
+	for _, ev := range events(t, buf) {
+		if ev["event"] == "sql.result" {
+			got = append(got, fmt.Sprintf("%v %v %v", ev["op"], ev["database"], ev["status"]))
+		}
+	}
+	want := []string{
+		"connect targetdb:5432/sampledb error",
+		"connect targetdb:5432/sampledb ok",
+		"ping targetdb:5432/sampledb ok",
+	}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("log = %v, want %v", got, want)
+	}
+	if strings.Contains(buf.String(), "rahasia") {
+		t.Error("password bocor ke log")
+	}
+}
+
+// fakeQueryErr berpura-pura menjalankan ping yang gagal dengan err
+func fakeQueryErr(ctx context.Context, err error) error {
+	return dbdriver.RunQuery(ctx, "-- ping", nil, func(context.Context) (int64, error) { return 0, err })
 }
 
 func TestWrap_SessionAndArgsAreObserved(t *testing.T) {

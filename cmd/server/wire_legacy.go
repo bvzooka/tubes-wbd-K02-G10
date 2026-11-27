@@ -19,7 +19,7 @@ func wireLegacyPages(cfg config.Config, d *httpx.Deps, mux *http.ServeMux, spaMo
 		return
 	}
 	connRepo := connmgr.NewRepo(d.Pool, cfg.SecretKey)
-	connmgr.NewHandler(*d, connmgr.NewService(connRepo, connmgr.DefaultFactory)).Register(mux)
+	connmgr.NewHandler(*d, connmgr.NewService(connRepo, observedFactory(d.Logger))).Register(mux)
 	viewer.NewHandler(*d, viewer.NewService(d.Authz, d.Drivers)).Register(mux)
 	explain.NewHandler(explain.NewService(d.Authz, d.Drivers), d.Render, d.HandleErr, d.Auth).Register(mux)
 }

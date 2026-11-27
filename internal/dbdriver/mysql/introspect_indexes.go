@@ -61,20 +61,15 @@ func readIndexParts(ctx context.Context, tx *sql.Tx, schema string, info serverI
 	if info.hasExpression {
 		expr = "EXPRESSION"
 	}
-	rows, err := tx.QueryContext(ctx, fmt.Sprintf(indexesSQL, expr), schema)
-	if err != nil {
-		return nil, err
-	}
 	got := map[indexKey]*indexAcc{}
-	for rows.Next() {
+	err := eachRow(ctx, tx, fmt.Sprintf(indexesSQL, expr), []any{schema}, func(rows *sql.Rows) error {
 		var k indexKey
 		var nonUnique, seq int
 		var col, collation, expression sql.NullString
 		var sub sql.NullInt64
 		var itype string
 		if err := rows.Scan(&k.table, &k.name, &nonUnique, &seq, &col, &sub, &collation, &itype, &expression); err != nil {
-			rows.Close()
-			return nil, err
+			return err
 		}
 		acc := got[k]
 		if acc == nil {
@@ -82,11 +77,9 @@ func readIndexParts(ctx context.Context, tx *sql.Tx, schema string, info serverI
 			got[k] = acc
 		}
 		acc.parts = append(acc.parts, newIndexPart(seq, col, sub, collation, expression))
-	}
-	if err := closeRows(rows); err != nil {
-		return nil, err
-	}
-	return got, nil
+		return nil
+	})
+	return got, err
 }
 
 // menyusun satu domain.Index dari bagian-bagiannya, diurutkan menurut posisi di index
