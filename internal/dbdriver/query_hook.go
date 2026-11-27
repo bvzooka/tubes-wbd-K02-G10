@@ -2,7 +2,7 @@ package dbdriver
 
 import "context"
 
-// membungkus satu SQL yang dijalankan driver di dalam operasi yang tidak menerima SQL dari luar . 
+// membungkus satu SQL yang dijalankan driver di dalam operasi yang tidak menerima SQL dari luar .
 // Decorator observasi masang lewat context biar SQL yang benar-benar dikirim ke db tercatat di log dan trace, run mengembalikan jlh baris dibaca.
 type QueryHook func(ctx context.Context, sql string, args []any, run func(ctx context.Context) (rows int64, err error)) error
 

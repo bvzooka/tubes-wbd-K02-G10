@@ -163,7 +163,6 @@ func (d *driver) Dialect() domain.DBMS                { return d.inner.Dialect()
 func (d *driver) Capabilities() dbdriver.Capabilities { return d.inner.Capabilities() }
 func (d *driver) Close()                              { d.inner.Close() }
 
-
 func (d *driver) Ping(ctx context.Context) error {
 	return d.inner.Ping(d.o.hooked(ctx, "ping"))
 }
