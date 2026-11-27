@@ -74,6 +74,7 @@ type historyJSON struct {
 	Status               string               `json:"status"`
 	Committed            bool                 `json:"committed"`
 	SQL                  string               `json:"sql"`
+	Resume               bool                 `json:"resume"`
 	RollsBackExecutionID *int64               `json:"rolls_back_execution_id"`
 	BatchesCommitted     int                  `json:"batches_committed"`
 	RowsCommitted        int64                `json:"rows_committed"`
@@ -116,7 +117,7 @@ func toHistoryJSON(h domain.HistoryEntry) historyJSON {
 	return historyJSON{
 		ID: h.ID, ExecutionID: h.ExecutionID, Attempt: h.Attempt, MigrationID: h.MigrationID,
 		Version: h.Version, Revision: h.Revision, Kind: h.Kind, ExecutedBy: h.ExecutedByName, Status: h.Status,
-		Committed: h.Committed, SQL: h.SQLExecuted, RollsBackExecutionID: h.RollsBackExecutionID,
+		Committed: h.Committed, SQL: h.SQLExecuted, Resume: h.Resume, RollsBackExecutionID: h.RollsBackExecutionID,
 		BatchesCommitted: h.BatchesCommitted, RowsCommitted: h.RowsCommitted, FailureCode: h.FailureCode,
 		FailureMessage: h.FailureMessage, CorrelationID: h.CorrelationID,
 		StartedAt: h.StartedAt, FinishedAt: h.FinishedAt,
