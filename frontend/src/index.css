@@ -326,8 +326,9 @@
   .tile-sub {
     @apply relative z-[2] inline-flex min-h-[44px] items-center gap-1.5 rounded-full border-[1.5px] border-current px-[0.85rem] text-[0.84rem] font-bold text-inherit no-underline opacity-85 hover:border-lime hover:bg-lime hover:text-ink hover:no-underline hover:opacity-100;
   }
+  /* panah ini cuma hiasan, jadi kliknya diteruskan ke link yang menutupi kartu */
   .tile-go {
-    @apply grid h-11 w-11 place-items-center rounded-full bg-ink text-white;
+    @apply pointer-events-none grid h-11 w-11 place-items-center rounded-full bg-ink text-white;
     transition:
       transform 0.18s,
       background-color 0.18s;
