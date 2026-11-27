@@ -12,7 +12,7 @@ import StatCard from '../../components/StatCard'
 import { useDatabaseName } from '../../hooks/useDatabaseName'
 import { useSession } from '../../hooks/useSession'
 import { databasePath } from '../databases/paths'
-import { ApprovalBadge, formatTime, kindLabel, modeLabel, StatusBadge } from './labels'
+import { actionLabel, ApprovalBadge, formatTime, modeLabel, StatusBadge } from './labels'
 import SqlBlock from './SqlBlock'
 import { migrationPath, migrationsPath } from './paths'
 
@@ -81,7 +81,7 @@ export default function ExecutionPage() {
       />
       <PageHeader
         eyebrow={{ icon: 'bolt', label: `${modeLabel[e.mode]} · revisi ${e.revision}` }}
-        title={`${e.resumes_execution_id ? 'Resume' : kindLabel[e.kind]} v${e.version}`}
+        title={`${actionLabel(e.kind, e.resumes_execution_id !== null)} v${e.version}`}
         titleExtra={<StatusBadge status={e.status} />}
         subtitle={`Diajukan ${e.requested_by}, ${formatTime(e.requested_at)}`}
         aside={
@@ -155,7 +155,8 @@ export default function ExecutionPage() {
       </div>
 
       <section className="card mb-5">
-        <SqlBlock title="SQL yang dijalankan" sql={e.sql} />
+        {/* sebelum ada percobaan yang menjalankannya, SQL ini baru sebatas diajukan */}
+        <SqlBlock title={attempts.some((a) => a.sql) ? 'SQL yang dijalankan' : 'SQL yang diajukan'} sql={e.sql} />
       </section>
 
       {attempts.length > 0 && (

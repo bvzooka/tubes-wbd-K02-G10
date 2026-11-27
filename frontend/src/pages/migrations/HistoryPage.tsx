@@ -10,7 +10,7 @@ import Pager from '../../components/Pager'
 import PageHeader from '../../components/PageHeader'
 import { useDatabaseName } from '../../hooks/useDatabaseName'
 import { databasePath } from '../databases/paths'
-import { formatTime, kindLabel, StatusBadge } from './labels'
+import { actionLabel, formatTime, StatusBadge } from './labels'
 import { executionPath, migrationPath, migrationsPath } from './paths'
 
 const statusOptions: { value: HistoryStatus; label: string }[] = [
@@ -118,7 +118,7 @@ function HistoryCard({ entry: h, databaseID }: { entry: HistoryEntry; databaseID
     <article className="card space-y-2 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="m-0 text-[1.05rem]">
-          {kindLabel[h.kind]}{' '}
+          {actionLabel(h.kind, h.resume)}{' '}
           <Link to={migrationPath(databaseID, h.version)} className="tap-link">
             v{h.version} revisi {h.revision}
           </Link>
