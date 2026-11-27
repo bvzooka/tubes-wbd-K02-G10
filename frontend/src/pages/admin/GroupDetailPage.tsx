@@ -296,6 +296,8 @@ export default function GroupDetailPage() {
                               }),
                             )
                           }
+                          // nama database ikut disebut supaya tombol tiap baris bisa dibedakan pembaca layar
+                          aria-label={`Ubah ke ${accessLabel[otherLevel[a.access_level]]} untuk ${a.connection_name}`}
                         >
                           <Icon name="edit" />
                           Ubah ke {accessLabel[otherLevel[a.access_level]]}
