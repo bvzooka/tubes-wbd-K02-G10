@@ -334,7 +334,8 @@ Server dan worker menulis log JSON (`log/slog`) ke stdout. Log tidak disimpan di
 - **Log SQL** ke database target: `sql.start` dan `sql.result` memuat query, parameter, durasi, jumlah baris, dan error beserta SQLSTATE. Di worker ditambah `migration_id`, `execution_id`, `job_id`, `attempt`, `requested_by`, dan `batch`. Awal dan akhir transaction dicatat terpisah (`tx.begin`, `tx.commit`, `tx.rollback`).
 - **Aktivitas:** login, perubahan definisi, pengajuan, keputusan persetujuan, antrean, job, kunci, batch, dan setiap percobaan (`migration.attempt`, berisi salinan SQL).
 - **Penyamaran:** atribut yang namanya memuat password, token, secret, cookie, authorization, csrf, atau session diganti `[REDACTED]`, begitu juga literal password di dalam SQL.
-- **Keterbatasan:** pembacaan schema dan isi tabel dicatat sebagai keterangan operasi, belum query aslinya, dan uji koneksi tidak tercatat. Nilai data lain di dalam teks SQL tidak disamarkan.
+- **Pembacaan dan uji koneksi:** pembacaan schema (`op` `introspect`) dan isi tabel (`table_data`) mencatat setiap query katalog dan `SELECT` halaman yang benar-benar dikirim, beserta parameternya. Uji koneksi dicatat sebagai `connect`, termasuk yang gagal. Ping PostgreSQL tercatat `-- ping` (statement yang dikirim pgx), sedangkan MySQL memakai perintah protokol `COM_PING`, bukan SQL.
+- **Keterbatasan:** nilai data di dalam teks SQL tidak disamarkan, kecuali literal password.
 
 **Korelasi.** Job memakai `correlation_id` milik pengajuan, sehingga pengajuan, kerja worker, dan riwayat bisa dicari dengan satu ID. Request **Jalankan** punya `correlation_id` sendiri, dan terhubung ke job lewat **span link** pada trace.
 
@@ -428,51 +429,59 @@ Semua label berkardinalitas rendah: route memakai pola (`/executions/{execID}/ru
 
 #### Contoh korelasi dari satu eksekusi
 
-Satu migration mode batch (versi 299 di koneksi `k6-db-1`, 200.000 baris, 4 batch) dijalankan lewat API. Semua nilai di bawah berasal dari sistem yang berjalan. Contoh ini diambil sebelum span `migration.lock` dan `migration.batch` ditambahkan, dan sebelum job memakai `correlation_id` milik pengajuan. Bentuk log dan span terbaru ada di bagian [Logging dan tracing](#logging-dan-tracing).
+Satu migration mode batch (eksekusi #751, koneksi `k6-shared`, 200.000 baris, ukuran batch 50.000) dijalankan oleh uji k6 dengan profil `observability` menyala. Semua nilai di bawah berasal dari sistem yang berjalan.
 
-**Log.** Saat contoh diambil, request `run` di server dan seluruh pekerjaan job di worker berbagi `correlation_id` `1ed8cb15cb5f382d`. Baris asli dari `docker compose logs server worker`, hanya peristiwa utama (batch 2 dan 3 serta `sql.start`/`sql.result` tidak ditampilkan):
+**Log.** Pengajuan, kerja worker, dan riwayat attempt berbagi `correlation_id` `a06c02343ffdd36f`. Request **Jalankan** punya `correlation_id` sendiri (`e358ad5eb0ede050`). Baris asli dari `docker compose logs server worker`, hanya peristiwa utama (batch 2 dan 3 serta `sql.start`/`sql.result` tidak ditampilkan):
 
 ```json
-{"time":"2026-11-26T17:18:54.170877904Z","level":"INFO","msg":"migration execution changed","event":"migration.queued","actor":"admin","connection_id":5,"migration_id":1488,"execution_id":738,"version":299,"kind":"apply","status":"approved","correlation_id":"1ed8cb15cb5f382d","trace_id":"f8226936b2609219c76b05ab149a4ce0","span_id":"b03def45cfbbcb17"}
-{"time":"2026-11-26T17:18:54.171195168Z","level":"INFO","msg":"http request","event":"http.request","actor":"admin","method":"POST","path":"/api/v1/executions/738/run","status":202,"duration_ms":12,"correlation_id":"1ed8cb15cb5f382d","trace_id":"f8226936b2609219c76b05ab149a4ce0","span_id":"b03def45cfbbcb17"}
-{"time":"2026-11-26T17:18:54.650843656Z","level":"INFO","msg":"job claimed","worker_id":"9077ffad9b4c-1","job_id":"c390f630-e1ac-4ac3-9c37-4956b1f66072","execution_id":738,"attempt":1,"actor":"system","event":"job.claimed","fence":738,"correlation_id":"1ed8cb15cb5f382d","trace_id":"60636f821fd1d6c15bbd17cfee41c274","span_id":"7f1fa866e058b76c"}
-{"time":"2026-11-26T17:18:54.651027738Z","level":"INFO","msg":"connection lock acquired","worker_id":"9077ffad9b4c-1","job_id":"c390f630-e1ac-4ac3-9c37-4956b1f66072","execution_id":738,"attempt":1,"actor":"system","event":"lock.acquired","connection_id":5,"correlation_id":"1ed8cb15cb5f382d","trace_id":"60636f821fd1d6c15bbd17cfee41c274","span_id":"7f1fa866e058b76c"}
-{"time":"2026-11-26T17:18:54.715157641Z","level":"INFO","msg":"migration started","worker_id":"9077ffad9b4c-1","event":"migration.started","actor":"admin","connection_id":5,"execution_id":738,"job_id":"c390f630-e1ac-4ac3-9c37-4956b1f66072","attempt":1,"mode":"batch","correlation_id":"1ed8cb15cb5f382d","trace_id":"60636f821fd1d6c15bbd17cfee41c274","span_id":"7f1fa866e058b76c"}
-{"time":"2026-11-26T17:18:55.538401135Z","level":"INFO","msg":"batch committed","worker_id":"9077ffad9b4c-1","event":"migration.batch_committed","execution_id":738,"job_id":"c390f630-e1ac-4ac3-9c37-4956b1f66072","attempt":1,"batch":1,"direction":"forward","lo":0,"hi":50000,"rows":50000,"correlation_id":"1ed8cb15cb5f382d","trace_id":"60636f821fd1d6c15bbd17cfee41c274","span_id":"7f1fa866e058b76c"}
-{"time":"2026-11-26T17:18:57.78779082Z","level":"INFO","msg":"batch committed","worker_id":"9077ffad9b4c-1","event":"migration.batch_committed","execution_id":738,"job_id":"c390f630-e1ac-4ac3-9c37-4956b1f66072","attempt":1,"batch":4,"direction":"forward","lo":150000,"hi":200000,"rows":50000,"correlation_id":"1ed8cb15cb5f382d","trace_id":"60636f821fd1d6c15bbd17cfee41c274","span_id":"7f1fa866e058b76c"}
-{"time":"2026-11-26T17:18:57.796027924Z","level":"INFO","msg":"migration attempt finished","worker_id":"9077ffad9b4c-1","event":"migration.attempt","actor":"admin","connection_id":5,"migration_id":1488,"execution_id":738,"job_id":"c390f630-e1ac-4ac3-9c37-4956b1f66072","version":299,"revision":1,"kind":"apply","attempt":1,"status":"success","committed":true,"failure_code":"","error":"","query":"UPDATE public.k6_items SET counter = counter + 1, updated_at = now() WHERE id > $1 AND id <= $2","correlation_id":"1ed8cb15cb5f382d","trace_id":"60636f821fd1d6c15bbd17cfee41c274","span_id":"7f1fa866e058b76c"}
-{"time":"2026-11-26T17:18:57.807241156Z","level":"INFO","msg":"job finished","worker_id":"9077ffad9b4c-1","job_id":"c390f630-e1ac-4ac3-9c37-4956b1f66072","execution_id":738,"attempt":1,"actor":"system","event":"job.finished","status":"success","error":"","correlation_id":"1ed8cb15cb5f382d","trace_id":"60636f821fd1d6c15bbd17cfee41c274","span_id":"7f1fa866e058b76c"}
-{"time":"2026-11-26T17:18:57.807374664Z","level":"INFO","msg":"connection lock released","worker_id":"9077ffad9b4c-1","job_id":"c390f630-e1ac-4ac3-9c37-4956b1f66072","execution_id":738,"attempt":1,"actor":"system","event":"lock.released","connection_id":5,"correlation_id":"1ed8cb15cb5f382d","trace_id":"60636f821fd1d6c15bbd17cfee41c274","span_id":"7f1fa866e058b76c"}
+{"time":"2026-11-27T01:14:01.481147683Z","level":"INFO","msg":"migration execution changed","event":"migration.requested","actor":"admin","connection_id":4,"migration_id":1555,"execution_id":751,"version":312,"kind":"apply","status":"approved","correlation_id":"a06c02343ffdd36f","trace_id":"feeaf53eee7405955496b14c8f7ce864","span_id":"3ac53e9c4db01f23"}
+{"time":"2026-11-27T01:14:01.481424043Z","level":"INFO","msg":"http request","event":"http.request","actor":"admin","method":"POST","path":"/api/v1/databases/4/migrations/312/executions","status":201,"duration_ms":21,"correlation_id":"a06c02343ffdd36f","trace_id":"feeaf53eee7405955496b14c8f7ce864","span_id":"3ac53e9c4db01f23"}
+{"time":"2026-11-27T01:14:01.493894262Z","level":"INFO","msg":"migration execution changed","event":"migration.queued","actor":"admin","connection_id":4,"migration_id":1555,"execution_id":751,"version":312,"kind":"apply","status":"approved","correlation_id":"e358ad5eb0ede050","trace_id":"6750618f840b986bd08acece902d3ae1","span_id":"ce03ac7d2f582078"}
+{"time":"2026-11-27T01:14:01.494498371Z","level":"INFO","msg":"http request","event":"http.request","actor":"admin","method":"POST","path":"/api/v1/executions/751/run","status":202,"duration_ms":11,"correlation_id":"e358ad5eb0ede050","trace_id":"6750618f840b986bd08acece902d3ae1","span_id":"ce03ac7d2f582078"}
+{"time":"2026-11-27T01:14:02.10937789Z","level":"INFO","msg":"job claimed","worker_id":"5bfbf338ea2a-1","job_id":"c226d292-5547-4aa1-adf4-0f1793702c1e","execution_id":751,"attempt":1,"actor":"system","event":"job.claimed","fence":748,"correlation_id":"a06c02343ffdd36f","trace_id":"b2f99567679763c51b0609bcfd03ed00","span_id":"270946b19b14ec75"}
+{"time":"2026-11-27T01:14:02.109565887Z","level":"INFO","msg":"connection lock acquired","worker_id":"5bfbf338ea2a-1","job_id":"c226d292-5547-4aa1-adf4-0f1793702c1e","execution_id":751,"attempt":1,"actor":"system","event":"lock.acquired","connection_id":4,"correlation_id":"a06c02343ffdd36f","trace_id":"b2f99567679763c51b0609bcfd03ed00","span_id":"270946b19b14ec75"}
+{"time":"2026-11-27T01:14:02.126230793Z","level":"INFO","msg":"migration started","worker_id":"5bfbf338ea2a-1","event":"migration.started","actor":"admin","connection_id":4,"execution_id":751,"job_id":"c226d292-5547-4aa1-adf4-0f1793702c1e","attempt":1,"mode":"batch","correlation_id":"a06c02343ffdd36f","trace_id":"b2f99567679763c51b0609bcfd03ed00","span_id":"270946b19b14ec75"}
+{"time":"2026-11-27T01:14:04.602087596Z","level":"INFO","msg":"batch committed","worker_id":"5bfbf338ea2a-1","event":"migration.batch_committed","batch":1,"direction":"forward","lo":0,"hi":50000,"rows":50000,"correlation_id":"a06c02343ffdd36f","trace_id":"b2f99567679763c51b0609bcfd03ed00","span_id":"270946b19b14ec75","migration_id":1555,"execution_id":751,"job_id":"c226d292-5547-4aa1-adf4-0f1793702c1e","attempt":1,"requested_by":"admin"}
+{"time":"2026-11-27T01:14:10.318057564Z","level":"INFO","msg":"batch committed","worker_id":"5bfbf338ea2a-1","event":"migration.batch_committed","batch":4,"direction":"forward","lo":150000,"hi":200000,"rows":50000,"correlation_id":"a06c02343ffdd36f","trace_id":"b2f99567679763c51b0609bcfd03ed00","span_id":"270946b19b14ec75","migration_id":1555,"execution_id":751,"job_id":"c226d292-5547-4aa1-adf4-0f1793702c1e","attempt":1,"requested_by":"admin"}
+{"time":"2026-11-27T01:14:10.411730741Z","level":"INFO","msg":"migration attempt finished","worker_id":"5bfbf338ea2a-1","event":"migration.attempt","actor":"admin","connection_id":4,"migration_id":1555,"execution_id":751,"job_id":"c226d292-5547-4aa1-adf4-0f1793702c1e","version":312,"revision":1,"kind":"apply","attempt":1,"status":"success","committed":true,"failure_code":"","error":"","query":"UPDATE public.k6_items SET counter = counter + 1, updated_at = now() WHERE id > $1 AND id <= $2","correlation_id":"a06c02343ffdd36f","trace_id":"b2f99567679763c51b0609bcfd03ed00","span_id":"270946b19b14ec75"}
+{"time":"2026-11-27T01:14:10.436086711Z","level":"INFO","msg":"job finished","worker_id":"5bfbf338ea2a-1","job_id":"c226d292-5547-4aa1-adf4-0f1793702c1e","execution_id":751,"attempt":1,"actor":"system","event":"job.finished","status":"success","error":"","correlation_id":"a06c02343ffdd36f","trace_id":"b2f99567679763c51b0609bcfd03ed00","span_id":"270946b19b14ec75"}
+{"time":"2026-11-27T01:14:10.436302951Z","level":"INFO","msg":"connection lock released","worker_id":"5bfbf338ea2a-1","job_id":"c226d292-5547-4aa1-adf4-0f1793702c1e","execution_id":751,"attempt":1,"actor":"system","event":"lock.released","connection_id":4,"correlation_id":"a06c02343ffdd36f","trace_id":"b2f99567679763c51b0609bcfd03ed00","span_id":"270946b19b14ec75"}
 ```
 
-Di Loki, `{service_name=~"dbplatform-.*"} | correlation_id="1ed8cb15cb5f382d"` mengembalikan 62 baris: 2 dari `dbplatform-api` dan 60 dari `dbplatform-worker`, termasuk `sql.start` dan `sql.result` untuk setiap query ke database target.
+Di Loki, `{service_name=~"dbplatform-.*"} | correlation_id="a06c02343ffdd36f"` mengembalikan 78 baris: 2 dari `dbplatform-api` dan 76 dari `dbplatform-worker`, termasuk `sql.start` dan `sql.result` untuk setiap query ke database target. Riwayat attempt eksekusi #751 juga menyimpan `correlation_id` yang sama.
 
-**Trace.** Job berjalan setelah request selesai, jadi worker membuat trace baru yang ditautkan (span link) ke trace request, bukan child di dalamnya. Ringkasan span dari API Tempo (`/api/traces/<trace_id>`), urut waktu mulai, dengan SQL dipotong:
-
-```
-trace f8226936b2609219c76b05ab149a4ce0 (1 span)
-  dbplatform-api     POST        12 ms
-
-trace 60636f821fd1d6c15bbd17cfee41c274 (26 span)
-  dbplatform-worker  queue.job   3158 ms  link -> f8226936b2609219c76b05ab149a4ce0  execution.id=738
-  dbplatform-worker  db.query      24 ms  SELECT pg_try_advisory_lock($1)
-  dbplatform-worker  db.query     633 ms  UPDATE public.k6_items SET counter = counter + 1, updated_at = now() WHERE id > $1 AND id <= $2
-  dbplatform-worker  db.query     290 ms  UPDATE public.k6_items ... (batch 2)
-  dbplatform-worker  db.query     803 ms  UPDATE public.k6_items ... (batch 3)
-  dbplatform-worker  db.query     548 ms  UPDATE public.k6_items ... (batch 4)
-  ... ditambah span pencatatan batch di _dbplatform
-```
-
-**Metrik.** Nilai dari Prometheus setelah job itu (worker baru dinyalakan, jadi hanya berisi job ini):
+**Trace.** Job berjalan setelah request selesai, jadi worker membuat trace baru yang ditautkan (span link) ke trace request **Jalankan**, bukan child di dalamnya. Ringkasan span dari API Tempo (`/api/traces/<trace_id>`), urut waktu mulai, dengan SQL dipotong:
 
 ```
-dbplatform_jobs_finished_total{job="worker",outcome="success"}            1
-dbplatform_queue_wait_seconds_sum{job="worker"}                           0.480487297
-dbplatform_job_duration_seconds_sum{job="worker",outcome="success"}       3.156373933
-traces_span_metrics_calls_total{service_name="dbplatform-worker",span_name="queue.job"}  1
+trace 6750618f840b986bd08acece902d3ae1 (1 span)
+  dbplatform-api     POST                 11.9 ms
+
+trace b2f99567679763c51b0609bcfd03ed00 (33 span)
+  queue.job                             8327.0 ms  execution.id=751  link -> 6750618f840b986bd08acece902d3ae1
+    db.query                               0.9 ms  -- ping
+    migration.lock                         1.3 ms  lock.acquired=true
+      db.query                             1.2 ms  SELECT pg_try_advisory_lock($1)
+    db.query  (10 span persiapan: tabel _dbplatform, pemeriksaan bukti, kolom kunci, checkpoint, batas)
+    migration.batch                     2352.2 ms  batch.number=1  batch.rows=50000
+      db.query                            69.0 ms  SELECT max(k)::bigint FROM (SELECT "id" AS k FROM "public"."k6_items" ...)
+      db.query                          2219.7 ms  UPDATE public.k6_items SET counter = counter + 1, updated_at = now() WHERE id > $1 AND id <= $2
+      db.query                             2.4 ms  INSERT INTO _dbplatform.batches (...)
+    migration.batch                     1663.0 ms  batch.number=2  batch.rows=50000
+    migration.batch                     1836.3 ms  batch.number=3  batch.rows=50000
+    migration.batch                     2178.2 ms  batch.number=4  batch.rows=50000
+    migration.batch                        2.6 ms  batch.number=5  batch.empty=true
+    db.query                               0.9 ms  INSERT INTO _dbplatform.executions (...)
 ```
 
-Angkanya saling cocok: tunggu queue 0,48 detik sama dengan selisih `queued_at` (17:18:54.164) dan `job.claimed` (17:18:54.650), dan durasi job 3,156 detik sama dengan span `queue.job` 3.158 ms.
+**Metrik.** Nilai dari Prometheus setelah uji k6 singkat itu (worker baru dinyalakan, jadi hanya berisi job dari uji ini, termasuk tiga eksekusi batch):
+
+```
+traces_span_metrics_calls_total{service_name="dbplatform-worker",span_name="migration.lock"}   8
+traces_span_metrics_calls_total{service_name="dbplatform-worker",span_name="migration.batch"} 15
+dbplatform_jobs_finished_total{job="worker",outcome="success"}                                  8
+```
+
+Angkanya saling cocok: 8 job berhasil masing-masing memegang kunci sekali, dan 3 eksekusi batch masing-masing punya 5 span `migration.batch` (4 berisi dan 1 kosong sebagai penutup). Untuk eksekusi #751, tunggu queue 0,62 detik (`queued_at` 01:14:01.488 sampai `job.claimed` 01:14:02.109) dan durasi 8,3 detik sama dengan span `queue.job`.
 
 ### Uji beban k6
 
@@ -493,7 +502,7 @@ GitHub Actions (`.github/workflows/codeql.yml`) memindai kode Go dan JavaScript/
 |---|---|---|---|---|---|
 | 1, 2 | `go/cookie-secure-not-set` | medium | `internal/httpx/flash.go` | cookie pesan flash terkirim lewat HTTP | **Diterima.** `Secure` aktif saat `APP_ENV=production`, dan sengaja mati saat pengembangan di `http://localhost`. Cookie hanya berisi pesan bertanda tangan untuk halaman lama. |
 | 3 | `go/unvalidated-url-redirection` | medium | `internal/auth/login_handler.go` | tautan login bisa mengarahkan korban ke situs lain | **Valid, belum diperbaiki.** Penyaring `next` meloloskan karakter tab, yang dibuang browser sehingga menjadi URL `//situs-lain`. Hanya halaman login lama (tanpa `WEB_DIST_DIR`) yang memakainya. |
-| 4 | `go/sql-injection` | high | `internal/dbdriver/mysql/driver.go` | SQL buatan pengguna dijalankan di database target | **Diterima.** Menjalankan SQL pengguna adalah fitur EXPLAIN. Dibatasi untuk View + Edit, satu statement DML, transaction yang selalu di-rollback, dan batas waktu. |
+| 4 | `go/sql-injection` | high | `internal/dbdriver/mysql/driver.go` | SQL buatan pengguna dijalankan di database target | **Diterima**, disetujui pemilik driver. Menjalankan SQL pengguna adalah fitur EXPLAIN, satu-satunya jalan SQL pengguna ke driver MySQL. Dibatasi untuk View + Edit, satu statement DML (driver juga menolak lebih dari satu statement), transaction `READ ONLY` bila tanpa ANALYZE dan selalu di-rollback, serta batas waktu 15 detik. `Exec` yang menerima banyak statement tidak terjangkau SQL pengguna karena migration menolak koneksi selain PostgreSQL. |
 | 5 | `go/incorrect-integer-conversion` | high | `internal/migration/api_handler.go` | nomor versi besar terpotong menjadi angka lain | **Diperbaiki** pada commit `e6b6a6b`: angka di luar jangkauan 32 bit dijawab 404. Scan ulang menandai temuan ini `fixed`. |
 
 ## Pembagian tugas
