@@ -189,6 +189,7 @@ export default function GroupDetailPage() {
                               className="btn-link"
                               disabled={busy}
                               onClick={() => run(() => api('PUT', `/admin/groups/${id}/leader`, { user_id: m.user_id }))}
+                              aria-label={`Jadikan leader ${m.username}`}
                             >
                               <Icon name="shield" />
                               Jadikan leader

@@ -277,6 +277,8 @@ export interface Migration extends MigrationInput {
   version: number
   revision: number
   state: MigrationState
+  // status permintaan yang belum selesai, kosong kalau tidak ada
+  open_status: ExecutionStatus | ''
   checksum: string
   created_by: string
   created_at: string

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../../api/client'
-import type { DatabaseItem, SchemaDiffCreated, SchemaDiffPreview, SchemaDiffSources } from '../../api/types'
+import type { SchemaDiffCreated, SchemaDiffPreview, SchemaDiffSources } from '../../api/types'
 import Badge from '../../components/Badge'
 import Breadcrumbs from '../../components/Breadcrumbs'
 import EmptyState from '../../components/EmptyState'
@@ -11,6 +11,7 @@ import Field from '../../components/Field'
 import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
+import { useDatabaseName } from '../../hooks/useDatabaseName'
 import { databasePath } from '../databases/paths'
 import { editMigrationPath, migrationsKey, migrationsPath } from '../migrations/paths'
 import { changeLabel } from './labels'
@@ -34,8 +35,7 @@ export default function SchemaDiffPage() {
     queryKey: ['schema-diff', id, 'sources'],
     queryFn: () => api<SchemaDiffSources>('GET', `/databases/${id}/schema-diff`),
   })
-  const databases = useQuery({ queryKey: ['databases'], queryFn: () => api<DatabaseItem[]>('GET', '/databases') })
-  const dbName = databases.data?.find((d) => String(d.id) === id)?.name ?? `Database ${id}`
+  const dbName = useDatabaseName(id)
 
   // hasil perbandingan tidak disimpan di cache karena schema bisa berubah kapan saja
   const preview = useMutation({
