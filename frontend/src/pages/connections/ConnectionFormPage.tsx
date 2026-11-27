@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../../api/client'
@@ -101,6 +101,12 @@ export default function ConnectionFormPage() {
     },
   })
 
+  // tombol Uji koneksi dan Simpan ada di bawah form, jadi halaman digulir ke pesan hasilnya supaya kelihatan
+  const resultRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [test.data, test.error, save.error, setActive.error])
+
   if (!isNew && conn.isLoading) return <Loading />
   if (!isNew && !conn.data) return <ErrorMessage error={conn.error} />
 
@@ -155,22 +161,26 @@ export default function ConnectionFormPage() {
       />
 
       <div className="max-w-[860px] space-y-4">
-        {test.data && (
-          <p role="status" className={'alert ' + (test.data.ok ? 'alert-success' : 'alert-error')}>
-            <span className="alert-mark" aria-hidden="true">
-              <Icon name={test.data.ok ? 'check' : 'alert'} className="h-[18px] w-[18px]" />
-            </span>
-            {test.data.message}
-          </p>
-        )}
-        <ErrorMessage error={otherError} />
-        {fieldError !== undefined && (
-          <p className="alert alert-warning">
-            <span className="alert-mark" aria-hidden="true">
-              !
-            </span>
-            Periksa kembali isian yang ditandai.
-          </p>
+        {(test.data || otherError || fieldError) && (
+          <div ref={resultRef} className="space-y-4">
+            {test.data && (
+              <p role="status" className={'alert ' + (test.data.ok ? 'alert-success' : 'alert-error')}>
+                <span className="alert-mark" aria-hidden="true">
+                  <Icon name={test.data.ok ? 'check' : 'alert'} className="h-[18px] w-[18px]" />
+                </span>
+                {test.data.message}
+              </p>
+            )}
+            <ErrorMessage error={otherError} />
+            {fieldError !== undefined && (
+              <p className="alert alert-warning">
+                <span className="alert-mark" aria-hidden="true">
+                  !
+                </span>
+                Periksa kembali isian yang ditandai.
+              </p>
+            )}
+          </div>
         )}
 
         <form onSubmit={submit} className="card overflow-hidden p-0" noValidate autoComplete="off">
