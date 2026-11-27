@@ -522,6 +522,27 @@ Hasil yang bersih tidak berarti kode pasti aman. Seluruh temuan:
 | 4 | `go/sql-injection` | high | `internal/dbdriver/mysql/driver.go` | SQL buatan pengguna dijalankan di database target | **Diterima**, disetujui pemilik driver. Menjalankan SQL pengguna adalah fitur EXPLAIN, satu-satunya jalan SQL pengguna ke driver MySQL. Dibatasi untuk View + Edit, satu statement DML (driver juga menolak lebih dari satu statement), transaction `READ ONLY` bila tanpa ANALYZE dan selalu di-rollback, serta batas waktu 15 detik. `Exec` yang menerima banyak statement tidak terjangkau SQL pengguna karena migration menolak koneksi selain PostgreSQL. |
 | 5 | `go/incorrect-integer-conversion` | high | `internal/migration/api_handler.go` | nomor versi besar terpotong menjadi angka lain | **Diperbaiki** pada commit `e6b6a6b`: angka di luar jangkauan 32 bit dijawab 404. Scan ulang menandai temuan ini `fixed`. |
 
+<details>
+<summary>Halaman detail temuan 1 sampai 4, diambil sebelum temuan 1 sampai 3 diperbaiki</summary>
+
+Temuan 1:
+
+![Detail temuan 1: cookie tanpa Secure di flash.go baris 46](docs/codeql/temuan-1.png)
+
+Temuan 2:
+
+![Detail temuan 2: cookie tanpa Secure di flash.go baris 55](docs/codeql/temuan-2.png)
+
+Temuan 3:
+
+![Detail temuan 3: open URL redirect di login_handler.go](docs/codeql/temuan-3.png)
+
+Temuan 4, masih terbuka dengan keputusan diterima:
+
+![Detail temuan 4: SQL dari pengguna di driver MySQL](docs/codeql/temuan-4.png)
+
+</details>
+
 ## Pembagian tugas
 
 ### Milestone 1
