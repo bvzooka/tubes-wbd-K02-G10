@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '../../api/client'
+import { api, ApiError } from '../../api/client'
 import type { Execution, ExecutionKind, Migration, MigrationDetail } from '../../api/types'
 import Badge from '../../components/Badge'
 import Breadcrumbs from '../../components/Breadcrumbs'
@@ -48,6 +48,13 @@ function requestChoices(m: Migration): RequestChoice[] {
 const confirmText: Partial<Record<StatusAction, string>> = {
   cancel: 'Batalkan draft ini? Versinya tidak bisa dipakai lagi.',
   supersede: 'Buang migration ini? Versinya tidak akan dicoba lagi.',
+}
+
+// pesan umumnya cuma "Data tidak valid", jadi yang ditampilkan pesan per isian supaya jelas apa yang kurang
+function withFieldMessages(error: unknown) {
+  if (!(error instanceof ApiError)) return error
+  const messages = Object.values(error.fields).join(' ')
+  return messages ? new ApiError(error.status, error.code, messages, {}, error.requestId) : error
 }
 
 export default function MigrationDetailPage() {
@@ -123,7 +130,7 @@ export default function MigrationDetailPage() {
       />
 
       <div className="mb-4 space-y-3">
-        <ErrorMessage error={change.error ?? request.error} />
+        <ErrorMessage error={withFieldMessages(change.error ?? request.error)} />
         {open && (
           <p className="alert alert-warning">
             <span className="alert-mark" aria-hidden="true">
