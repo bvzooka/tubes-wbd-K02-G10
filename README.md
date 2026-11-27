@@ -242,7 +242,7 @@ Pilihan **Hide rollback** menyembunyikan eksekusi yang dibatalkan beserta rollba
 
 ### Pemulihan saat worker mati
 
-1. Koneksi worker ke database target terputus, sehingga PostgreSQL melepas advisory lock dan membatalkan transaction yang belum di-commit.
+1. Koneksi worker ke database target terputus. PostgreSQL membatalkan transaction yang belum di-commit dan melepas advisory lock. Kalau saat itu masih ada statement yang berjalan, keduanya baru terjadi setelah statement itu selesai.
 2. Kunci di platform tetap tercatat sampai lease habis (paling lama 30 detik).
 3. Pemeriksa (tiap 10 detik) di worker yang hidup mengambil alih job dengan fence baru, lalu **mengecek bukti di database target** sebelum memutuskan apa pun:
    - ada bukti selesai: dicatat berhasil tanpa menjalankan SQL lagi;
