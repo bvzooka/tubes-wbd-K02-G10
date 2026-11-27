@@ -205,4 +205,7 @@ type HistoryEntry struct {
 	FailureCode, FailureMessage                string
 	CorrelationID, TraceID                     string
 	StartedAt, FinishedAt                      time.Time
+
+	// true kalau percobaan ini melanjutkan batch yang setengah jalan
+	Resume bool
 }

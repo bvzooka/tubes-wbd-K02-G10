@@ -148,6 +148,12 @@ func TestBatch_Integration_PartialThenResume(t *testing.T) {
 		t.Errorf("batch lama tidak boleh diulang, jumlah = %d", got)
 	}
 
+	// riwayat harus bisa membedakan resume dari forward biasa
+	entries, err := b.repo.ListHistory(context.Background(), b.conn, migration.HistoryFilter{}, 10, 0)
+	if err != nil || len(entries) != 2 || entries[0].Resume || !entries[1].Resume {
+		t.Errorf("tanda resume di riwayat = %+v, %v; mau false lalu true", entries, err)
+	}
+
 	// rollback membatalkan batch dari kedua eksekusi
 	back, _ := b.do(t, domain.KindRollback, false)
 	b.want(t, back, domain.ExecSuccess, domain.StateRolledBack, 3, 25)

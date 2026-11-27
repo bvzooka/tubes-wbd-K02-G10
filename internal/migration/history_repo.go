@@ -171,9 +171,10 @@ func (r *Repo) ListHistory(ctx context.Context, connID int64, f HistoryFilter, l
 		SELECT h.id, h.execution_id, h.migration_id, h.connection_id, h.attempt, h.version, h.revision, h.kind,
 		       h.executed_by, u.username, h.status, h.committed, h.sql_executed, h.rolls_back_execution_id,
 		       h.batches_committed, h.rows_committed, h.failure_code, h.failure_message, h.correlation_id,
-		       h.trace_id, h.started_at, h.finished_at
+		       h.trace_id, h.started_at, h.finished_at, e.resumes_execution_id IS NOT NULL
 		FROM migration_history h
 		JOIN users u ON u.id = h.executed_by
+		JOIN migration_executions e ON e.id = h.execution_id
 		WHERE h.connection_id = $1
 		  AND ($2::bigint = 0 OR h.execution_id = $2)
 		  AND ($3::text = '' OR h.status = $3)
@@ -195,7 +196,7 @@ func (r *Repo) ListHistory(ctx context.Context, connID int64, f HistoryFilter, l
 			&h.ID, &h.ExecutionID, &h.MigrationID, &h.ConnectionID, &h.Attempt, &h.Version, &h.Revision, &h.Kind,
 			&h.ExecutedBy, &h.ExecutedByName, &h.Status, &h.Committed, &h.SQLExecuted, &h.RollsBackExecutionID,
 			&h.BatchesCommitted, &h.RowsCommitted, &h.FailureCode, &h.FailureMessage, &h.CorrelationID,
-			&h.TraceID, &h.StartedAt, &h.FinishedAt,
+			&h.TraceID, &h.StartedAt, &h.FinishedAt, &h.Resume,
 		); err != nil {
 			return nil, fmt.Errorf("scan history: %w", err)
 		}

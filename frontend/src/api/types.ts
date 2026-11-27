@@ -359,6 +359,8 @@ export interface HistoryEntry {
   version: number
   revision: number
   kind: ExecutionKind
+  // true kalau percobaan ini melanjutkan batch yang setengah jalan
+  resume: boolean
   executed_by: string
   status: HistoryStatus
   committed: boolean

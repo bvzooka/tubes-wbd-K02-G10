@@ -11,7 +11,7 @@ import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
 import { useDatabaseName } from '../../hooks/useDatabaseName'
 import { databasePath } from '../databases/paths'
-import { formatTime, isOpen, kindLabel, modeLabel, StateBadge, StatusBadge } from './labels'
+import { actionLabel, formatTime, isOpen, modeLabel, StateBadge, StatusBadge } from './labels'
 import SqlBlock from './SqlBlock'
 import { copyMigrationPath, editMigrationPath, executionPath, migrationsKey, migrationsPath } from './paths'
 
@@ -217,7 +217,7 @@ export default function MigrationDetailPage() {
                       #{e.id}
                     </Link>
                   </td>
-                  <td>{e.resumes_execution_id ? 'Resume' : kindLabel[e.kind]}</td>
+                  <td>{actionLabel(e.kind, e.resumes_execution_id !== null)}</td>
                   <td>
                     <StatusBadge status={e.status} />
                   </td>

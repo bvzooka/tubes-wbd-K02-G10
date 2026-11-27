@@ -18,6 +18,11 @@ const stateStyle: Record<MigrationState, { label: string; tone: BadgeTone }> = {
 export const modeLabel: Record<MigrationMode, string> = { normal: 'Normal', batch: 'Batch' }
 export const kindLabel: Record<ExecutionKind, string> = { apply: 'Apply', rollback: 'Rollback', forward: 'Forward' }
 
+// resume disimpan sebagai forward, tapi di layar disebut resume supaya sama di semua halaman
+export function actionLabel(kind: ExecutionKind, resume: boolean) {
+  return resume ? 'Resume' : kindLabel[kind]
+}
+
 const statusStyle: Record<ExecutionStatus, { label: string; tone: BadgeTone }> = {
   pending_review: { label: 'Menunggu persetujuan', tone: 'butter' },
   approved: { label: 'Disetujui', tone: 'lime' },
