@@ -12,7 +12,7 @@ import StatCard from '../../components/StatCard'
 import { useDatabaseName } from '../../hooks/useDatabaseName'
 import { useSession } from '../../hooks/useSession'
 import { databasePath } from '../databases/paths'
-import { actionLabel, ApprovalBadge, formatTime, modeLabel, StatusBadge } from './labels'
+import { actionLabel, ApprovalBadge, formatTime, isOpen, modeLabel, StatusBadge } from './labels'
 import SqlBlock from './SqlBlock'
 import { migrationPath, migrationsPath } from './paths'
 
@@ -27,10 +27,10 @@ export default function ExecutionPage() {
   const detail = useQuery({
     queryKey: key,
     queryFn: () => api<ExecutionDetail>('GET', `/executions/${executionID}`),
-    // bertanya tiap 2 detik hanya selama worker masih bisa mengubah hasilnya, lalu berhenti
+    // selama permintaan belum selesai halaman bertanya tiap 2 detik, supaya keputusan leader dan hasil worker muncul sendiri
     refetchInterval: (query) => {
       const status = query.state.data?.execution.status
-      return status === 'queued' || status === 'running' ? pollMs : false
+      return status && isOpen(status) ? pollMs : false
     },
   })
 
