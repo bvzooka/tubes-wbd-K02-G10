@@ -159,10 +159,15 @@ func TestDefinitionService_Integration_OpenRequestBlocksChange(t *testing.T) {
 	if _, err := e.service.Supersede(ctx, e.editor, e.conn, d.Version); !errors.Is(err, domain.ErrConflict) {
 		t.Errorf("supersede saat ada permintaan: %v", err)
 	}
+	// daftar harus memberi tahu bahwa ada permintaan yang masih menunggu
+	list, err := e.service.List(ctx, e.viewer, e.conn)
+	if err != nil || len(list) != 1 || list[0].OpenStatus != domain.ExecPendingReview {
+		t.Errorf("daftar = %+v, %v; mau status pending_review", list, err)
+	}
 
 	testutil.MustExec(t, e.pool, "UPDATE migration_executions SET status = 'rejected'")
 	got, err := e.service.Supersede(ctx, e.editor, e.conn, d.Version)
-	if err != nil || got.State != domain.StateSuperseded {
-		t.Errorf("supersede = %s, %v", got.State, err)
+	if err != nil || got.State != domain.StateSuperseded || got.OpenStatus != "" {
+		t.Errorf("supersede = %s %q, %v", got.State, got.OpenStatus, err)
 	}
 }
