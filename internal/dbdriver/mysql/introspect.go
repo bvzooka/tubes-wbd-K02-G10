@@ -87,23 +87,26 @@ func closeRows(rows *sql.Rows) error {
 func detectServer(ctx context.Context, tx *sql.Tx) (serverInfo, error) {
 	var info serverInfo
 	var version string
-	if err := tx.QueryRowContext(ctx, "SELECT VERSION()").Scan(&version); err != nil {
+	if err := eachRow(ctx, tx, versionSQL, nil, scanInto(&version)); err != nil {
 		return info, err
 	}
 	info.mariadb = isMariaDB(version)
 
 	var n int
-	if err := tx.QueryRowContext(ctx, hasChecksTableSQL).Scan(&n); err != nil {
+	if err := eachRow(ctx, tx, hasChecksTableSQL, nil, scanInto(&n)); err != nil {
 		return info, err
 	}
 	info.hasChecks = n > 0
 
-	if err := tx.QueryRowContext(ctx, hasExpressionColumnSQL).Scan(&n); err != nil {
+	if err := eachRow(ctx, tx, hasExpressionColumnSQL, nil, scanInto(&n)); err != nil {
 		return info, err
 	}
 	info.hasExpression = n > 0
 	return info, nil
 }
+
+// versionSQL dipakai utk membedakan MySQL dan MariaDB
+const versionSQL = "SELECT VERSION()"
 
 // isMariaDB mengenali MariaDB dari string VERSION(), misalnya "10.11.6-MariaDB"
 func isMariaDB(version string) bool {
@@ -112,17 +115,12 @@ func isMariaDB(version string) bool {
 
 // readTables mengisi out.Tables dan mengembalikan peta posisi tiap tabel di dalamnya
 func readTables(ctx context.Context, tx *sql.Tx, schema string, out *domain.Schema) (map[string]int, error) {
-	rows, err := tx.QueryContext(ctx, tablesSQL, schema)
-	if err != nil {
-		return nil, err
-	}
 	pos := map[string]int{}
-	for rows.Next() {
+	err := eachRow(ctx, tx, tablesSQL, []any{schema}, func(rows *sql.Rows) error {
 		var name, ttype string
 		var est sql.NullInt64
 		if err := rows.Scan(&name, &ttype, &est); err != nil {
-			rows.Close()
-			return nil, err
+			return err
 		}
 		t := domain.Table{Schema: schema, Name: name, Kind: domain.TableKindTable, EstimatedRows: -1}
 		if ttype == tableTypeView {
@@ -132,25 +130,18 @@ func readTables(ctx context.Context, tx *sql.Tx, schema string, out *domain.Sche
 		}
 		pos[name] = len(out.Tables)
 		out.Tables = append(out.Tables, t)
-	}
-	if err := closeRows(rows); err != nil {
-		return nil, err
-	}
-	return pos, nil
+		return nil
+	})
+	return pos, err
 }
 
 // readColumns menempelkan kolom ke tabelnya
 func readColumns(ctx context.Context, tx *sql.Tx, schema string, info serverInfo, out *domain.Schema, pos map[string]int) error {
-	rows, err := tx.QueryContext(ctx, columnsSQL, schema)
-	if err != nil {
-		return err
-	}
-	for rows.Next() {
+	return eachRow(ctx, tx, columnsSQL, []any{schema}, func(rows *sql.Rows) error {
 		var tn, dataType, nullable, extra string
 		var c domain.Column
 		var def sql.NullString
 		if err := rows.Scan(&tn, &c.Name, &c.Position, &c.DataType, &dataType, &nullable, &def, &extra); err != nil {
-			rows.Close()
 			return err
 		}
 		c.Nullable = nullable == "YES"
@@ -158,8 +149,8 @@ func readColumns(ctx context.Context, tx *sql.Tx, schema string, info serverInfo
 		if i, ok := pos[tn]; ok {
 			out.Tables[i].Columns = append(out.Tables[i].Columns, c)
 		}
-	}
-	return closeRows(rows)
+		return nil
+	})
 }
 
 // columnDefault menyamakan format default kolom: MariaDB sudah memberi tanda kutip sendiri, MySQL harus ditambahkan

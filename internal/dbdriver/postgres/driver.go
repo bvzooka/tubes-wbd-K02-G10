@@ -72,11 +72,17 @@ func (d *Driver) Capabilities() dbdriver.Capabilities {
 	return dbdriver.Capabilities{TransactionalDDL: true}
 }
 
+// statement yg dikirim pgx saat Ping
+const pingSQL = "-- ping"
+
 // Ping mengecek server masih terjangkau, dengan batas waktu supaya tidak menggantung
 func (d *Driver) Ping(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
-	if err := d.pool.Ping(ctx); err != nil {
+	err := dbdriver.RunQuery(ctx, pingSQL, nil, func(ctx context.Context) (int64, error) {
+		return 0, d.pool.Ping(ctx)
+	})
+	if err != nil {
 		return ClassifyError(err)
 	}
 	return nil

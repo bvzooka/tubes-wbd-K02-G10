@@ -163,37 +163,45 @@ func (d *driver) Dialect() domain.DBMS                { return d.inner.Dialect()
 func (d *driver) Capabilities() dbdriver.Capabilities { return d.inner.Capabilities() }
 func (d *driver) Close()                              { d.inner.Close() }
 
+
 func (d *driver) Ping(ctx context.Context) error {
-	return d.o.observe(ctx, "ping", "SELECT 1", nil, func(ctx context.Context) (int64, error) {
-		return 0, d.inner.Ping(ctx)
-	})
+	return d.inner.Ping(d.o.hooked(ctx, "ping"))
 }
 
 func (d *driver) Introspect(ctx context.Context) (*domain.Schema, error) {
-	var schema *domain.Schema
-	err := d.o.observe(ctx, "introspect", "-- introspect information_schema", nil, func(ctx context.Context) (int64, error) {
-		var err error
-		schema, err = d.inner.Introspect(ctx)
-		if schema == nil {
-			return 0, err
-		}
-		return int64(len(schema.Tables)), err
-	})
-	return schema, err
+	return d.inner.Introspect(d.o.hooked(ctx, "introspect"))
 }
 
 func (d *driver) TableData(ctx context.Context, ref domain.TableRef, page domain.PageRequest) (*domain.TableData, error) {
-	var data *domain.TableData
-	query := "-- table data " + ref.Schema + "." + ref.Table + " page " + strconv.Itoa(page.Page)
-	err := d.o.observe(ctx, "table_data", query, nil, func(ctx context.Context) (int64, error) {
-		var err error
-		data, err = d.inner.TableData(ctx, ref, page)
-		if data == nil {
-			return 0, err
-		}
-		return int64(len(data.Rows)), err
+	return d.inner.TableData(d.o.hooked(ctx, "table_data"), ref, page)
+}
+
+// memasang hook yg mencatat setiap SQL driver dengan nama operasi op
+func (o *observer) hooked(ctx context.Context, op string) context.Context {
+	return dbdriver.WithQueryHook(ctx, func(ctx context.Context, sql string, args []any, run func(context.Context) (int64, error)) error {
+		return o.observe(ctx, op, sql, args, run)
 	})
-	return data, err
+}
+
+// membungkus pembuat driver, dipakai untuk tes koneksi
+func WrapFactory[F ~func(context.Context, domain.Connection, string) (dbdriver.Driver, error)](factory F, logger *slog.Logger) F {
+	return func(ctx context.Context, c domain.Connection, password string) (dbdriver.Driver, error) {
+		database := connectionLabel(c)
+		o := &observer{logger: logger, tracer: otel.Tracer("dbplatform/dbdriver"), database: database}
+		drv, err := factory(o.hooked(ctx, "connect"), c, password)
+		if err != nil {
+			return nil, err
+		}
+		return Wrap(drv, logger, database), nil
+	}
+}
+
+// memakai nama koneksi, atau host/database untuk koneksi yang belum disimpan
+func connectionLabel(c domain.Connection) string {
+	if c.Name != "" {
+		return c.Name
+	}
+	return c.Host + ":" + strconv.Itoa(c.Port) + "/" + c.DatabaseName
 }
 
 func (d *driver) WithTx(ctx context.Context, opts dbdriver.TxOptions, fn func(tx dbdriver.Tx) error) error {

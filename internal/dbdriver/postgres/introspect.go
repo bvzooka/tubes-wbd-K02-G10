@@ -121,16 +121,11 @@ func (d *Driver) Introspect(ctx context.Context) (*domain.Schema, error) {
 // readTables mengisi out.Tables dan mengembalikan peta posisi tiap tabel di dalamnya
 func readTables(ctx context.Context, tx pgx.Tx, out *domain.Schema) (map[relKey]int, error) {
 	pos := map[relKey]int{}
-	rows, err := tx.Query(ctx, tablesSQL)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
+	err := eachRow(ctx, tx, tablesSQL, nil, func(rows pgx.Rows) error {
 		var t domain.Table
 		var kind string
 		if err := rows.Scan(&t.Schema, &t.Name, &kind, &t.EstimatedRows); err != nil {
-			return nil, err
+			return err
 		}
 		t.Kind = domain.TableKindTable
 		if kind == relkindView || kind == relkindMatView {
@@ -141,21 +136,14 @@ func readTables(ctx context.Context, tx pgx.Tx, out *domain.Schema) (map[relKey]
 		}
 		pos[relKey{t.Schema, t.Name}] = len(out.Tables)
 		out.Tables = append(out.Tables, t)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return pos, nil
+		return nil
+	})
+	return pos, err
 }
 
 // readColumns menempelkan kolom ke tabelnya
 func readColumns(ctx context.Context, tx pgx.Tx, out *domain.Schema, pos map[relKey]int) error {
-	rows, err := tx.Query(ctx, columnsSQL)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
+	return eachRow(ctx, tx, columnsSQL, nil, func(rows pgx.Rows) error {
 		var s, tn string
 		var c domain.Column
 		if err := rows.Scan(&s, &tn, &c.Name, &c.Position, &c.DataType, &c.Nullable, &c.Default); err != nil {
@@ -164,18 +152,13 @@ func readColumns(ctx context.Context, tx pgx.Tx, out *domain.Schema, pos map[rel
 		if i, ok := pos[relKey{s, tn}]; ok {
 			out.Tables[i].Columns = append(out.Tables[i].Columns, c)
 		}
-	}
-	return rows.Err()
+		return nil
+	})
 }
 
 // readConstraints menempelkan constraint ke tabelnya, kolom rujukan hanya diisi untuk foreign key
 func readConstraints(ctx context.Context, tx pgx.Tx, out *domain.Schema, pos map[relKey]int) error {
-	rows, err := tx.Query(ctx, constraintsSQL)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
+	return eachRow(ctx, tx, constraintsSQL, nil, func(rows pgx.Rows) error {
 		var s, tn, ctype, upd, del string
 		var c domain.Constraint
 		if err := rows.Scan(&s, &tn, &c.Name, &ctype, &c.Columns,
@@ -199,18 +182,13 @@ func readConstraints(ctx context.Context, tx pgx.Tx, out *domain.Schema, pos map
 		if i, ok := pos[relKey{s, tn}]; ok {
 			out.Tables[i].Constraints = append(out.Tables[i].Constraints, c)
 		}
-	}
-	return rows.Err()
+		return nil
+	})
 }
 
 // readIndexes menempelkan index ke tabelnya
 func readIndexes(ctx context.Context, tx pgx.Tx, out *domain.Schema, pos map[relKey]int) error {
-	rows, err := tx.Query(ctx, indexesSQL)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
+	return eachRow(ctx, tx, indexesSQL, nil, func(rows pgx.Rows) error {
 		var s, tn string
 		var ix domain.Index
 		if err := rows.Scan(&s, &tn, &ix.Name, &ix.Unique, &ix.Primary, &ix.Method,
@@ -220,8 +198,8 @@ func readIndexes(ctx context.Context, tx pgx.Tx, out *domain.Schema, pos map[rel
 		if i, ok := pos[relKey{s, tn}]; ok {
 			out.Tables[i].Indexes = append(out.Tables[i].Indexes, ix)
 		}
-	}
-	return rows.Err()
+		return nil
+	})
 }
 
 // fkAction mengubah kode aksi foreign key di pg_constraint menjadi teks SQL

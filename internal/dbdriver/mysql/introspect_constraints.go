@@ -109,23 +109,16 @@ func readConstraintDecls(ctx context.Context, tx *sql.Tx, schema string, info se
 	if info.hasChecks {
 		extra = ", 'CHECK'"
 	}
-	rows, err := tx.QueryContext(ctx, fmt.Sprintf(constraintsSQL, extra), schema)
-	if err != nil {
-		return nil, err
-	}
 	var decls []constraintDecl
-	for rows.Next() {
+	err := eachRow(ctx, tx, fmt.Sprintf(constraintsSQL, extra), []any{schema}, func(rows *sql.Rows) error {
 		var d constraintDecl
 		if err := rows.Scan(&d.key.table, &d.key.name, &d.ctype); err != nil {
-			rows.Close()
-			return nil, err
+			return err
 		}
 		decls = append(decls, d)
-	}
-	if err := closeRows(rows); err != nil {
-		return nil, err
-	}
-	return decls, nil
+		return nil
+	})
+	return decls, err
 }
 
 // membaca kolom tiap constraint, diurutkan menurut posisinya di key
@@ -135,23 +128,19 @@ func readKeyUsage(ctx context.Context, tx *sql.Tx, schema string) (map[conKey]*k
 		col, rcol       string
 		rschema, rtable sql.NullString
 	}
-	rows, err := tx.QueryContext(ctx, keyColumnsSQL, schema)
-	if err != nil {
-		return nil, err
-	}
 	parts := map[conKey][]part{}
-	for rows.Next() {
+	err := eachRow(ctx, tx, keyColumnsSQL, []any{schema}, func(rows *sql.Rows) error {
 		var k conKey
 		var p part
 		var rcol sql.NullString
 		if err := rows.Scan(&k.table, &k.name, &p.col, &p.ord, &p.rschema, &p.rtable, &rcol); err != nil {
-			rows.Close()
-			return nil, err
+			return err
 		}
 		p.rcol = rcol.String
 		parts[k] = append(parts[k], p)
-	}
-	if err := closeRows(rows); err != nil {
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -173,24 +162,17 @@ func readKeyUsage(ctx context.Context, tx *sql.Tx, schema string) (map[conKey]*k
 
 // membaca aturan ON UPDATE dan ON DELETE khusus foreign key
 func readFKRules(ctx context.Context, tx *sql.Tx, schema string) (map[conKey]fkRule, error) {
-	rows, err := tx.QueryContext(ctx, referentialSQL, schema)
-	if err != nil {
-		return nil, err
-	}
 	rules := map[conKey]fkRule{}
-	for rows.Next() {
+	err := eachRow(ctx, tx, referentialSQL, []any{schema}, func(rows *sql.Rows) error {
 		var k conKey
 		var r fkRule
 		if err := rows.Scan(&k.table, &k.name, &r.onUpdate, &r.onDelete); err != nil {
-			rows.Close()
-			return nil, err
+			return err
 		}
 		rules[k] = r
-	}
-	if err := closeRows(rows); err != nil {
-		return nil, err
-	}
-	return rules, nil
+		return nil
+	})
+	return rules, err
 }
 
 // membaca ekspresi check, tabelnya hanya ada di server yang mendukung CHECK
@@ -203,23 +185,16 @@ func readCheckClauses(ctx context.Context, tx *sql.Tx, schema string, info serve
 	if info.mariadb {
 		q = checksMariaDBSQL
 	}
-	rows, err := tx.QueryContext(ctx, q, schema)
-	if err != nil {
-		return nil, err
-	}
-	for rows.Next() {
+	err := eachRow(ctx, tx, q, []any{schema}, func(rows *sql.Rows) error {
 		var k conKey
 		var clause string
 		if err := rows.Scan(&k.table, &k.name, &clause); err != nil {
-			rows.Close()
-			return nil, err
+			return err
 		}
 		checks[k] = clause
-	}
-	if err := closeRows(rows); err != nil {
-		return nil, err
-	}
-	return checks, nil
+		return nil
+	})
+	return checks, err
 }
 
 // buildConstraint menyusun satu domain.Constraint dari deklarasi, kolom, aturan, dan ekspresi check

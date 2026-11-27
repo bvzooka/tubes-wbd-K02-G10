@@ -91,11 +91,17 @@ func (d *Driver) Capabilities() dbdriver.Capabilities {
 	return dbdriver.Capabilities{TransactionalDDL: false}
 }
 
+// pingCommand dicatat untuk Ping. MySQL memakai perintah protokol COM_PING, bukan SQL.
+const pingCommand = "COM_PING"
+
 // Ping mengecek server masih terjangkau, dengan batas waktu supaya tidak menggantung
 func (d *Driver) Ping(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
-	if err := d.ro.PingContext(ctx); err != nil {
+	err := dbdriver.RunQuery(ctx, pingCommand, nil, func(ctx context.Context) (int64, error) {
+		return 0, d.ro.PingContext(ctx)
+	})
+	if err != nil {
 		return ClassifyError(err)
 	}
 	return nil
