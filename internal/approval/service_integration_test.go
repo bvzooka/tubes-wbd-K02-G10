@@ -216,6 +216,18 @@ func TestIntegration_InboxAndRequiredNow(t *testing.T) {
 		t.Fatalf("bukan leader, inbox harus kosong: %+v", items)
 	}
 
+	// kolomnya diisi langsung karena yang diuji cuma apakah inbox ikut membacanya
+	if items[0].Execution.ResumesExecutionID != nil {
+		t.Fatalf("permintaan biasa tidak boleh ditandai resume: %+v", items[0].Execution)
+	}
+	if _, err := e.pool.Exec(ctx, `UPDATE migration_executions SET resumes_execution_id = id WHERE id = $1`, execID); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := e.svc.Inbox(ctx, e.leadB.ID)
+	if err != nil || len(resumed) != 1 || resumed[0].Execution.ResumesExecutionID == nil {
+		t.Fatalf("inbox harus menandai resume: %+v %v", resumed, err)
+	}
+
 	groups, err := e.svc.RequiredNow(ctx, e.pool, e.connID)
 	if err != nil || len(groups) != 2 {
 		t.Fatalf("RequiredNow: %+v %v", groups, err)

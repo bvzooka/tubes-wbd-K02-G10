@@ -69,6 +69,7 @@ export interface InboxItem {
   group_id: number
   group_name: string
   status: string
+  resumes_execution_id: number | null
 }
 
 // Koneksi dan viewer. Bentuknya mengikuti struct JSON di

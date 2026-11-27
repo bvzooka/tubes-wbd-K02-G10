@@ -30,6 +30,9 @@ type inboxItemJSON struct {
 	GroupID      int64                  `json:"group_id"`
 	GroupName    string                 `json:"group_name"`
 	Status       domain.ExecutionStatus `json:"status"`
+
+	// terisi kalau permintaan ini melanjutkan batch yang setengah jalan
+	ResumesExecutionID *int64 `json:"resumes_execution_id"`
 }
 
 func (h *APIHandler) Inbox(w http.ResponseWriter, r *http.Request) error {
@@ -45,6 +48,7 @@ func (h *APIHandler) Inbox(w http.ResponseWriter, r *http.Request) error {
 			Version: e.Version, Kind: e.Kind, Mode: e.Mode, SQL: e.SQLSnapshot,
 			RequestedBy: e.RequestedByName, RequestedAt: e.RequestedAt,
 			GroupID: p.Approval.GroupID, GroupName: p.Approval.GroupName, Status: e.Status,
+			ResumesExecutionID: e.ResumesExecutionID,
 		})
 	}
 	return apiv1.OK(w, out)

@@ -112,7 +112,7 @@ func inbox(ctx context.Context, q appdb.DBTX, leaderID int64) ([]domain.PendingA
 	rows, err := q.Query(ctx, `
 		SELECT e.id, e.migration_id, e.connection_id, e.version, e.revision, e.kind, e.mode,
 		       e.sql_snapshot, e.status, e.requested_by, req.username, e.requested_at,
-		       a.group_id, a.group_name, c.name
+		       a.group_id, a.group_name, c.name, e.resumes_execution_id
 		FROM execution_approvals a
 		JOIN migration_executions e ON e.id = a.execution_id
 		JOIN connections c ON c.id = e.connection_id
@@ -127,7 +127,7 @@ func inbox(ctx context.Context, q appdb.DBTX, leaderID int64) ([]domain.PendingA
 		e := &p.Execution
 		err := row.Scan(&e.ID, &e.MigrationID, &e.ConnectionID, &e.Version, &e.Revision, &e.Kind, &e.Mode,
 			&e.SQLSnapshot, &e.Status, &e.RequestedBy, &e.RequestedByName, &e.RequestedAt,
-			&p.Approval.GroupID, &p.Approval.GroupName, &p.Database)
+			&p.Approval.GroupID, &p.Approval.GroupName, &p.Database, &e.ResumesExecutionID)
 		p.Approval.ExecutionID, p.Approval.LeaderID, p.Approval.Status = e.ID, leaderID, domain.ApprovalPending
 		return p, err
 	})

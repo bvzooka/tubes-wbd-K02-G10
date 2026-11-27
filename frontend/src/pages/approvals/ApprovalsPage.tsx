@@ -7,8 +7,7 @@ import EmptyState from '../../components/EmptyState'
 import ErrorMessage from '../../components/ErrorMessage'
 import Loading from '../../components/Loading'
 import PageHeader from '../../components/PageHeader'
-
-const kindLabel: Record<InboxItem['kind'], string> = { apply: 'Apply', rollback: 'Rollback', forward: 'Forward' }
+import { actionLabel } from '../migrations/labels'
 
 interface Decision {
   item: InboxItem
@@ -52,7 +51,8 @@ export default function ApprovalsPage() {
           <article key={itemKey(item)} className="card space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-medium">
-                {kindLabel[item.kind]} v{item.version} · {item.database}
+                {/* resume berjenis forward, jadi dibedakan lewat eksekusi yang dilanjutkan */}
+                {actionLabel(item.kind, item.resumes_execution_id !== null)} v{item.version} · {item.database}
               </h2>
               <span className="text-xs text-muted">
                 oleh {item.requested_by}, {new Date(item.requested_at).toLocaleString('id-ID')} · sebagai leader {item.group_name}
