@@ -41,6 +41,8 @@ export default function ExplainPage() {
   if (db.isLoading) return <Loading />
   if (!db.data) return <ErrorMessage error={db.error} />
   const database = db.data.database
+  // migration hanya berjalan di PostgreSQL, jadi draft untuk DBMS lain tidak ditawarkan
+  const canSaveDraft = database.dbms === 'postgres'
   const invalid = save.error instanceof ApiError && save.error.status === 422 ? save.error : null
   // error nama tampil di bawah isiannya, sisanya jadi pesan di bawah form
   let saveError: unknown = save.error
@@ -93,27 +95,31 @@ export default function ExplainPage() {
               ANALYZE benar-benar menjalankan statement untuk mengukur waktu nyata, lalu selalu di-rollback.
             </span>
           </div>
-          <Field
-            label="Nama migration"
-            error={invalid?.fields.name}
-            hint="Hanya diperlukan kalau statement ini mau disimpan sebagai migration."
-          >
-            <input className="input" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
-          </Field>
+          {canSaveDraft && (
+            <Field
+              label="Nama migration"
+              error={invalid?.fields.name}
+              hint="Hanya diperlukan kalau statement ini mau disimpan sebagai migration."
+            >
+              <input className="input" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
+            </Field>
+          )}
           <div className="flex flex-wrap gap-2.5">
             <button type="submit" className="btn-primary" disabled={explain.isPending || !sql.trim()}>
               <Icon name="bolt" />
               {explain.isPending ? 'Menganalisis…' : 'Analisis plan'}
             </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={save.isPending || !sql.trim()}
-              onClick={() => save.mutate()}
-            >
-              <Icon name="plus" />
-              {save.isPending ? 'Menyimpan…' : 'Simpan sebagai draft'}
-            </button>
+            {canSaveDraft && (
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={save.isPending || !sql.trim()}
+                onClick={() => save.mutate()}
+              >
+                <Icon name="plus" />
+                {save.isPending ? 'Menyimpan…' : 'Simpan sebagai draft'}
+              </button>
+            )}
           </div>
         </form>
       )}
